@@ -4,6 +4,8 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
 
 def test_monitor_reads_spend_and_reports_failed_health(tmp_path, monkeypatch):
     spec = importlib.util.spec_from_file_location(
@@ -22,6 +24,7 @@ def test_monitor_reads_spend_and_reports_failed_health(tmp_path, monkeypatch):
         )
     monkeypatch.setattr(monitor.subprocess, "run", Mock(return_value=Mock(returncode=0)))
     values = monitor.measurements(tmp_path)
+    assert values["outbox_oldest_age_seconds"] == 1e12
     assert values["healthy"] == 1
     assert values["daily_model_spend_ratio"] == 0.8
     assert 0 <= values["disk_used_ratio"] <= 1
@@ -29,3 +32,39 @@ def test_monitor_reads_spend_and_reports_failed_health(tmp_path, monkeypatch):
         monitor.subprocess, "run", Mock(side_effect=monitor.subprocess.TimeoutExpired("docker", 45))
     )
     assert monitor.measurements(tmp_path)["healthy"] == 0
+
+
+@pytest.mark.parametrize("state", ["empty", "stale", "missing", "corrupt", "invalid_timestamp"])
+def test_outbox_age_fails_closed_without_reading_event_contents(tmp_path, state):
+    spec = importlib.util.spec_from_file_location(
+        "always_on_monitor", Path(__file__).parents[1] / "deploy/always-on-monitor.py"
+    )
+    monitor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(monitor)
+    database = tmp_path / "outbox.sqlite"
+    if state == "corrupt":
+        database.write_bytes(b"not a database")
+    elif state != "missing":
+        with sqlite3.connect(database) as db:
+            db.execute("CREATE TABLE outbox(id,body)")
+            if state != "empty":
+                timestamp = (
+                    (monitor.dt.datetime.now(monitor.dt.UTC) - monitor.dt.timedelta(seconds=900)).isoformat()
+                    if state == "stale"
+                    else "bad"
+                )
+                db.execute("INSERT INTO outbox VALUES (?,?)", ("event", json.dumps({"at": timestamp})))
+                if state == "stale":
+                    db.execute(
+                        "INSERT INTO outbox VALUES (?,?)",
+                        ("newer", json.dumps({"at": monitor.dt.datetime.now(monitor.dt.UTC).isoformat()})),
+                    )
+    age = monitor.outbox_oldest_age(database)
+    if state == "empty":
+        assert age == 0
+    elif state == "stale":
+        assert 899 <= age <= 905
+    else:
+        assert age == 1e12
+    if state == "missing":
+        assert not database.exists()

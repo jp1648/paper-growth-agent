@@ -21,6 +21,24 @@ def metadata(path):
         return response.read().decode()
 
 
+def outbox_oldest_age(database):
+    try:
+        with sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=5) as db:
+            oldest, total, valid = db.execute(
+                "SELECT min(julianday(json_extract(body,'$.at'))), count(*), "
+                "count(julianday(json_extract(body,'$.at'))) FROM outbox"
+            ).fetchone()
+        if total != valid:
+            return 1e12
+        if not total:
+            return 0.0
+        now = dt.datetime.now(dt.UTC).timestamp()
+        return max(0.0, now - (oldest - 2440587.5) * 86400)
+    except (OSError, sqlite3.Error):
+        # Unknown export state must exceed the staleness alert threshold.
+        return 1e12
+
+
 def measurements(root=ROOT):
     with (root / "config.toml").open("rb") as handle:
         config = tomllib.load(handle)
@@ -50,6 +68,7 @@ def measurements(root=ROOT):
     database = pathlib.Path(config.get("database", "state/ledger.sqlite"))
     if not database.is_absolute():
         database = root / database
+    values["outbox_oldest_age_seconds"] = outbox_oldest_age(database.parent / "telemetry-outbox.sqlite")
     day = dt.datetime.now(ZoneInfo("America/New_York")).date().isoformat()
     with sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=5) as db:
         used = db.execute(
@@ -86,7 +105,7 @@ def main():
     )
     with urllib.request.urlopen(request, timeout=15):
         pass
-    print("Health, disk and estimated model spending metrics published")
+    print("Health, disk, outbox and estimated model spending metrics published")
     return 0 if values["healthy"] else 1
 
 
