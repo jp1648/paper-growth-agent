@@ -606,3 +606,133 @@ def test_specialist_tool_allowance_stops_retrieval_and_preserves_budget():
     assert len(calls) == 10 and budget.tools == 10
     assert "missing evidence" in reply.content
     assert reply.tool_call_id == "source-call"
+
+
+def test_lead_browsing_cannot_spend_required_specialist_slots():
+    from types import SimpleNamespace
+
+    from trader.research_team import ROLES, Guard
+
+    budget = Budget(Settings())
+    reports = {}
+    lead = Guard(budget, "research_lead", {"read_source", "task"}, reports)
+    source = SimpleNamespace(tool_call={"name": "read_source", "id": "source"})
+    called = []
+    for _ in range(30):
+        lead.wrap_tool_call(source, lambda request: called.append(request))
+    assert len(called) == 4
+    for role in ROLES:
+        request = SimpleNamespace(tool_call={"name": "task", "id": role, "args": {"subagent_type": role}})
+
+        def specialist(request, role=role):
+            guard = Guard(budget, role, {"read_source"})
+            for _ in range(10):
+                guard.wrap_tool_call(source, lambda request: None)
+            reports[role] = {"evidence_ids": ["known-source"]}
+
+        lead.wrap_tool_call(request, specialist)
+        lead.wrap_tool_call(
+            request, lambda request: pytest.fail("Repeated delegation must reuse saved report")
+        )
+    assert set(reports) == set(ROLES)
+    assert budget.tools == 48 and not budget.failed
+
+
+def test_lead_prerequisites_and_permissions_do_not_disappear_at_quota():
+    from types import SimpleNamespace
+
+    from trader.research_team import Guard
+
+    budget = Budget(Settings())
+    lead = Guard(budget, "research_lead", {"task", "read_source"})
+    request = SimpleNamespace(tool_call={"name": "task", "id": "v", "args": {"subagent_type": "valuation"}})
+    reply = lead.wrap_tool_call(request, lambda request: pytest.fail("Prerequisites missing"))
+    assert "business" in reply.content and budget.tools == 0
+    lead.tool_calls = lead.lead_allowance
+    forbidden = SimpleNamespace(tool_call={"name": "execute", "id": "bad"})
+    with pytest.raises(ResearchLimit, match="permissions"):
+        lead.wrap_tool_call(forbidden, lambda request: None)
+
+
+def test_premature_and_concurrent_delegation_keep_reserved_slot_available():
+    from types import SimpleNamespace
+
+    from trader.research_team import Guard
+
+    budget = Budget(Settings())
+    reports = {}
+    lead = Guard(budget, "research_lead", {"task"}, reports)
+    request = SimpleNamespace(
+        tool_call={"name": "task", "id": "valuation", "args": {"subagent_type": "valuation"}}
+    )
+    lead.wrap_tool_call(request, lambda request: pytest.fail("Premature valuation"))
+    reports.update(business={}, catalysts={})
+
+    def running(request):
+        reply = lead.wrap_tool_call(request, lambda request: pytest.fail("Duplicate active worker"))
+        assert "valuation" in reply.content
+        reports["valuation"] = {"calculation_id": "calculation-example"}
+
+    lead.wrap_tool_call(request, running)
+    assert budget.tools == 1
+    assert not lead.running_tasks
+    assert (
+        "calculation-example"
+        in lead.wrap_tool_call(request, lambda request: pytest.fail("Already complete")).content
+    )
+
+
+def test_full_graph_reserves_all_specialists_after_exhaustive_lead_browsing(env, decision):
+    class ExhaustiveModel(TeamModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            schema = kwargs["response_format"]["json_schema"]["name"]
+            padding = {"Decision": 4, "Research": 8, "Catalysts": 10, "Valuation": 9, "Critique": 10}
+            padded = any(
+                isinstance(message, AIMessage)
+                and any(call["id"].startswith("padding-") for call in message.tool_calls)
+                for message in messages
+            )
+            names = {tool.get("name") if isinstance(tool, dict) else tool.name for tool in kwargs["tools"]}
+            if not padded:
+                assert "company_evidence" in names
+                message = AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "company_evidence",
+                            "args": {"symbol": "ACME"},
+                            "id": f"padding-{schema}-{index}",
+                            "type": "tool_call",
+                        }
+                        for index in range(padding[schema])
+                    ],
+                )
+                message.usage_metadata = {"input_tokens": 100, "output_tokens": 100, "total_tokens": 200}
+                return ChatResult(generations=[ChatGeneration(message=message)])
+            if schema == "Decision":
+                assert names == {"task"}, "Lead browsing must stop while mandatory delegation stays available"
+            messages = [
+                message
+                for message in messages
+                if not (
+                    isinstance(message, AIMessage)
+                    and any(call["id"].startswith("padding-") for call in message.tool_calls)
+                )
+                and not (isinstance(message, ToolMessage) and message.tool_call_id.startswith("padding-"))
+            ]
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    service, broker, _ = env
+    service.cfg.input_cost_per_million = dec("1")
+    service.cfg.output_cost_per_million = dec("1")
+    service.cfg.research_max_model_calls = 40
+    proposal = decision.model_copy(update={"evidence_ids": ["fixture-sec"]})
+    model = ExhaustiveModel(decision=proposal.model_dump(mode="json"))
+    worker = DeepResearchTeam(service.cfg, service.store, Evidence(), model)
+    result = build_graph(service, worker).invoke({"symbol": "ACME", "run_key": "exhaustive-lead"})
+    assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
+    assert result["calculations"]
+    assert result["execution"]["status"] == "submitted"
+    assert broker.submits == 1
+    audit = service.store.get("exhaustive-lead", "research_audit")
+    assert audit["tool_calls"] == 48 and not audit["stopped"]

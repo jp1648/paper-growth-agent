@@ -185,9 +185,18 @@ class NoHiddenSummaries(AgentMiddleware):
 
 
 class Guard(AgentMiddleware):
-    def __init__(self, budget, role, allowed):
+    def __init__(self, budget, role, allowed, reports=None):
         self.budget, self.role, self.allowed = budget, role, allowed
+        self.reports = reports if reports is not None else {}
         self.tool_calls = 0
+        self.running_tasks = set()
+        # Reserve one delegation per role before dividing the shared pool.
+        self.specialist_allowance = min(
+            10, max(0, (budget.cfg.research_max_tool_calls - len(ROLES)) // len(ROLES))
+        )
+        self.lead_allowance = max(
+            0, budget.cfg.research_max_tool_calls - len(ROLES) * (1 + self.specialist_allowance)
+        )
 
     @staticmethod
     def bounded_messages(messages):
@@ -217,8 +226,10 @@ class Guard(AgentMiddleware):
         tools = [
             t for t in request.tools if (t.get("name") if isinstance(t, dict) else t.name) in self.allowed
         ]
-        if self.role != "research_lead" and self.tool_calls >= 10:
+        if self.role != "research_lead" and self.tool_calls >= self.specialist_allowance:
             tools = []
+        elif self.role == "research_lead" and self.tool_calls >= self.lead_allowance:
+            tools = [t for t in tools if (t.get("name") if isinstance(t, dict) else t.name) == "task"]
         payload = {
             "messages": [m.model_dump() for m in messages],
             "system": request.system_message.model_dump() if request.system_message else None,
@@ -330,18 +341,52 @@ class Guard(AgentMiddleware):
 
     @traced("tool.call", inputs=lambda self, request, handler: {"role": self.role, "tool": request.tool_call})
     def wrap_tool_call(self, request, handler):
-        with self.budget.lock:
-            if self.role != "research_lead" and self.tool_calls >= 10:
-                return ToolMessage(
-                    content="Specialist tool allowance exhausted. Return your structured report now, stating unverified assumptions and missing evidence. Do not invent facts or valuations.",
-                    tool_call_id=request.tool_call["id"],
-                )
-            self.tool_calls += 1
-        self.budget.tool()
-        if request.tool_call["name"] not in self.allowed:
+        name = request.tool_call["name"]
+        if name not in self.allowed:
             self.budget.failed = True
             raise ResearchLimit("Tool outside research role permissions")
-        return handler(request)
+        delegated = None
+        with self.budget.lock:
+            if self.role == "research_lead" and name == "task":
+                delegated = request.tool_call.get("args", {}).get("subagent_type")
+                if delegated not in ROLES:
+                    self.budget.failed = True
+                    raise ResearchLimit("Unknown research specialist")
+                if delegated in self.reports:
+                    return ToolMessage(
+                        content=dumps(self.reports[delegated]), tool_call_id=request.tool_call["id"]
+                    )
+                prerequisites = {
+                    "valuation": {"business", "catalysts"},
+                    "adversarial": {"business", "catalysts", "valuation"},
+                }.get(delegated, set())
+                missing = prerequisites - self.reports.keys()
+                if missing or delegated in self.running_tasks:
+                    return ToolMessage(
+                        content="Await prerequisite specialists: "
+                        + ", ".join(sorted(missing or {delegated})),
+                        tool_call_id=request.tool_call["id"],
+                    )
+                self.running_tasks.add(delegated)
+            else:
+                allowance = self.lead_allowance if self.role == "research_lead" else self.specialist_allowance
+                if self.tool_calls >= allowance:
+                    return ToolMessage(
+                        content=(
+                            "Lead source/planning allowance exhausted. Delegate the remaining required specialists, then return your decision."
+                            if self.role == "research_lead"
+                            else "Specialist tool allowance exhausted. Return your structured report now, stating unverified assumptions and missing evidence. Do not invent facts or valuations."
+                        ),
+                        tool_call_id=request.tool_call["id"],
+                    )
+                self.tool_calls += 1
+        try:
+            self.budget.tool()
+            return handler(request)
+        finally:
+            if delegated is not None:
+                with self.budget.lock:
+                    self.running_tasks.discard(delegated)
 
 
 class ResearchDesk:
@@ -584,7 +629,7 @@ class ResearchDesk:
                 delegation,
                 NoHiddenSummaries(),
                 TodoListMiddleware(),
-                Guard(self.budget, role, allowed),
+                Guard(self.budget, role, allowed, self.reports),
             ],
         )
 
@@ -674,7 +719,7 @@ class ResearchDesk:
             "Delegate to business and catalysts first (they may run concurrently), then valuation, then "
             "adversarial. For targeted news review, call catalysts first; unchanged fresh business/valuation "
             "reports may be reused by the system. All four reports must exist before your final decision. "
-            "Use tools to inspect evidence gaps. Compare with existing holdings and cash, resolve conflicts, "
+            "You have a bounded auxiliary planning/source allowance; reserve delegation for all four specialists. Delegate evidence gaps rather than browsing exhaustively yourself. Compare with existing holdings and cash, resolve conflicts, "
             "then propose BUY/ADD/HOLD/REDUCE/SELL/WATCH. The critique is mandatory. Use quantity zero for "
             "HOLD/WATCH and whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "
             "invalidation conditions and a future review date. An unresolved material gap blocks BUY/ADD.",
