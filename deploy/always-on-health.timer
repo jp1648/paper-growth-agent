@@ -1,0 +1,7 @@
+[Unit]
+Description=Check trader health each minute
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1min
+[Install]
+WantedBy=timers.target

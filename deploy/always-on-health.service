@@ -1,0 +1,8 @@
+[Unit]
+Description=Check trader health without research or orders
+After=always-on.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 @TRADER_ROOT@/deploy/always-on-monitor.py
+TimeoutStartSec=90

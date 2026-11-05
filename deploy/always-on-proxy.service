@@ -1,0 +1,25 @@
+[Unit]
+Description=Cloud SQL proxy using VM service account
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=@TRADER_ROOT@
+
+[Service]
+User=paper-agent
+Group=paper-agent
+EnvironmentFile=/etc/always-on.env
+ExecStart=/usr/local/bin/cloud-sql-proxy --unix-socket /run/trader-cloudsql ${CLOUD_SQL_INSTANCE}
+Restart=on-failure
+RestartSec=10
+RuntimeDirectory=trader-cloudsql
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=restart
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/trader-cloudsql
+
+[Install]
+WantedBy=multi-user.target
