@@ -1,0 +1,137 @@
+from datetime import timedelta
+
+import httpx
+import pytest
+from conftest import AT
+
+from trader.alpaca import AlpacaBroker, AlpacaData
+from trader.config import Settings
+from trader.models import D
+
+
+@pytest.fixture
+def keys(monkeypatch):
+    monkeypatch.setenv("ALPACA_PAPER_API_KEY", "fixture-key")
+    monkeypatch.setenv("ALPACA_PAPER_SECRET_KEY", "fixture-secret")
+
+
+def test_broker_hardcodes_paper_and_preserves_decimals(keys):
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        return httpx.Response(200, text='{"cash":"100000.01","numeric":0.1234567890123456789}')
+
+    broker = AlpacaBroker(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    assert broker.account()["numeric"] == D("0.1234567890123456789")
+    assert str(seen[0].url) == "https://paper-api.alpaca.markets/v2/account"
+    assert seen[0].headers["APCA-API-KEY-ID"] == "fixture-key"
+
+
+def test_no_redirect_to_live(keys):
+    def handler(req):
+        return httpx.Response(307, headers={"Location": "https://api.alpaca.markets/v2/account"})
+
+    broker = AlpacaBroker(
+        Settings(), httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        broker.account()
+
+
+def test_activity_pagination_and_lookup404(keys):
+    requests = []
+
+    def handler(req):
+        requests.append(req)
+        path = req.url.path
+        if path.endswith("activities"):
+            if "page_token" not in req.url.params:
+                return httpx.Response(200, json=[{"id": str(i)} for i in range(100)])
+            assert req.url.params["page_token"] == "99"
+            return httpx.Response(200, json=[{"id": "100"}])
+        if path.endswith("by_client_order_id"):
+            return httpx.Response(404)
+        if path.endswith("account"):
+            return httpx.Response(200, json={"id": "fixture"})
+        return httpx.Response(200, json=[])
+
+    broker = AlpacaBroker(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    snap = broker.snapshot(AT.isoformat(), ["unknown"])
+    assert len(snap.activities) == 101
+    assert broker.lookup("unknown") is None
+
+
+@pytest.mark.parametrize("feed,coverage", [("iex", "IEX exchange only"), ("sip", "US consolidated SIP")])
+def test_feed_metadata_and_halt_feed(keys, monkeypatch, feed, coverage):
+    monkeypatch.setattr("trader.alpaca.now", lambda: AT)
+    halt_xml = f"""<rss xmlns:n="http://www.nasdaqtrader.com/"><channel><title>NASDAQTrader.com</title>
+    <pubDate>{AT.strftime("%a, %d %b %Y %H:%M:%S GMT")}</pubDate><n:numItems>1</n:numItems>
+    <item><n:IssueSymbol>HALT</n:IssueSymbol><n:ResumptionDate/><n:ResumptionTradeTime/></item></channel></rss>"""
+
+    def handler(req):
+        if req.url.host == "www.nasdaqtrader.com":
+            return httpx.Response(200, text=halt_xml)
+        assert req.url.params["feed"] == feed
+        return httpx.Response(200, json={"quote": {"bp": 99.99, "ap": 100, "t": AT.isoformat()}})
+
+    data = AlpacaData(Settings(feed=feed), httpx.Client(transport=httpx.MockTransport(handler)))
+    quote = data.quote("ACME")
+    assert quote.coverage == coverage
+    assert quote.feed == feed
+    assert quote.delayed is False
+    assert quote.halted is False
+    assert data.quote("HALT").halted is True
+    monkeypatch.setattr("trader.alpaca.now", lambda: AT + timedelta(minutes=5))
+    assert data.quote("ACME").halted is None
+
+
+def test_regular_session_close_excludes_extended_hours(keys):
+    def handler(req):
+        assert req.url.params["timeframe"] == "1Min"
+        assert req.url.params["adjustment"] == "split"
+        assert req.url.params["feed"] == "iex"
+        return httpx.Response(
+            200,
+            json={
+                "bars": [{"t": "2026-10-21T19:59:00Z", "c": 100}, {"t": "2026-10-21T20:00:00Z", "c": 200}],
+                "next_page_token": None,
+            },
+        )
+
+    data = AlpacaData(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    assert data.session_close("ACME", {"date": "2026-10-21", "open": "09:30", "close": "16:00"}) == D(100)
+
+
+def test_sip_entitlement_failure_does_not_fall_back(keys):
+    requests = []
+
+    def handler(req):
+        requests.append(req)
+        assert req.url.params["feed"] == "sip"
+        return httpx.Response(403, json={"message": "subscription does not permit querying recent SIP data"})
+
+    data = AlpacaData(Settings(feed="sip"), httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(httpx.HTTPStatusError):
+        data.quote("ACME")
+    assert len(requests) == 1
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://data.sec.gov/api",
+        "https://data.sec.gov.attacker.test/api",
+        "https://user:secret@www.sec.gov/Archives/a",
+        "https://127.0.0.1/",
+        "https://www.sec.gov:8443/Archives/a",
+        "file:///etc/passwd",
+    ],
+)
+def test_sec_rejects_untrusted_origin_before_network(url):
+    from trader.evidence import EvidenceProvider
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda req: pytest.fail("Unexpected request")))
+    provider = EvidenceProvider(Settings(sec_user_agent="Test contact@example.org"), None, None, client)
+    with pytest.raises(ValueError, match="SEC evidence URLs"):
+        provider.request(url)

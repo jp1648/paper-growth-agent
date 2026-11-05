@@ -1,0 +1,35 @@
+[project]
+name = "paper-growth-agent"
+version = "0.1.0"
+description = "Broker-authoritative, cash-only active paper investing"
+requires-python = ">=3.12"
+dependencies = [
+    "deepagents>=0.7.32,<0.8",
+    "httpx>=0.28,<1",
+    "langchain-openai>=1.7.3,<2",
+    "langgraph>=1.0,<2",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic>=2.10,<3",
+    "websockets>=15,<17",
+]
+
+[project.scripts]
+paper-agent = "trader.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["trader"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["paper: opt-in network test that submits an actual simulated order"]
+
+[tool.ruff]
+line-length = 110
+extend-exclude = ["state"]

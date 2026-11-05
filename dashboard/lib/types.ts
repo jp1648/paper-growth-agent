@@ -1,0 +1,57 @@
+export type Amount = string | number | null;
+export interface EquitySample {
+  date: string;
+  equity: Amount;
+}
+export interface ResearchRun {
+  id: string;
+  status: "accepted" | "failed" | "incomplete";
+  decision: Record<string, unknown> | null;
+  reports: Record<string, unknown>;
+  calculations: Record<string, unknown>;
+  cost: Amount;
+  model_calls: number;
+  tool_calls: number;
+  sources: { id: string; title?: string; type?: string; url?: string }[];
+}
+export interface TraceEvent {
+  at: string;
+  name: string;
+  phase: string;
+  span_id: string | null;
+  parent_span_id: string | null;
+  detail: string;
+  truncated: boolean;
+}
+export interface Snapshot {
+  generated_at: string;
+  portfolio: {
+    as_of: string;
+    kill_switch: boolean;
+    reconciliation: { ok: boolean } | null;
+    equity: Amount;
+    total_pnl: Amount;
+    cash: Amount;
+    model_cost_usd_estimate: Amount;
+    market_data: { coverage: string };
+    limitations: string[];
+    risk_reviews: string[];
+  };
+  runs: ResearchRun[];
+  daily: { daily_equity: EquitySample[]; missing_sessions: string[] }[];
+  positions: {
+    symbol: string;
+    qty: Amount;
+    avg_entry_price: Amount;
+    market_value: Amount;
+    unrealized_pl: Amount;
+  }[];
+  open_orders: unknown[];
+  research_cost_known_usd: Amount;
+  research_cost_unknown_calls: number;
+  coverage: string;
+}
+export interface OverviewData {
+  snapshot: Snapshot | null;
+  at: string | null;
+}

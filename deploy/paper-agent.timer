@@ -1,0 +1,10 @@
+[Unit]
+Description=Wake deterministic paper-investing checks each minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=false
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

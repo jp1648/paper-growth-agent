@@ -1,0 +1,12 @@
+[Unit]
+Description=Finite paper investing tick
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/paper-agent
+EnvironmentFile=/etc/paper-agent.env
+ExecStart=/opt/paper-agent/.venv/bin/paper-agent --config /opt/paper-agent/config.toml tick
+TimeoutStartSec=1800
+User=paper-agent
+UMask=0077

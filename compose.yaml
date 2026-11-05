@@ -1,0 +1,83 @@
+name: paper-growth-agent
+services:
+  agent:
+    build: .
+    restart: unless-stopped
+    init: true
+    cpus: 2
+    mem_limit: 2g
+    pids_limit: 128
+    user: "${TRADER_UID:?Use deploy/container.sh}:${TRADER_GID:?Use deploy/container.sh}"
+    # Preserve the existing absolute ledger binding; run Compose from the repository root.
+    working_dir: "${PWD:?Run Compose from the repository root}"
+    environment:
+      HOME: "${HOME:?Set the host home directory}"
+    secrets:
+      - trader_env
+    volumes:
+      - type: bind
+        source: ./config.toml
+        target: /run/config.toml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./state
+        target: "${PWD}/state"
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${HOME}/.local/state/paper-growth-agent"
+        target: "${HOME}/.local/state/paper-growth-agent"
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "/opt/venv/bin/python", "-m", "trader.health", "--config", "/run/config.toml"]
+      interval: 60s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  postgres:
+    image: paper-growth-agent-postgres:security-20261103
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: observability
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD_FILE: /run/secrets/observability_password
+    secrets:
+      - observability_password
+    volumes:
+      - observability_pg:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trader -d observability"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  observability_pg:
+secrets:
+  observability_password:
+    file: ./state/observability/postgres-password
+  trader_env:
+    file: ./.env

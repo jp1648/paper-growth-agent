@@ -1,0 +1,15 @@
+[Unit]
+Description=Paper order, quote and news listeners (no continuously running LLM)
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/paper-agent
+EnvironmentFile=/etc/paper-agent.env
+ExecStart=/opt/paper-agent/.venv/bin/paper-agent --config /opt/paper-agent/config.toml listen
+Restart=on-failure
+RestartSec=30
+User=paper-agent
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

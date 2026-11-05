@@ -1,0 +1,67 @@
+x_enabled = false
+x_daily_calls = 6 # At most 60 returned posts/day, separate from model budget
+x_cache_hours = 4
+# Engineering defaults, not optimized investment parameters.
+broker_url = "https://paper-api.alpaca.markets"
+database = "state/ledger.sqlite"
+initial_capital = "100000"
+experiment_weeks = 12
+max_position = "0.10"
+max_sector = "0.40"
+max_positions = 10
+turnover_30d = "1.0" # Gross filled + pending notional / current equity over 30 days
+cooldown_hours = 24
+price_tolerance = "0.005"
+fee_buffer = "1"
+quote_max_age_seconds = 60
+halt_max_age_seconds = 180
+order_ttl_minutes = 30
+time_in_force = "day"
+feed = "iex" # Free real-time IEX venue data for US stocks; optional "sip" needs consolidated-data entitlement.
+poll_seconds = 60
+trigger_minutes = 15
+research_cache_hours = 12
+flovia_x_enabled = false
+flovia_x_daily_calls = 6 # Total X search attempts per UTC day
+flovia_x_cache_hours = 4
+event_debounce_minutes = 15
+price_trigger = "0.05"
+preopen_minutes = 45
+model = "gpt-6.1-sol" # Default: business, valuation, and adversarial research.
+reasoning_effort = "medium"
+# Shared limits across the lead and all four specialists, per research run.
+research_max_model_calls = 24
+research_max_tool_calls = 48
+research_max_seconds = 600
+research_max_input_bytes = 180000
+research_max_output_tokens = 3000
+research_max_cost_usd = "5" # Estimated ceiling, not a spending target or billing guarantee.
+research_daily_cost_usd = "10" # Shared across runs/restarts; New York date when each run starts.
+sec_user_agent = "" # Your application name and contact email, as required by SEC.
+# Standard short-context USD / million tokens, checked 2026-10-28; verify before running.
+input_cost_per_million = "2"
+output_cost_per_million = "10"
+
+[role_models.research_lead]
+model = "gpt-6-astra" # Planning, delegation, and final synthesis.
+reasoning_effort = "high"
+input_cost_per_million = "10"
+output_cost_per_million = "50"
+
+[role_models.catalysts]
+model = "gpt-6.1-terra" # Focused news/event review; deeper analysis remains with Sol/Astra.
+reasoning_effort = "low"
+input_cost_per_million = "1"
+output_cost_per_million = "5"
+
+# Operator-verified stock universe and sectors. Research ranks this list; these are examples,
+# not recommendations. Add more US-listed common stocks with SEC CIK and sector before running.
+[universe.AAPL]
+sector = "Information Technology"
+cik = "320193"
+[universe.MSFT]
+sector = "Information Technology"
+cik = "789019"
+[universe.AMZN]
+sector = "Consumer Discretionary"
+cik = "1018724"

@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.env
+state/
+*.sqlite*
+config.toml
+
+# Credentials and generated/runtime artifacts at any depth
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.log
+*.sql.gz
+*.tsbuildinfo
+.DS_Store
+node_modules/
+.next/
+out/
+.vercel/
+test-results/
+playwright-report/
+coverage/
