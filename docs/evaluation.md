@@ -187,7 +187,35 @@ Prior thesis source bodies are not copied into every new prompt. They remain in
 the saved thesis and are loaded when reports are reused; historical evidence IDs
 are explicitly distinguished from current verified evidence. The prior decision,
 reports and valuation remain available for comparison.
+Prior execution records similarly retain only status, reasons, timestamps and
+order identifiers in prompts; their full evidence remains in the ledger. An
+offline check against the actual post-execution state reduced prior-context size
+from 912,645 to 25,233 bytes without modifying that state.
 
 Offline verification: 261 tests passed, three external opt-in checks skipped.
 This does not change historical cohort scores or make a recovery-only success
 proof that an ordinary full investigation completes within budget.
+
+### Ordinary paper operation verified, November 6
+
+`normal-graph-20261106-aapl-5` completed a fresh ordinary investigation with all
+four specialists and final synthesis, without `--finalize-from`. It used 38 model
+calls and cost an estimated $3.822670 within the $5 run ceiling. The final handoff
+was 101,196 bytes. The decision was HOLD the existing one-share paper position,
+quantity zero; current intrinsic-value targets were withheld because material
+normalization and valuation gaps remained. This is a completed abstention from
+adding exposure, not a successful sufficient-evidence valuation benchmark.
+
+The normal intraday runner subsequently consumed the deferred result with current
+execution checks and returned `no_order`. The listener was explicitly resumed for
+the user-authorized paper pilot. Reconciliation and password-protected dashboard
+access were verified, and the earlier one-share broker fill and Telegram receipt
+remain the execution/notification evidence. No additional order was forced.
+
+The regular $6 daily model allowance was restored immediately after validation;
+the obsolete midnight restoration timer was disabled. November 6's charged or
+reserved model total was $28.315769, including the conservative unknown baseline
+charge, within the temporary $30 validation ceiling. Further new research that
+day is budget-blocked; monitoring and reconciliation continue. Original cohort
+scores remain unchanged: the quality target is unmet and no profitable edge or
+independent human semantic approval is claimed.

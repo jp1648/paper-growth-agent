@@ -478,6 +478,12 @@ class ResearchDesk:
             self.context = copy.deepcopy(context)
             prior_prompt = self.context["portfolio"]["prior_thesis"]
             prior_prompt.pop("research_sources", None)
+            if "execution" in prior_prompt:
+                prior_prompt["execution"] = {
+                    key: value
+                    for key, value in prior_prompt["execution"].items()
+                    if key in {"status", "reasons", "reason", "at", "client_order_id", "order_id"}
+                }
             prior_prompt["evidence_note"] = (
                 "Prior thesis evidence IDs are historical references, not current verified evidence. "
                 "Original sources remain in the saved thesis and are loaded when reports are reused; "

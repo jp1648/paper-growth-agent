@@ -602,7 +602,11 @@ def test_context_shortens_only_old_source_results_without_mutating_history():
 
 
 def test_prior_source_bodies_are_not_repeated_in_every_prompt():
-    prior = {"research_sources": [{"id": "old", "content": "x" * 200000}], "decision": {"action": "WATCH"}}
+    prior = {
+        "research_sources": [{"id": "old", "content": "x" * 200000}],
+        "decision": {"action": "WATCH"},
+        "execution": {"status": "no_order", "reasons": [], "evidence": "x" * 200000},
+    }
     context = {"symbol": "ACME", "portfolio": {"prior_thesis": prior}}
     cfg = Settings()
     desk = ResearchDesk(cfg, Evidence(), context, Evidence().get("ACME"), Budget(cfg), None)
@@ -610,6 +614,8 @@ def test_prior_source_bodies_are_not_repeated_in_every_prompt():
     assert len(prior["research_sources"][0]["content"]) == 200000
     assert "research_sources" not in desk.context["portfolio"]["prior_thesis"]
     assert desk.context["portfolio"]["prior_thesis"]["decision"] == prior["decision"]
+    assert desk.context["portfolio"]["prior_thesis"]["execution"] == {"status": "no_order", "reasons": []}
+    assert len(prior["execution"]["evidence"]) == 200000
     assert "not current verified evidence" in desk.context["portfolio"]["prior_thesis"]["evidence_note"]
 
 
