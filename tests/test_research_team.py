@@ -103,7 +103,15 @@ class TeamModel(BaseChatModel):
                 if context["targeted_news_review"]
                 else ["parallel", "valuation", "adversarial"]
             )
-            if not self.omit_specialists and len(prior) < len(roles) and roles[len(prior)] == "parallel":
+            if context.get("reports") and set(context["reports"]) == {
+                "business",
+                "catalysts",
+                "valuation",
+                "adversarial",
+            }:
+                assert not names
+                msg = AIMessage(content=json.dumps(self.decision))
+            elif not self.omit_specialists and len(prior) < len(roles) and roles[len(prior)] == "parallel":
                 msg = AIMessage(
                     content="",
                     tool_calls=[
@@ -593,6 +601,18 @@ def test_context_shortens_only_old_source_results_without_mutating_history():
     assert "Re-read the original" in result[0].content
 
 
+def test_prior_source_bodies_are_not_repeated_in_every_prompt():
+    prior = {"research_sources": [{"id": "old", "content": "x" * 200000}], "decision": {"action": "WATCH"}}
+    context = {"symbol": "ACME", "portfolio": {"prior_thesis": prior}}
+    cfg = Settings()
+    desk = ResearchDesk(cfg, Evidence(), context, Evidence().get("ACME"), Budget(cfg), None)
+    assert desk.prior is prior and context["portfolio"]["prior_thesis"] is prior
+    assert len(prior["research_sources"][0]["content"]) == 200000
+    assert "research_sources" not in desk.context["portfolio"]["prior_thesis"]
+    assert desk.context["portfolio"]["prior_thesis"]["decision"] == prior["decision"]
+    assert "not current verified evidence" in desk.context["portfolio"]["prior_thesis"]["evidence_note"]
+
+
 def test_specialist_tool_allowance_stops_retrieval_and_preserves_budget():
     from types import SimpleNamespace
 
@@ -695,6 +715,13 @@ def test_full_graph_reserves_all_specialists_after_exhaustive_lead_browsing(env,
                 for message in messages
             )
             names = {tool.get("name") if isinstance(tool, dict) else tool.name for tool in kwargs["tools"]}
+            if schema == "Decision" and json.loads(messages[1].content).get("reports"):
+                context = json.loads(messages[1].content)
+                assert len(messages) == 2 and not names
+                assert set(context["report_times"]) == set(context["reports"])
+                assert context["calculations"] and context["quote"] and context["portfolio"]
+                assert context["reports"]["adversarial"]["evidence_ids"]
+                return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
             if not padded:
                 assert "company_evidence" in names
                 message = AIMessage(
@@ -1117,6 +1144,38 @@ def test_watch_has_no_forced_holding_period_but_trades_keep_positive_period(deci
             Decision.model_validate({**raw, "action": action, "holding_period_days": 0})
     with pytest.raises(ValueError):
         Decision.model_validate({**raw, "holding_period_days": -1})
+
+
+def test_compact_final_handoff_preserves_citation_repair(env, decision):
+    class RepairLead(TeamModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            if kwargs["response_format"]["json_schema"]["name"] == "Decision":
+                context = json.loads(messages[1].content)
+                if context.get("reports"):
+                    assert not kwargs["tools"]
+                    if len(messages) == 2:
+                        bad = self.decision | {"evidence_ids": ["invented-source"]}
+                        message = AIMessage(content=json.dumps(bad))
+                        message.usage_metadata = {
+                            "input_tokens": 100,
+                            "output_tokens": 100,
+                            "total_tokens": 200,
+                        }
+                        return ChatResult(generations=[ChatGeneration(message=message)])
+                    assert json.loads(messages[-2].content)["evidence_ids"] == ["invented-source"]
+                    assert json.loads(messages[-1].content)["rejected_ids"] == ["invented-source"]
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    service, _, _ = env
+    proposal = decision.model_dump(mode="json") | {"evidence_ids": ["fixture-sec"]}
+    service.cfg.input_cost_per_million = dec("1")
+    service.cfg.output_cost_per_million = dec("1")
+    worker = DeepResearchTeam(service.cfg, service.store, Evidence(), RepairLead(decision=proposal))
+    result = build_graph(service, worker).invoke(
+        {"symbol": "ACME", "run_key": "compact-repair", "research_only": True}
+    )
+    assert result["decision"]["evidence_ids"] == ["fixture-sec"]
+    assert len(service.store.events("research_citation_correction")) == 1
 
 
 def test_citation_correction_is_bounded_and_preserves_guards(decision):

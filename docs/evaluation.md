@@ -173,3 +173,21 @@ Finalization with `--defer-execution` preserves the review step before execution
 
 Verification after extending recovery to normal runs: 259 offline tests passed,
 three external opt-in checks skipped; Ruff and whitespace checks passed.
+
+### Normal final synthesis context
+
+Once all four specialists finish, the ordinary lead request replaces planning and
+delegation history with one context containing the portfolio, quote, completed
+reports and timestamps, deterministic calculations and source previews. Tools are
+disabled for that synthesis. Original messages and source bodies remain in the
+audit; this transformation changes only the provider request. Citation correction
+still retains the rejected decision and feedback, and all shared limits apply.
+
+Prior thesis source bodies are not copied into every new prompt. They remain in
+the saved thesis and are loaded when reports are reused; historical evidence IDs
+are explicitly distinguished from current verified evidence. The prior decision,
+reports and valuation remain available for comparison.
+
+Offline verification: 261 tests passed, three external opt-in checks skipped.
+This does not change historical cohort scores or make a recovery-only success
+proof that an ordinary full investigation completes within budget.

@@ -14,7 +14,7 @@ from deepagents.middleware.subagents import SubAgentMiddleware
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, TodoListMiddleware
 from langchain.agents.structured_output import ProviderStrategy
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
@@ -209,9 +209,10 @@ class NoHiddenSummaries(AgentMiddleware):
 
 
 class Guard(AgentMiddleware):
-    def __init__(self, budget, role, allowed, reports=None):
+    def __init__(self, budget, role, allowed, reports=None, final_context=None):
         self.budget, self.role, self.allowed = budget, role, allowed
         self.reports = reports if reports is not None else {}
+        self.final_context = final_context
         self.tool_calls = 0
         self.running_tasks = set()
         # Reserve one delegation per role before dividing the shared pool.
@@ -250,6 +251,12 @@ class Guard(AgentMiddleware):
         tools = [
             t for t in request.tools if (t.get("name") if isinstance(t, dict) else t.name) in self.allowed
         ]
+        if self.final_context and set(self.reports) == set(ROLES):
+            # Completed reports replace orchestration history only in the provider request.
+            messages = [HumanMessage(content=dumps(self.final_context()))]
+            if len(request.messages) > 1 and isinstance(request.messages[-1], HumanMessage):
+                messages.extend(request.messages[-2:])
+            tools = []
         if (
             not self.budget.unrestricted_research
             and self.role != "research_lead"
@@ -467,6 +474,15 @@ class ResearchDesk:
         self.reused = []
         self.running = set()
         self.prior = context["portfolio"].get("prior_thesis") or {}
+        if self.prior:
+            self.context = copy.deepcopy(context)
+            prior_prompt = self.context["portfolio"]["prior_thesis"]
+            prior_prompt.pop("research_sources", None)
+            prior_prompt["evidence_note"] = (
+                "Prior thesis evidence IDs are historical references, not current verified evidence. "
+                "Original sources remain in the saved thesis and are loaded when reports are reused; "
+                "otherwise retrieve current supporting evidence."
+            )
         times = self.prior.get("team_report_times", {})
         self.targeted = (
             context.get("trigger") == "new news evidence"
@@ -768,7 +784,13 @@ class ResearchDesk:
                 delegation,
                 NoHiddenSummaries(),
                 TodoListMiddleware(),
-                Guard(self.budget, role, allowed, self.reports),
+                Guard(
+                    self.budget,
+                    role,
+                    allowed,
+                    self.reports,
+                    self.final_context if role == "research_lead" else None,
+                ),
             ],
         )
 
@@ -889,6 +911,17 @@ class ResearchDesk:
         )
         return self.result(output)
 
+    def final_context(self):
+        return {
+            **self.context,
+            "reports": self.reports,
+            "report_times": self.report_times,
+            "calculations": self.calculations,
+            "evidence": self.source_previews(self.sources.values()),
+            "targeted_news_review": bool(self.targeted),
+            "instruction": "All four specialist reports are complete. Return the final Decision using these reports and their cited evidence. Preserve uncertainties and unresolved gaps; do not invent additional evidence.",
+        }
+
     def finalize(self, audit, report_times):
         if set(audit["reports"]) != set(ROLES):
             raise ValueError("Finalization requires all four completed reports")
@@ -924,15 +957,7 @@ class ResearchDesk:
                     "messages": [
                         {
                             "role": "user",
-                            "content": dumps(
-                                {
-                                    **self.context,
-                                    "reports": self.reports,
-                                    "report_times": report_times,
-                                    "calculations": self.calculations,
-                                    "evidence": self.source_previews(self.sources.values()),
-                                }
-                            ),
+                            "content": dumps(self.final_context()),
                         }
                     ]
                 },
