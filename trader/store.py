@@ -133,7 +133,30 @@ class Store:
         directory = self.path.parent / "backups"
         directory.mkdir(mode=0o700, exist_ok=True)
         destination = directory / ("ledger-" + now().date().isoformat() + ".sqlite")
-        if destination.exists():
+
+        def verify(path):
+            if path.is_symlink() or not path.is_file() or path.stat().st_mode & 0o077:
+                raise RuntimeError("Backup must be a private regular file")
+            with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as saved:
+                if saved.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                    raise RuntimeError("Backup integrity check failed")
+                row = saved.execute(
+                    "SELECT body FROM documents WHERE scope='global' AND kind='state' AND key='active'"
+                ).fetchone()
+                experiment = json.loads(row[0]) if row else None
+                if experiment != self.experiment:
+                    raise RuntimeError("Backup belongs to a different experiment; preserve and investigate")
+
+        def sync_directory():
+            fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+
+        if destination.exists() or destination.is_symlink():
+            verify(destination)
+            sync_directory()
             return destination
         fd, name = tempfile.mkstemp(prefix=".backup-", suffix=".sqlite", dir=directory)
         os.close(fd)
@@ -145,7 +168,11 @@ class Store:
                     raise RuntimeError("Backup integrity check failed")
                 # Publish one closed database, not a file depending on temporary WAL sidecars.
                 target.execute("PRAGMA journal_mode=DELETE")
+            verify(temporary)
+            with temporary.open("rb") as source:
+                os.fsync(source.fileno())
             os.replace(temporary, destination)
+            sync_directory()
         finally:
             temporary.unlink(missing_ok=True)
         return destination

@@ -534,3 +534,19 @@ operator attestation, not independent API verification of delivery.
   real exposure. No production broker mutation or paid model call occurred.
 - Nine selected safety mutations were caught; disabling loss-triggered buy
   cancellation caused four test failures. The unmodified mutation baseline passed.
+- Recovery audit found existing daily backups were returned without revalidation.
+  Reuse now requires a private non-symlink regular file, SQLite integrity and an
+  exact active-experiment match. Mismatches/corruption are retained for inspection,
+  never overwritten. New publication flushes the closed database before atomic
+  rename and its directory afterward. Flush failures propagate, clean temporary
+  files and preserve the source; post-rename failure retains the published copy
+  for verification on retry. This is not a physical power-loss/storage guarantee.
+- Restoring a snapshot from before an intent while the broker has since filled
+  that order now has explicit regression evidence: reconciliation and repeated
+  execution attempts both reject the unapproved fill; no order is repeated and
+  the pause, original experiment and retained post-backup source survive.
+- Full offline suite passed 490 tests with three integrations skipped. An added
+  broken-symlink case then passed the recovery suite. Ruff/whitespace checks pass.
+  Previous cancellation commit 91cf1bd passed remote CI run 42310499036. No new
+  code deployed and no broker mutations/models used. Cross-host fencing, actual
+  failover and restored-cloud-ledger reconciliation remain open requirements.
