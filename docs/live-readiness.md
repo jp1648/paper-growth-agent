@@ -550,3 +550,25 @@ operator attestation, not independent API verification of delivery.
   Previous cancellation commit 91cf1bd passed remote CI run 42310499036. No new
   code deployed and no broker mutations/models used. Cross-host fencing, actual
   failover and restored-cloud-ledger reconciliation remain open requirements.
+- Actual cloud recovery check at 2026-11-06T23:18:59Z found the published daily
+  backup predates a subsequently approved/finally filled paper order: the backup
+  had zero intents and rejected the broker fill as lacking an approved order.
+  Integrity alone therefore did not establish recovery readiness. A current-ledger
+  SQLite snapshot reconciled twice successfully with the same broker. No missing
+  intent was invented, imported or bypassed to make the old backup pass.
+- Preserved a new private recovery-20261106T231945Z.sqlite beside, not over, the
+  existing backup. The new file was made by SQLite's backup API, integrity-checked,
+  flushed and published without overwriting existing files. At 23:20:01Z a separate
+  scratch copy of that saved artifact reconciled twice against the actual paper
+  broker; its original experiment remained intact and its reservations were zero.
+  The preserved backup hash remained unchanged across verification.
+- Both checks used the deployed pinned image and isolated temporary ledgers and
+  control directories. A custom HTTP transport rejected all non-GET traffic and
+  all hosts except paper-api.alpaca.markets; no model/data/notification calls ran.
+  Original ledger, old backup, deployment and production pause were untouched.
+  Private response evidence is retained in ignored state/audit-20261106 files.
+- This verifies current paper-broker convergence of a specific saved cloud-host
+  artifact, not the pending code or a booted disaster-recovery host. The artifact
+  remains on the state disk; disk-loss/off-host recovery and cross-host fencing
+  remain unverified. The discovered backup recovery-point gap requires durable
+  pre-submission intent checkpoints/replication, not merely more frequent reports.
