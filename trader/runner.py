@@ -90,6 +90,12 @@ class Runner:
         self.service.cancel_expired()
         self.service.reconcile()
         self.store.backup()
+        try:
+            from .notifications import notify_fills
+
+            notify_fills(self.store)
+        except Exception as error:  # noqa: BLE001 - notification failure must not stop monitoring
+            self.store.log("telegram_notification_failed", {"error_type": type(error).__name__})
         # Dashboard export is optional and cannot interrupt cancellation/reconciliation.
         try:
             from .dashboard import publish_snapshot

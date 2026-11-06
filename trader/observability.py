@@ -29,7 +29,7 @@ LOG = logging.getLogger(__name__)
 CONTEXT = contextvars.ContextVar("trace", default=None)
 _sink = None
 SECRET = re.compile(
-    r"authorization|cookie|password|secret|api.?key|access.?token|refresh.?token|bearer.?token|dsn",
+    r"authorization|cookie|password|secret|api.?key|access.?token|refresh.?token|bearer.?token|bot.?token|dsn",
     re.IGNORECASE,
 )
 SCHEMA = """

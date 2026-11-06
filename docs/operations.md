@@ -106,3 +106,25 @@ Maintenance creates a SQLite-consistent backup once per UTC date under `state/ba
 To recover, stop the container and any other account process. Preserve the damaged database and its WAL/SHM files for investigation. Restore the verified backup to the **original absolute database path**, with the original control-directory account binding and pause flag, and do not run `init`. Start paused; reconcile with the broker before `resume`. A backup can predate an in-flight intent: an unknown external order/fill must pause the restored account. Never submit another trade to compensate for a missing record. Recover the newer journal or resolve with the broker; an old backup cannot prove that no order was submitted.
 
 The container has CPU, memory and process limits. The CLI prevents a second listener for the same account/control directory on the same OS. Health remains an operational reconciliation check, not a certificate that OpenAI, research quality, or all data feeds are ready. Unknown-cost API failures retain their reserved daily allowance; a budget reservation is not a confirmed provider charge.
+
+## Telegram fill alerts
+
+Set `TELEGRAM_BOT_TOKEN` and numeric `TELEGRAM_CHAT_ID` in the executor's private
+runtime environment. Create the bot with Telegram's BotFather and start its
+private chat before linking it. Never put either value in tracked configuration.
+The optional notifier activates on the first maintenance cycle with both values
+present and sends only broker `FILL` activities timestamped after activation.
+Each partial fill has its own activity ID and alert; an alert does not imply the
+whole order completed. Alerts identify paper trading explicitly.
+
+The existing ledger records `telegram_notification` delivery status by fill ID,
+including returned message IDs. Reconciliation and risk checks run before the
+notifier. Notification failures cannot authorize or submit trades.
+
+Delivery favors avoiding duplicate alerts: the attempt is durably recorded before
+sending. A timeout or process interruption leaves `unknown`; an explicit API
+failure leaves `rejected`. Neither is automatically resent because Telegram's
+`sendMessage` endpoint has no idempotency key. Review these journal events when
+troubleshooting missed alerts. Repeated reconciliation never resends a recorded
+fill. Telegram credentials are redacted from telemetry; raw request URLs and
+provider error bodies are never journaled.
