@@ -437,3 +437,24 @@ operator attestation, not independent API verification of delivery.
   https://alpaca.markets/support/can-i-margin-or-short-with-cryptocurrency.
 - Semantic-review-boundary commit 37dd421 passed all remote CI jobs in run
   42308273734. New funding-gate code remains local/pending deployment verification.
+- Adjustment approval integrity: exact retries are idempotent and conflicting
+  rewrites of an approved activity adjustment are rejected. New approvals require
+  the active experiment and explicit trading pause. Before saving any new entry,
+  the candidate batch is replayed and matched to fresh broker account identity,
+  unchanged/present activities, cash and share quantities. Non-finite deltas are
+  rejected before persistence. Originals and the pause remain intact.
+- The existing acknowledge-adjustment JSON file may now contain either one object
+  or a list of objects for related unresolved activities. A single incomplete
+  approval fails without saving; submit all required related adjustments together.
+  Retrying the same batch is safe. An interruption during persistence may leave a
+  subset of preflight-approved entries; the pause remains and the identical batch
+  completes the remainder. Approved entries cannot be silently edited; a later
+  genuine correction requires a separately audited correction design.
+- Replay now rejects corporate actions that remove all shares but leave orphaned
+  cost basis. Matching cash/shares still does not establish economic correctness
+  of a basis allocation, realized gain, merger or spinoff; those need independent
+  broker-supported review. Full corporate-action/bust support remains open.
+- Full offline suite passed 448 tests with three integrations skipped; an additional
+  missing-broker-activity case then passed in the 18-test accounting matrix.
+  Ruff/format/whitespace checks passed. Funding-gate commit 05be23f passed all remote
+  CI jobs in run 42308483653. New adjustment code is not deployed; no orders made.

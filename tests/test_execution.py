@@ -146,6 +146,7 @@ def test_cash_movement_requires_explicit_acknowledgment(env):
     broker.raw_account.update(cash="101000", equity="101000")
     with pytest.raises(LedgerError, match="Unacknowledged"):
         service.reconcile()
+    service.kill_path.write_text("Operator reviewing account adjustment")
     service.acknowledge_adjustment(
         {"id": "deposit", "cash": "1000", "reason": "Explicit experiment contribution"}
     )
@@ -163,6 +164,7 @@ def test_corporate_action_pauses_until_audited_adjustment(env, decision):
     broker.positions[0]["qty"] = "20"
     with pytest.raises(LedgerError, match="Unsupported corporate"):
         service.reconcile()
+    service.kill_path.write_text("Operator reviewing account adjustment")
     service.acknowledge_adjustment(
         {
             "id": "split",
@@ -312,6 +314,7 @@ def test_prebaseline_funding_requires_explicit_zero_delta_acknowledgment(env):
     broker.activities.append(activity)
     with pytest.raises(LedgerError):
         service.reconcile()
+    service.kill_path.write_text("Operator reviewing account adjustment")
     service.acknowledge_adjustment(
         {
             "id": activity["id"],

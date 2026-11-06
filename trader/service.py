@@ -466,14 +466,50 @@ class Service:
     @traced("service.acknowledge_adjustment")
     def acknowledge_adjustment(self, adjustment):
         with self.lock():
-            if not adjustment.get("reason") or "cash" not in adjustment or "id" not in adjustment:
-                raise ValueError(
-                    "Adjustment requires broker activity id, exact cash delta, positions, and reason"
-                )
-            if not self.store.get(adjustment["id"], "activity"):
-                raise ValueError("Adjustment must reference a recorded broker activity")
-            self.store.put(adjustment["id"], adjustment, "adjustment")
-            self.store.log("explicit_adjustment", adjustment)
+            self.require_experiment()
+            if not self.kill_path.exists():
+                raise ValueError("Pause trading before approving account adjustments")
+            batch = adjustment if isinstance(adjustment, list) else [adjustment]
+            if not batch or len({a["id"] for a in batch}) != len(batch):
+                raise ValueError("Adjustment batch must contain unique activity IDs")
+            effective = {a["id"]: a for a in self.store.activities()}
+            approved = {a["id"]: a for a in self.store.items("adjustment")}
+            pending = []
+            for item in batch:
+                if not item.get("reason") or "cash" not in item or "id" not in item:
+                    raise ValueError("Adjustment requires activity id, cash delta, positions, and reason")
+                if item["id"] not in effective:
+                    raise ValueError("Adjustment must reference a recorded broker activity")
+                prior = approved.get(item["id"])
+                if prior:
+                    if prior != item:
+                        raise ValueError("Approved adjustment is immutable; investigate the discrepancy")
+                    continue
+                dec(item["cash"])
+                for change in item.get("positions", {}).values():
+                    dec(change["quantity_delta"])
+                    dec(change["basis_delta"])
+                approved[item["id"]] = item
+                pending.append(item)
+            if not pending:
+                return self.reconcile()
+            tracked = [o["client_order_id"] for o in self.store.items("order")]
+            snap = self.broker.snapshot(self.store.experiment["started_at"], tracked)
+            if snap.account["id"] != self.account_id:
+                raise LedgerError("Broker account identity does not match experiment")
+            if any(effective.get(a["id"]) != a for a in snap.activities):
+                raise LedgerError("Broker activities changed; reconcile before approving adjustments")
+            if not {item["id"] for item in pending}.issubset({a["id"] for a in snap.activities}):
+                raise LedgerError("Proposed adjustment activity is missing from current broker evidence")
+            ledger = replay(self.store.experiment["initial_capital"], list(effective.values()), approved)
+            if abs(ledger["cash"] - dec(snap.account["cash"])) > dec("0.02"):
+                raise LedgerError("Proposed adjustments do not reconcile broker cash")
+            actual = {p["symbol"]: dec(p["qty"]) for p in snap.positions}
+            if actual != {symbol: qty for symbol, qty in ledger["shares"].items() if qty != 0}:
+                raise LedgerError("Proposed adjustments do not reconcile broker positions")
+            for item in pending:
+                self.store.put(item["id"], item, "adjustment")
+                self.store.log("explicit_adjustment", item)
             return self.reconcile()
 
     @traced("service.acknowledge_revision")
