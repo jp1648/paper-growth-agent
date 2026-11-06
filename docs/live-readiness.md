@@ -419,3 +419,21 @@ operator attestation, not independent API verification of delivery.
   Ruff lint/format and whitespace checks pass. Operator verification of reviewer
   identity/independence is still required; hashes do not authenticate people.
   No actual semantic approval, model call, deployment or order occurred.
+- Account funding gate: new purchases must fit both cash minus local open-order
+  reservations and the broker's non_marginable_buying_power, including the fee
+  buffer. Missing, malformed, non-finite or negative broker balances reject new
+  exposure. Broker-reported holds are not subtracted twice. Owned protective
+  exits remain available under all other risk gates when that balance is absent.
+  Eleven regressions pass; full offline suite 437 passed, three integrations
+  skipped, Ruff/format and whitespace checks pass.
+- This is an additional conservative buying ceiling, not an assertion that
+  equity settlement or live account eligibility is resolved. Alpaca's published
+  support page says Trading API accounts are margin accounts; limiting spending
+  to cash does not make the brokerage account a cash account. Its non-marginable
+  buying-power formula is described in crypto support documentation. The actual
+  account's stock settlement/restriction policy still requires broker-backed
+  verification before a live release; no margin or account settings changed.
+  References: https://alpaca.markets/support/alpaca-cash-accounts and
+  https://alpaca.markets/support/can-i-margin-or-short-with-cryptocurrency.
+- Semantic-review-boundary commit 37dd421 passed all remote CI jobs in run
+  42308273734. New funding-gate code remains local/pending deployment verification.

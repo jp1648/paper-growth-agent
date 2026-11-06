@@ -1,1 +1,1 @@
-{"id":"fixture-paper-account","status":"ACTIVE","currency":"USD","cash":"100000","equity":"100000","buying_power":"400000","short_market_value":"0","trading_blocked":false,"account_blocked":false,"trade_suspended_by_user":false}
+{"id":"fixture-paper-account","status":"ACTIVE","currency":"USD","cash":"100000","equity":"100000","buying_power":"400000","short_market_value":"0","trading_blocked":false,"account_blocked":false,"trade_suspended_by_user":false,"non_marginable_buying_power":"100000"}

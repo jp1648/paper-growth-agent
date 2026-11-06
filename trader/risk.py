@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import InvalidOperation
 from zoneinfo import ZoneInfo
 
 from .accounting import recent_turnover, remaining, reserved
@@ -109,6 +110,15 @@ def check(
         available = cash - reserved(orders, settings.fee_buffer)
         if notional + settings.fee_buffer > available:
             reasons.append("Insufficient unreserved cash")
+        try:
+            non_marginable = dec(account["non_marginable_buying_power"])
+            if non_marginable < 0:
+                raise ValueError("Negative non-marginable buying power")
+            # Broker balance already reflects holds; do not subtract local reservations twice.
+            if notional + settings.fee_buffer > non_marginable:
+                reasons.append("Insufficient broker non-marginable buying power")
+        except (KeyError, ValueError, InvalidOperation):
+            reasons.append("Broker non-marginable buying power unavailable or invalid")
         exposure = {s: max(ZERO, dec(p["market_value"])) for s, p in positions.items()}
         for o in orders:
             if o["side"] == "buy":
