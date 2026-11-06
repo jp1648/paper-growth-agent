@@ -747,3 +747,28 @@ operator attestation, not independent API verification of delivery.
   original ledger and experiment were preserved. No claim is made about why the
   marker was absent; investigate prior runtime/operator events before activation.
   Production remains on the previous image; new code is not yet deployed.
+- Pause investigation found journal kill_switch_resumed at 2026-11-06T20:00:47Z,
+  following a kill at 19:59:37Z; this predates the readiness goal. The available
+  journal supports explicit resume, not unexplained file deletion. The restored
+  readiness pause was present on follow-up. Operator identity is not recorded in
+  that event, so this does not independently establish who authorized the resume.
+- Deployed the CI-verified executor image built from 2713a92 at
+  2026-11-06T23:58:02Z, digest
+  sha256:e50f1980c6ebb42aff09f4368dad9eb250703f05a33ac4d68d140d3957b25dcb.
+  Stopped the old service before changing its pinned image/config. Preserved a
+  SQLite integrity-checked ledger backup, complete control directory, old config
+  and service environment under private state/release-rollback-2713a92. Original
+  experiment/history and pause remain intact. Candidate config validated inside
+  the exact image without network, credentials or operational state.
+- Enabled executor_fence and checkpoint_bucket for the existing private recovery
+  bucket. The deployed guard successfully matched actual VM metadata to ownership.
+  Post-start heartbeat/reconciliation at 23:58:22Z succeeded; daily baseline was
+  valid and unbreached, cumulative latch false, held-position review issues empty.
+  The deployed health command passed. Before/after counts stayed at 8 acceptance
+  runs, 2 activities, 2 intents and 1 order; AAPL remained one share and reconciled
+  cash was 99655.67. No supervised order test or paid research was initiated.
+- This deploys the executor changes, not the dashboard. Actual order-path required
+  checkpoint behavior has offline and isolated cloud evidence but no new broker
+  submission was used to test it in production. Full service failover, live
+  account constraints and independent investment-quality/forward evidence remain
+  open. Keep the release paused; overall status remains NO-GO for live money.
