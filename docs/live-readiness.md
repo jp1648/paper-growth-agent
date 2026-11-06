@@ -18,7 +18,7 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 | 7 | Live execution economics/account restrictions | Local spread/midpoint, executable-side displayed-size participation and per-order equity caps implemented with entry/exit and provider-unit tests. Account settlement/eligibility, adverse execution and live pilot evidence pending. |
 | 8 | Explicit isolated live release boundary | Draft release contract in live-pilot-release.md specifies account/artifact/capital approval, isolated state and credentials, settlement evidence, fencing, loss limits and supervised launch. 28 negative adapter tests pass for runtime endpoint changes, all redirect statuses and generic credential fallback. Actual live adapter/release and independent approval remain pending; runtime stays paper-only. |
 | 9 | Process-level crash consistency | Five real SIGKILL subprocess drills pass against loopback broker: prepared intent, accepted POST, saved order, accepted cancel, persisted fill. No duplicate orders; unresolved intent retains reservation. Cloud/process concurrency and disk failure drills pending. |
-| 10 | Single executor and disaster recovery | Cloud snapshot restored to a temporary read-only disk: ten SQLite databases passed integrity checks; original experiment, account binding and pause marker survived. Temporary disk removed. Cross-host fencing, failover and restored-ledger reconciliation against current broker state remain pending. |
+| 10 | Single executor and disaster recovery | Saved cloud ledger reconciled twice against the paper broker; exact off-host generation/hash restored and integrity verified. Actual two-VM admission/transfer/restart and storage-permission-loss drill passed. Full restored-executor service failover, in-flight broker reconciliation across transfer, network partition and production enablement remain pending. |
 | 11 | Evidence/stream/provider failure matrix | Future-dated evidence cache and specialist-report reuse blocked with regressions. Clean stream closures now back off; disconnect/auth/subscription/malformed-message tests preserve maintenance, duplicate hints cannot create fills. Broader amendments, reconnect/backfill, throttling and injection matrix pending. |
 | 12 | Complete authenticated traces | Implemented timestamp/UUID pagination and authenticated run-scoped full-event retrieval; real Postgres 205-event equal-timestamp test and browser pagination/auth tests pass locally. Cloud deployment pending. |
 | 13 | Notification recovery | Local bounded 429 retries, strict response validation, audited no-resend operator resolution and reconciled correction notices tested. Actual independent health/spend email delivery verified against Cloud Monitoring incident IDs and authenticated Gmail. New code deployment and complete missing-heartbeat outage drill remain pending. |
@@ -673,3 +673,25 @@ operator attestation, not independent API verification of delivery.
   Operators must coordinate against concurrent old-host restart, verify the new
   paused ledger and reconcile in-flight requests. Cross-host fault evidence and
   production enablement remain open; all sixteen requirements remain active.
+
+- Actual isolated two-VM ownership drill on 2026-11-06 used temporary Debian VMs
+  without external IPs or broker credentials, a separate bucket and a dedicated
+  service account with only bucket object-read access. The exact current guard
+  and its Python dependencies were copied over IAP; private manifests retain
+  source hashes, VM identities, transfer generations and raw outcomes.
+- Source A passed the guard; standby B failed specifically for identity mismatch.
+  The real transfer CLI blocked while A was RUNNING. After stopping A, the CLI
+  verified TERMINATED and conditionally transferred the reviewed object generation
+  to B. B then passed. Restarting A preserved its identity but the guard denied
+  it as the former owner while B continued to pass. An initial SSH boot-readiness
+  failure was retained separately and was not counted as a guard rejection.
+- Removing the drill identity's bucket-read grant caused an actual GCS 403 and
+  ExecutionFenceError on B; restoring the grant restored admission. This is an
+  IAM-loss drill, not a network partition or stale-connection/in-flight POST test.
+- No production executor stop/start, ownership change, deployment, broker request,
+  model call or trading-pause change occurred. This establishes cross-host
+  admission and guarded transfer behavior, not complete trading-service failover.
+  The remaining release gates above stay open; status remains NO-GO.
+- Cleanup verified: both drill VMs and their auto-deleted boot disks are absent;
+  the temporary bucket and service account were deleted. The production VM
+  remains RUNNING. Raw private evidence remains in ignored state/fencing-drill.
