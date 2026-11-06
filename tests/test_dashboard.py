@@ -1,4 +1,20 @@
+import pytest
+
 from trader.dashboard import publish_snapshot
+
+
+@pytest.mark.parametrize("status", ["complete", "failed", "started"])
+def test_snapshot_shows_only_completed_supervised_decisions(env, decision, status):
+    service, broker, _ = env
+    service.reconcile()
+    service.store.put("supervised", {"stopped": status == "failed"}, "research_audit")
+    service.store.put("supervised", {"mode": "research", "status": status}, "acceptance")
+    saved = decision.model_dump(mode="json")
+    service.store.put("supervised", {"decision": saved}, "acceptance_research")
+    run = publish_snapshot(service)["runs"][0]
+    assert run["decision"] == (saved if status == "complete" else None)
+    assert (run["status"] == "accepted") == (status == "complete")
+    assert broker.submits == 0
 
 
 def test_snapshot_preserves_failed_research_and_omits_account_identifiers(env):

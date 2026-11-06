@@ -17,6 +17,9 @@ def publish_snapshot(service):
     ):
         audit = json.loads(body)
         accepted = store.get(key, "research_result")
+        acceptance = store.get(key, "acceptance") or {}
+        if not accepted and acceptance.get("mode") == "research" and acceptance.get("status") == "complete":
+            accepted = store.get(key, "acceptance_research")
         sources = audit.get("sources", [])
         runs.append(
             {
