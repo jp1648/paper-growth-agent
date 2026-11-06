@@ -101,3 +101,9 @@ directory. Backend snapshot tests use offline fixtures and do not submit orders.
 ### Other Postgres hosts
 
 See the optional [hosted migration procedure](../docs/supabase.md).
+
+The Overview spend table groups current-experiment model usage by model and data
+requests by provider, across all recorded attempts (not only the latest 30 runs).
+Known estimates exclude unpriced requests and budget reservations. X/Flovia costs
+remain unknown when the provider response does not report a charge. Cloud hosting,
+market-data subscriptions, SEC access and Telegram billing are not integrated.

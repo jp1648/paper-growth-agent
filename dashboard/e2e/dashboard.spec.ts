@@ -19,6 +19,12 @@ test("private dashboard, research filtering, traces and responsive layout", asyn
   await expect(
     page.getByText("Automatic trading paused", { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Spend by source" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Missing billing data does not mean zero cost/),
+  ).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.screenshot({
     path: "../state/dashboard-desktop.png",

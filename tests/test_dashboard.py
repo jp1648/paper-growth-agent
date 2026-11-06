@@ -37,3 +37,32 @@ def test_snapshot_preserves_failed_research_and_omits_account_identifiers(env):
     assert "account_id" not in snapshot and "experiment" not in snapshot["portfolio"]
     assert broker.submits == 0
     assert snapshot["portfolio"]["total_pnl"] == 0
+
+
+def test_spend_breakdown_separates_models_unknowns_and_data_requests(env):
+    from trader.dashboard import spend_breakdown
+    from trader.models import dec
+
+    service, _, _ = env
+    store = service.store
+    store.log("x_attempt", {"operation_id": "x1"})
+    store.log("x_attempt", {"operation_id": "x2"})
+    store.log("x_result", {"operation_id": "x1", "cost_usd": None})
+    store.log("flovia_x_attempt", {"operation_id": "f1"})
+    store.log("data_cost", {"source": "Example data", "usd": "0.03"})
+    models = [
+        {"model": "astra", "estimated_usd": "0.1"},
+        {"model": "astra", "estimated_usd": "0.2"},
+        {"model": "astra", "estimated_usd": None},
+        {"model": "sol", "estimated_usd": "0"},
+    ]
+    rows = {r["source"]: r for r in spend_breakdown(store, models)}
+    assert rows["OpenAI · astra"]["known_usd"] == dec("0.3")
+    assert rows["OpenAI · astra"]["requests"] == 3
+    assert rows["OpenAI · astra"]["unknown_requests"] == 1
+    assert rows["OpenAI · sol"]["known_usd"] == 0
+    assert rows["X API"]["known_usd"] is None
+    assert rows["X API"]["requests"] == rows["X API"]["unknown_requests"] == 2
+    assert rows["Flovia (legacy)"]["known_usd"] is None
+    assert rows["Example data"]["known_usd"] == dec("0.03")
+    assert sum(r["known_usd"] or dec(0) for r in rows.values()) == dec("0.33")

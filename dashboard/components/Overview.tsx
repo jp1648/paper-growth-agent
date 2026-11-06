@@ -45,6 +45,61 @@ export default function Overview({
           </section>
         ))}
       </div>
+      <section className="panel">
+        <div className="panel-title">
+          <div>
+            <h2>Spend by source</h2>
+            <p>
+              Current experiment · all recorded attempts, including failed runs
+              · USD
+            </p>
+          </div>
+        </div>
+        {s.spend_breakdown?.length ? (
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Source</th>
+                  <th>Known cost estimate</th>
+                  <th>Requests</th>
+                  <th>Unpriced requests</th>
+                </tr>
+              </thead>
+              <tbody>
+                {s.spend_breakdown.map((row) => (
+                  <tr key={row.source}>
+                    <td>
+                      <b>{row.source}</b>
+                    </td>
+                    <td>
+                      {row.known_usd === null
+                        ? "Unknown"
+                        : money(row.known_usd, 4)}
+                    </td>
+                    <td>{row.requests}</td>
+                    <td>{row.unknown_requests}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="muted">
+            No source-level spending records available yet.
+          </p>
+        )}
+        <p className="notice">
+          Model costs use recorded token usage and configured rates, not
+          provider invoices. Unknown request costs and budget reservations are
+          excluded from these known estimates.
+        </p>
+        <p className="muted">
+          Google Cloud hosting/database, Alpaca market-data subscriptions, SEC
+          access and Telegram charges are not tracked here. Missing billing data
+          does not mean zero cost.
+        </p>
+      </section>
       <div className="overview-grid">
         <section className="panel">
           <div className="panel-title">

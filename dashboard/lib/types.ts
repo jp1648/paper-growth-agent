@@ -47,6 +47,12 @@ export interface Snapshot {
     unrealized_pl: Amount;
   }[];
   open_orders: unknown[];
+  spend_breakdown?: {
+    source: string;
+    known_usd: Amount;
+    requests: number;
+    unknown_requests: number;
+  }[];
   research_cost_known_usd: Amount;
   research_cost_unknown_calls: number;
   coverage: string;
