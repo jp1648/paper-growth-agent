@@ -92,8 +92,16 @@ class Runner:
                 },
             )
         self.store.put("heartbeat", {"at": current})
+        previous_limit = self.store.get("loss_limit") or {}
+        already_blocked = previous_limit.get("latched") or not previous_limit.get("daily", {}).get(
+            "valid", True
+        )
         self.service.cancel_expired()
         snapshot = self.service.reconcile()
+        limit = self.store.get("loss_limit") or {}
+        if not already_blocked and (limit.get("latched") or not limit.get("daily", {}).get("valid", True)):
+            self.service.cancel_expired()
+            snapshot = self.service.reconcile()
         issues = self.service.position_review_issues(snapshot.positions, now())
         previous_review = self.store.get("position_review")
         if previous_review is None or previous_review.get("issues") != issues:

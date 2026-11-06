@@ -73,7 +73,9 @@ class ScriptedBroker:
         for o in self.orders.values():
             if o["id"] == order_id:
                 o["status"] = "pending_cancel"
-                o["updated_at"] = (self.at + timedelta(seconds=1)).isoformat()
+                o["updated_at"] = (
+                    max(self.at, datetime.fromisoformat(o["updated_at"])) + timedelta(seconds=1)
+                ).isoformat()
 
     def clock(self):
         return {"timestamp": self.at.isoformat(), "is_open": self.open}

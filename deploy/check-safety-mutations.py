@@ -30,6 +30,7 @@ MUTATIONS = {
         'if not self.store.get("loss_limit")["daily"]["valid"]:',
         "if False:",
     ),
+    "loss_cancel": ("trader/service.py", 'or (loss_blocked and o["side"] == "buy")', "or False"),
 }
 
 

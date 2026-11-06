@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+import httpx
 import pytest
 
 from trader.health import check_health
@@ -245,3 +246,78 @@ def test_withdrawal_cutoff_and_future_activity(stamp, valid, pnl):
     assert result["valid"] is valid
     if valid:
         assert result["pnl"] == dec(pnl)
+
+
+def test_loss_maintenance_cancels_buy_and_reconciles_racing_fill(env, decision, monkeypatch):
+    service, broker, _ = env
+    cid = service.execute(decision, "working-buy")["client_order_id"]
+    # Detect the breach during maintenance, not through a prior explicit reconcile.
+    broker.activities.append(
+        {"id": "loss", "activity_type": "FEE", "net_amount": "-2000", "date": "2026-10-21"}
+    )
+    broker.raw_account.update(cash="98000", equity="98000")
+    original_cancel = broker.cancel
+
+    def racing_cancel(order_id):
+        original_cancel(order_id)
+        broker.fixture_fill(cid)
+
+    monkeypatch.setattr(broker, "cancel", racing_cancel)
+    Runner(service, None).maintain()
+    assert len(broker.cancels) == 1
+    assert service.store.get(cid, "order")["status"] == "filled"
+    assert service.store.get("snapshot")["positions"][0]["qty"] == "10"
+    assert service.reservation_summary() == 0
+    assert broker.submits == 1  # No automatic liquidation or replacement.
+
+
+@pytest.mark.parametrize("cause", ["loss", "missing_baseline"])
+def test_loss_cancel_pending_retains_reservation_and_does_not_spam(env, decision, cause):
+    service, broker, _ = env
+    cid = service.execute(decision, "partial-buy")["client_order_id"]
+    broker.fixture_fill(cid, "4", status="partially_filled")
+    if cause == "loss":
+        fee(service, broker, "2000")
+    else:
+        broker.raw_account.pop("last_equity")
+    Runner(service, None).maintain()
+    Runner(service, None).maintain()
+    assert len(broker.cancels) == 1
+    assert service.store.get(cid, "order")["status"] == "pending_cancel"
+    assert service.reservation_summary() == dec("601")
+    broker.orders[cid]["status"] = "canceled"
+    broker.orders[cid]["updated_at"] = "2026-10-21T15:00:10+00:00"
+    Runner(service, None).maintain()
+    assert service.reservation_summary() == 0
+    assert service.store.get("snapshot")["positions"][0]["qty"] == "4"
+
+
+def test_loss_cancel_timeout_remains_reserved_and_retries_next_maintenance(env, decision, monkeypatch):
+    service, broker, _ = env
+    service.execute(decision, "timeout-buy")
+    fee(service, broker, "2000")
+    calls = []
+
+    def timeout(order_id):
+        calls.append(order_id)
+        raise httpx.ReadTimeout("Fixture cancel timeout")
+
+    monkeypatch.setattr(broker, "cancel", timeout)
+    for expected in (1, 2):
+        Runner(service, None).maintain()
+        assert len(calls) == expected
+        assert service.reservation_summary() == dec("1001")
+    assert len(service.store.events("cancel_error")) == 2
+
+
+def test_loss_maintenance_leaves_working_protective_sell(env, decision):
+    service, broker, _ = env
+    cid = service.execute(decision, "owned")["client_order_id"]
+    broker.fixture_fill(cid)
+    fee(service, broker, "2000")
+    exit_order = service.execute(
+        decision.model_copy(update={"action": "SELL", "exit_reason": "risk"}), "protect"
+    )
+    Runner(service, None).maintain()
+    assert not broker.cancels
+    assert service.store.get(exit_order["client_order_id"], "order")["status"] == "new"

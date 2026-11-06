@@ -464,13 +464,16 @@ class Service:
             if self.broker.account()["id"] != self.account_id:
                 raise LedgerError("Broker account identity does not match experiment")
             # Cancellation must work even when missing fills or an unknown submission block replay.
+            limit = self.store.get("loss_limit") or {}
+            loss_blocked = limit.get("latched") or not limit.get("daily", {}).get("valid", True)
             for o in self.broker.open_orders():
                 if (
                     cancel_all
                     or self.kill_path.exists()
                     or now() >= dt(self.store.experiment["ends_at"])
                     or now() - dt(o["created_at"]) >= timedelta(minutes=self.cfg.order_ttl_minutes)
-                ):
+                    or (loss_blocked and o["side"] == "buy")
+                ) and o["status"] != "pending_cancel":
                     self.request_cancel(o)
 
     @traced("service.request_cancel")

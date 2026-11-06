@@ -515,3 +515,22 @@ operator attestation, not independent API verification of delivery.
 - Eight selected safety mutations were caught, including disabled loss-latch
   entry enforcement and disabled daily-baseline entry enforcement. This tests
   the actual execution rejection path, not just calculation output.
+- Working-order loss response: maintenance now requests cancellation of working
+  buys when the loss latch is set or the daily baseline is unavailable, including
+  a block first detected during that maintenance pass. Working sells remain
+  governed by existing expiry/pause rules. Broker pending_cancel suppresses
+  duplicate requests; an ambiguous timeout retains the reservation and may be
+  retried on the next maintenance pass after another broker open-order query.
+- Five new regressions exercise a fill racing the cancellation request, partial
+  fill with pending/confirmed cancel, unavailable-baseline cancellation, timeout
+  recovery and preserving a working protective sell. Confirmed fills remain held;
+  no replacement/liquidation occurs. The scripted broker's cancel timestamps now
+  advance from its latest order timestamp, avoiding accidental stale fixture data.
+- Full offline suite passed 481 tests with three integrations skipped; adding
+  unavailable-baseline coverage then passed all 31 loss-control tests. Ruff and
+  whitespace checks passed. Daily-loss commit 7317473 passed remote CI run
+  42310234303. These changes remain undeployed and cannot guarantee cancellation
+  before a fill; missing/outage detection and broker cancellation latency remain
+  real exposure. No production broker mutation or paid model call occurred.
+- Nine selected safety mutations were caught; disabling loss-triggered buy
+  cancellation caused four test failures. The unmodified mutation baseline passed.
