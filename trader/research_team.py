@@ -116,7 +116,8 @@ ROLES = {
         (
             "Use business and catalyst findings. Call value_scenarios with explicitly "
             "justified cash-flow assumptions. Supply financial_source_id and financial_period_end from original "
-            "structured facts: matched annual USD operating cash flow, USD capex and diluted weighted-average shares. "
+            "structured facts: matched annual USD operating cash flow, USD capex and diluted weighted-average shares "
+            "from one coherent filing accession/date/form. Do not mix amended and older facts. "
             "cash_flow_per_share must equal (CFO-capex)/shares rounded to six decimals. The historical proxy "
             "does not establish normalized earnings; discuss debt, dilution, SBC and nonrecurring items. Return its calculation_id and exact bear/base/bull values. "
             "Explain sensitivity and expectations embedded in today's price. If this simplified "

@@ -44,6 +44,8 @@ def annual_cash_flow(source, period_end, cutoff):
         selections[tag] = {**selected, "unit": unit}
     if len({r["start"] for r in selections.values()}) != 1:
         raise ValueError("Financial inputs have mismatched annual periods")
+    if len({(r["accn"], r["filed"], r["form"]) for r in selections.values()}) != 1:
+        raise ValueError("Financial inputs have mixed filing basis; review amendments before valuation")
     cash, capex, shares = [dec(r["val"]) for r in selections.values()]
     if capex < 0 or shares <= 0 or cash - capex <= 0:
         raise ValueError("Positive annual cash-flow proxy unavailable; use unsupported valuation")

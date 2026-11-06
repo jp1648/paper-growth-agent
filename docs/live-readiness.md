@@ -709,3 +709,20 @@ operator attestation, not independent API verification of delivery.
 - Full offline verification: 544 passed, three opt-in integrations skipped;
   Ruff and whitespace checks passed. No deployment, model calls or broker
   requests occurred in this boundary fix.
+- Financial provenance audit found independent newest-fact selection could mix
+  amended CFO with capex/shares from an older filing without evidence that the
+  reporting bases remain consistent. The narrow proxy now requires the selected
+  annual inputs to share accession, filing date and form, in addition to period
+  and units. It does not silently fall back to older pre-amendment numbers.
+- Three mixed-basis regressions failed before the fix; a tool-path regression
+  also verifies that no calculation is recorded. Complete coherent restatements
+  remain supported, and the actual frozen annual-filing cohort still passes its
+  deterministic input tests. Research instructions disclose the requirement;
+  evaluation scoring contract advances to financial-provenance-v4 so old scores
+  cannot be compared as if evaluated under the stronger contract.
+- A partial amendment may legitimately leave other figures unchanged. Resolving
+  that requires original-document review and an explicit financial bridge; this
+  narrow derivation conservatively reports unsupported rather than assuming it.
+  This does not complete debt/SBC normalization or independent economic review.
+- Full offline verification: 548 passed, three opt-in integrations skipped;
+  Ruff/whitespace checks pass. No models, broker requests or deployment occurred.

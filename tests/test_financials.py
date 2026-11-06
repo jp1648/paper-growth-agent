@@ -69,8 +69,17 @@ def test_financial_inputs_fail_closed(fault):
 
 def test_latest_restated_fact_selected_without_summing_duplicate_periods():
     source = {"id": "original", "content": {"facts": financial_facts()}}
-    records = source["content"]["facts"][CFO]["USD"]
-    records.append({**records[0], "val": 700, "filed": "2026-06-01", "accn": "amended", "form": "10-K/A"})
+    for tag, units in source["content"]["facts"].items():
+        records = next(iter(units.values()))
+        records.append(
+            {
+                **records[0],
+                "val": 700 if tag == CFO else records[0]["val"],
+                "filed": "2026-06-01",
+                "accn": "amended",
+                "form": "10-K/A",
+            }
+        )
     result = annual_cash_flow(source, "2025-12-31", CUTOFF)
     assert result["cash_flow_per_share"] == "6.000000"
     assert result["facts"][CFO]["accn"] == "amended"
@@ -151,3 +160,48 @@ def test_future_specialist_reports_cannot_be_reused(env):
         None,
     )
     assert not desk.targeted
+
+
+@pytest.mark.parametrize("fault", ["partial_restatement", "different_accession", "different_filing_date"])
+def test_mixed_filing_basis_requires_review(fault):
+    source = {"id": "original", "content": {"facts": financial_facts()}}
+    record = source["content"]["facts"][CFO]["USD"][0]
+    if fault == "partial_restatement":
+        source["content"]["facts"][CFO]["USD"].append(
+            {**record, "val": 700, "filed": "2026-06-01", "accn": "amended", "form": "10-K/A"}
+        )
+    elif fault == "different_accession":
+        record["accn"] = "different"
+    else:
+        record["filed"] = "2026-01-02"
+    with pytest.raises(ValueError, match="filing basis"):
+        annual_cash_flow(source, "2025-12-31", CUTOFF)
+
+
+def test_partial_restatement_cannot_create_calculation():
+    cfg = Settings(input_cost_per_million="1", output_cost_per_million="1")
+    desk = ResearchDesk(
+        cfg,
+        Evidence(),
+        {"symbol": "ACME", "portfolio": {}},
+        Evidence().get("ACME"),
+        Budget(cfg),
+        None,
+        evaluation_at=CUTOFF.isoformat(),
+    )
+    records = desk.sources["fixture-sec"]["content"]["facts"][CFO]["USD"]
+    records.append({**records[0], "val": 700, "filed": "2026-06-01", "accn": "amended", "form": "10-K/A"})
+    tool = next(t for t in desk.tools() if t.name == "value_scenarios")
+    with pytest.raises(ValueError, match="filing basis"):
+        tool.invoke(
+            {
+                "cash_flow_per_share": "6",
+                "financial_source_id": "fixture-sec",
+                "financial_period_end": "2025-12-31",
+                "growth_rates": ["0"] * 3,
+                "discount_rate": ".1",
+                "terminal_multiples": ["0"] * 3,
+                "years": 1,
+            }
+        )
+    assert not desk.calculations
