@@ -726,3 +726,24 @@ operator attestation, not independent API verification of delivery.
   This does not complete debt/SBC normalization or independent economic review.
 - Full offline verification: 548 passed, three opt-in integrations skipped;
   Ruff/whitespace checks pass. No models, broker requests or deployment occurred.
+- Release preparation pinned Python 3.12-slim and uv 0.9.28 to resolved multiarch
+  manifest digests. Cloud Build 937bb1e4-5070-448f-8746-945e774f85df built source
+  commit 2713a92 from a 31-entry allowlisted Git archive (Dockerfile, Docker ignore,
+  lock/project files and trader Python source only). No runtime state or secrets
+  were uploaded. Build succeeded; executor image digest is
+  sha256:e50f1980c6ebb42aff09f4368dad9eb250703f05a33ac4d68d140d3957b25dcb.
+- CI run 42314789529 for that commit passed backend, dashboard and secrets jobs.
+  VM image pull initially lacked registry authentication; retry used its metadata
+  service identity and a temporary Docker auth directory removed on completion.
+  No credential was printed or installed in the image. An isolated container
+  with no network/credentials/ledger mounts verified all 26 installed source-file
+  hashes against local reviewed source and the paper-only default endpoint.
+  An initial validation command used a nonexistent Settings attribute and failed;
+  its corrected hash/endpoint check passed. Private build receipts are retained
+  under ignored state/release-2713a92. This is artifact verification, not deployment.
+- Deployment preflight contradicted the assumed pause state: the active account's
+  pause marker was absent. Restored it with exclusive creation and file/directory
+  fsync, and journaled readiness_pause_restored without broker/model calls. The
+  original ledger and experiment were preserved. No claim is made about why the
+  marker was absent; investigate prior runtime/operator events before activation.
+  Production remains on the previous image; new code is not yet deployed.
