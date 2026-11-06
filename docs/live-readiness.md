@@ -617,3 +617,22 @@ operator attestation, not independent API verification of delivery.
   Full disk-loss failover, independent executor fencing and project-disaster
   recovery remain unverified. Per-order storage/network cost and ledger growth
   need monitoring; model-spend limits do not cover those infrastructure charges.
+- Cloud ownership guard added behind executor_fence (requires checkpoint_bucket).
+  Before broker mutations it verifies GCE metadata instance/project/zone against
+  a private pinned executor-owner.json. Wrong/unavailable ownership rejects before
+  a broker HTTP request; read-only reconciliation remains possible. Known guard
+  denials are recorded as rejected intents, not ambiguous submissions. Shared
+  metadata-token handling retains fixed endpoints, no redirects/proxy inheritance.
+- Eleven regressions cover VM/project/zone mismatch, malformed/missing records,
+  timeout/redirect rejection, POST/DELETE transport exclusion, available reads
+  and intent/reservation handling. Full offline suite: 519 passed, three skipped;
+  Ruff and whitespace checks pass.
+- Created the initial owner record with create-only generation precondition for
+  the current VM. A read-only execution of the new guard on that VM successfully
+  matched its actual metadata identity to the record. Production image/config
+  remain unchanged: this is not yet active protection on production submissions.
+- No automatic takeover or lease expiry exists. This is an ownership admission
+  guard, not proof of complete distributed fencing. Old-host shutdown must be
+  verified before any ownership transfer; in-flight broker calls need reconciliation.
+  Transfer tooling, cross-host partition/restart drills, and a final risk freshness
+  check after ownership-network I/O remain open before deployment/live acceptance.

@@ -7,6 +7,21 @@ from urllib.parse import quote
 import httpx
 
 
+def storage_headers(client):
+    token = client.get(
+        "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token",
+        headers={"Metadata-Flavor": "Google"},
+        timeout=5,
+    )
+    token.raise_for_status()
+    if token.headers.get("Metadata-Flavor") != "Google":
+        raise ValueError("Unverified metadata token response")
+    access_token = token.json()["access_token"]
+    if not isinstance(access_token, str) or not access_token:
+        raise ValueError("Missing recovery credential")
+    return {"Authorization": "Bearer " + access_token}
+
+
 def replicate_checkpoint(path, bucket):
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", bucket):
         raise ValueError("Invalid recovery bucket")
@@ -16,18 +31,7 @@ def replicate_checkpoint(path, bucket):
     name = "checkpoints/" + path.name
     metadata_url = f"https://storage.googleapis.com/storage/v1/b/{bucket}/o/{quote(name, safe='')}"
     with httpx.Client(timeout=30, follow_redirects=False, trust_env=False) as client:
-        token = client.get(
-            "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token",
-            headers={"Metadata-Flavor": "Google"},
-            timeout=5,
-        )
-        token.raise_for_status()
-        if token.headers.get("Metadata-Flavor") != "Google":
-            raise ValueError("Unverified metadata token response")
-        access_token = token.json()["access_token"]
-        if not isinstance(access_token, str) or not access_token:
-            raise ValueError("Missing recovery credential")
-        headers = {"Authorization": "Bearer " + access_token}
+        headers = storage_headers(client)
         try:
             with path.open("rb") as source:
                 uploaded = client.post(

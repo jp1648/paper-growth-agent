@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from .config import Settings, credentials
+from .executor_owner import verify_executor_owner
 from .models import PAPER_URL, Quote, Snapshot, dec, dt, now
 from .observability import traced
 
@@ -25,6 +26,8 @@ class AlpacaBroker:
         Settings.model_validate(self.settings.model_dump())
         if not path.startswith("/v2/"):
             raise ValueError("Invalid trading path")
+        if method.upper() != "GET" and self.settings.executor_fence:
+            verify_executor_owner(self.settings.checkpoint_bucket)
         response = self.client.request(
             method, PAPER_URL + path, headers=self.headers, follow_redirects=False, **kwargs
         )

@@ -9,6 +9,7 @@ import httpx
 from .accounting import LedgerError, replay, reserved
 from .alpaca import safe_error
 from .evidence import EvidenceProvider
+from .executor_owner import ExecutionFenceError
 from .models import TERMINAL, ZERO, Decision, dec, dt, dumps, now
 from .observability import traced
 from .risk import check, daily_loss
@@ -459,6 +460,11 @@ class Service:
                 return result
             try:
                 order = self.broker.submit(payload)
+            except ExecutionFenceError as error:
+                result.update(status="rejected", reasons=[str(error)])
+                self.store.put(cid, result, "intent")
+                self.store.log("execution_fenced", result)
+                return result
             except Exception as error:  # noqa: BLE001 - persist failure at the execution boundary
                 result.update(status="unknown", error=safe_error(error))
                 self.store.put(cid, result, "intent")
