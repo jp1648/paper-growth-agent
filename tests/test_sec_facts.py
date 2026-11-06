@@ -109,7 +109,11 @@ def test_filing_freshness_rejects_unverifiable_response(env, monkeypatch, fault)
 
     source = provider(env, monkeypatch)
     monkeypatch.setattr("trader.evidence.now", lambda: AT)
-    recent = {"form": ["10-Q/A"], "accessionNumber": ["amendment"], "acceptanceDateTime": [AT.isoformat()]}
+    recent = {
+        "form": ["10-Q/A"],
+        "accessionNumber": ["0000000001-26-000001"],
+        "acceptanceDateTime": [AT.isoformat()],
+    }
     raw = {"cik": 2 if fault == "identity" else 1, "filings": {"recent": recent}}
     if fault == "missing_time":
         del recent["acceptanceDateTime"]
@@ -124,3 +128,52 @@ def test_filing_freshness_rejects_unverifiable_response(env, monkeypatch, fault)
     monkeypatch.setattr(source, "request", lambda url: httpx.Response(200, json=raw))
     with pytest.raises((ValueError, KeyError, IndexError)):
         source.filings_since("ACME", AT - timedelta(minutes=5))
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "empty",
+        "string_forms",
+        "blank_form",
+        "extra_row",
+        "nonlist_column",
+        "old_bad_accession",
+        "future_cutoff",
+        "expired_cutoff",
+    ],
+)
+def test_incomplete_filing_history_cannot_prove_absence(env, monkeypatch, fault):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    source = provider(env, monkeypatch)
+    monkeypatch.setattr("trader.evidence.now", lambda: AT)
+    since = AT - timedelta(minutes=5)
+    recent = {
+        "form": ["10-K"],
+        "accessionNumber": ["0000000001-26-000001"],
+        "acceptanceDateTime": [(AT - timedelta(days=1)).isoformat()],
+    }
+    if fault == "empty":
+        recent = {key: [] for key in recent}
+    elif fault == "string_forms":
+        recent["form"] = "10-K"
+    elif fault == "blank_form":
+        recent["form"] = [""]
+    elif fault == "extra_row":
+        recent["acceptanceDateTime"].append(AT.isoformat())
+    elif fault == "nonlist_column":
+        recent["unexpected"] = "not-an-array"
+    elif fault == "old_bad_accession":
+        recent["accessionNumber"] = ["unverified"]
+    elif fault == "future_cutoff":
+        since = AT + timedelta(seconds=1)
+    else:
+        since = AT - timedelta(days=365)
+    monkeypatch.setattr(
+        source, "request", lambda url: httpx.Response(200, json={"cik": 1, "filings": {"recent": recent}})
+    )
+    with pytest.raises(ValueError):
+        source.filings_since("ACME", since)

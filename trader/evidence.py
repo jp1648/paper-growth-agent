@@ -200,22 +200,34 @@ class EvidenceProvider:
 
     @traced("evidence.filings_since")
     def filings_since(self, symbol, since):
+        since = dt(since)
+        if not timedelta(0) <= now() - since < timedelta(days=365):
+            raise ValueError("Filing freshness cutoff is outside recent submissions coverage")
         cik = self.cfg.universe[symbol].cik.zfill(10)
         raw = self.request(f"https://data.sec.gov/submissions/CIK{cik}.json").json()
         if str(raw.get("cik", "")).zfill(10) != cik:
             raise ValueError("SEC response company identity does not match configured CIK")
         recent = raw["filings"]["recent"]
+        forms = recent["form"]
+        if (
+            not isinstance(forms, list)
+            or not forms
+            or not {"accessionNumber", "acceptanceDateTime"}.issubset(recent)
+            or any(not isinstance(v, list) or len(v) != len(forms) for v in recent.values())
+            or any(not isinstance(form, str) or not form.strip() for form in forms)
+        ):
+            raise ValueError("SEC recent submissions are empty or malformed")
         changed = []
-        for i, form in enumerate(recent["form"]):
+        for i, form in enumerate(forms):
             if form.removesuffix("/A") not in {"10-K", "10-Q", "8-K", "20-F", "6-K"}:
                 continue
             filing = {key: values[i] for key, values in recent.items()}
+            if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", filing["accessionNumber"]):
+                raise ValueError("SEC filing lacks valid accession")
             accepted = dt(filing["acceptanceDateTime"])
             if accepted > now():
                 raise ValueError("SEC filing acceptance is future-dated")
-            if accepted >= dt(since):
-                if not filing.get("accessionNumber"):
-                    raise ValueError("SEC filing lacks accession")
+            if accepted >= since:
                 changed.append(filing)
         return changed
 

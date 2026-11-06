@@ -384,3 +384,10 @@ operator attestation, not independent API verification of delivery.
   skipped. An additional full-graph regression then passed proving the oldest
   source timestamp reaches the execution check. Ruff lint/format and whitespace
   checks passed. New remote CI/deployment verification remains pending.
+- SEC freshness response validation now rejects empty histories, unequal/non-array
+  columns, blank forms, invalid accessions (including old rows), and cutoffs beyond
+  the recent-history window or in the future. Eight regressions prove these
+  responses cannot be interpreted as absence of new filings. Current offline
+  suite: 418 passed, three integrations skipped; combined coverage 82%, 80% floor
+  passed. No production calls or deployment. Remote run 42307462274 for the prior
+  filing commit was still running when this local verification completed.
