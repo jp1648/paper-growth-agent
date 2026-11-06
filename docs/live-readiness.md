@@ -572,3 +572,22 @@ operator attestation, not independent API verification of delivery.
   remains on the state disk; disk-loss/off-host recovery and cross-host fencing
   remain unverified. The discovered backup recovery-point gap requires durable
   pre-submission intent checkpoints/replication, not merely more frequent reports.
+- Local execution checkpoints now close the demonstrated intent-backup gap:
+  after persisting the exact prepared intent and decision audit, each new order
+  requires a verified, flushed immutable intent checkpoint before its broker POST.
+  Existing files must match both original experiment and exact prepared intent.
+  Checkpoint failure records a rejected intent without calling the broker; replay
+  of that same key does not retry. Shared risk checks run again after disk work.
+- A real SQLite restore regression leaves the daily backup older than the order,
+  then restores the automatically created checkpoint after a broker fill. Original
+  experiment/pause survive; repeated reconciliation/execution imports the fill
+  once and never resubmits. Additional regressions prove full-disk and changed-
+  checkpoint rejection plus stale-quote/pause rejection after checkpoint work.
+- Full offline suite: 496 passed, three opt-in integrations skipped; Ruff and
+  whitespace checks passed. Prior recovery-evidence commit 74cfabe passed both
+  remote CI runs 42311229341 and 42311221628. New code remains undeployed.
+- These checkpoints are on the same state disk and do not establish off-host
+  durability, power-loss hardware behavior, cross-host fencing or live readiness.
+  A checkpoint can predate a POST that never occurred; an unresolved prepared
+  intent remains blocked pending broker/operator investigation. Automatic deletion
+  is absent and checkpoint storage growth needs operational monitoring.

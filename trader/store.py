@@ -128,11 +128,19 @@ class Store:
             result.append(current)
         return result
 
-    def backup(self):
-        """Publish a consistent SQLite backup once per UTC day, including WAL transactions."""
+    def backup(self, intent_id=None):
+        """Publish a verified daily backup or immutable prepared-intent checkpoint."""
+        intent = self.get(intent_id, "intent") if intent_id else None
+        if intent_id and (not intent or intent.get("status") != "prepared"):
+            raise RuntimeError("Execution checkpoint requires a prepared intent")
         directory = self.path.parent / "backups"
         directory.mkdir(mode=0o700, exist_ok=True)
-        destination = directory / ("ledger-" + now().date().isoformat() + ".sqlite")
+        name = (
+            "intent-" + hashlib.sha256(f"{self.scope}:{intent_id}".encode()).hexdigest()
+            if intent_id
+            else "ledger-" + now().date().isoformat()
+        )
+        destination = directory / (name + ".sqlite")
 
         def verify(path):
             if path.is_symlink() or not path.is_file() or path.stat().st_mode & 0o077:
@@ -146,6 +154,13 @@ class Store:
                 experiment = json.loads(row[0]) if row else None
                 if experiment != self.experiment:
                     raise RuntimeError("Backup belongs to a different experiment; preserve and investigate")
+                if intent_id:
+                    row = saved.execute(
+                        "SELECT body FROM documents WHERE scope=? AND kind='intent' AND key=?",
+                        (self.scope, intent_id),
+                    ).fetchone()
+                    if not row or json.loads(row[0]) != intent:
+                        raise RuntimeError("Execution checkpoint does not match prepared intent")
 
         def sync_directory():
             fd = os.open(directory, os.O_RDONLY)

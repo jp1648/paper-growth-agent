@@ -413,6 +413,40 @@ class Service:
                 "extended_hours": False,
                 "client_order_id": cid,
             }
+            try:
+                checkpoint = self.store.backup(intent_id=cid)
+                self.store.log(
+                    "execution_checkpoint_saved", {"client_order_id": cid, "file": checkpoint.name}
+                )
+            except Exception as error:  # noqa: BLE001 - no POST without a verified checkpoint
+                result.update(
+                    status="rejected", reasons=["Execution checkpoint failed"], error=safe_error(error)
+                )
+                self.store.put(cid, result, "intent")
+                self.store.log("execution_checkpoint_failed", result)
+                return result
+            # Disk work can outlast quote/session validity; recheck the saved risk inputs at submission time.
+            last = self.store.get(decision.symbol, "last_trade")
+            reasons = check(
+                self.cfg,
+                decision,
+                risk_context["snapshot"],
+                quote,
+                risk_context["asset"],
+                risk_context["clock"],
+                risk_context["calendar"],
+                self.store.active_orders(),
+                self.store.activities(),
+                last["at"] if last else None,
+                self.store.get("reconciliation")["ok"],
+                self.kill_path.exists(),
+                self.store.experiment["ends_at"],
+                now(),
+            )
+            if reasons:
+                result.update(status="rejected", reasons=reasons)
+                self.store.put(cid, result, "intent")
+                return result
             # Kill can be activated without waiting for this account lock.
             if self.kill_path.exists():
                 result.update(status="rejected", reasons=["Kill switch activated before submission"])

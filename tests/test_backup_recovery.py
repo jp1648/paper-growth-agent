@@ -2,8 +2,10 @@
 
 import sqlite3
 from contextlib import closing
+from datetime import timedelta
 
 import pytest
+from conftest import AT
 
 from trader.accounting import LedgerError
 from trader.models import dec
@@ -12,7 +14,14 @@ from trader.store import Store
 
 
 @pytest.mark.parametrize(
-    "stage", ["before_intent", "before_intent_then_filled", "prepared", "prepared_then_filled"]
+    "stage",
+    [
+        "before_intent",
+        "before_intent_then_filled",
+        "prepared",
+        "prepared_then_filled",
+        "checkpoint_then_filled",
+    ],
 )
 def test_restored_backup_preserves_pause_and_never_repeats_submission(env, decision, tmp_path, stage):
     service, broker, data = env
@@ -20,17 +29,24 @@ def test_restored_backup_preserves_pause_and_never_repeats_submission(env, decis
     backup = None
     if stage.startswith("before_intent"):
         backup = service.store.backup()
+    if stage == "checkpoint_then_filled":
+        service.store.backup()  # Deliberately leave the daily backup older than the order.
     submit = broker.submit
 
     def capture_before_post(payload):
         nonlocal backup
         if backup is None:
-            backup = service.store.backup()
+            backup = (
+                next(service.store.path.parent.glob("backups/intent-*.sqlite"))
+                if stage == "checkpoint_then_filled"
+                else service.store.backup()
+            )
         return submit(payload)
 
     broker.submit = capture_before_post
     result = service.execute(decision, "restore-drill")
-    assert list(backup.parent.iterdir()) == [backup]
+    assert backup.exists()
+    assert len(list(backup.parent.glob("intent-*.sqlite"))) == 1
     cid = result["client_order_id"]
     if stage.endswith("then_filled"):
         broker.fixture_fill(cid)
@@ -63,7 +79,7 @@ def test_restored_backup_preserves_pause_and_never_repeats_submission(env, decis
             recovered.execute(decision, "restore-drill")
             recovered.execute(decision, "restore-drill")
             assert len(restored.items("intent")) == 1
-            if stage == "prepared_then_filled":
+            if stage.endswith("then_filled"):
                 assert restored.get("audit")["cash"] == "99000"
                 assert restored.get("audit")["shares"]["ACME"] == "10"
                 assert len(restored.items("activity")) == 1
@@ -185,3 +201,61 @@ def test_backup_symlink_is_rejected_without_touching_target(env, tmp_path, broke
         assert target.read_bytes() == before
     else:
         assert not target.exists()
+
+
+def test_failed_checkpoint_rejects_before_broker_post_and_never_retries_same_intent(
+    env, decision, monkeypatch
+):
+    import errno
+
+    service, broker, _ = env
+
+    def full_disk(*args):
+        raise OSError(errno.ENOSPC, "Fixture full disk")
+
+    monkeypatch.setattr("trader.store.os.replace", full_disk)
+    result = service.execute(decision, "checkpoint-failure")
+    assert result["status"] == "rejected"
+    assert result["reasons"] == ["Execution checkpoint failed"]
+    assert service.execute(decision, "checkpoint-failure")["status"] == "rejected"
+    assert broker.submits == 0
+    assert service.reservation_summary() == 0
+    assert len(service.store.events("execution_checkpoint_failed")) == 1
+
+
+@pytest.mark.parametrize("interrupt", ["stale", "pause"])
+def test_checkpoint_delay_or_pause_prevents_submission(env, decision, monkeypatch, interrupt):
+    service, broker, _ = env
+    backup = service.store.backup
+
+    def interrupted(*args, **kwargs):
+        result = backup(*args, **kwargs)
+        if interrupt == "stale":
+            monkeypatch.setattr("trader.service.now", lambda: AT + timedelta(minutes=2))
+        else:
+            service.kill_path.write_text("Pause during checkpoint")
+        return result
+
+    monkeypatch.setattr(service.store, "backup", interrupted)
+    result = service.execute(decision, "checkpoint-interruption")
+    assert result["status"] == "rejected"
+    assert any(("stale" if interrupt == "stale" else "Kill switch") in r for r in result["reasons"])
+    assert broker.submits == 0
+    assert len(list(service.store.path.parent.glob("backups/intent-*.sqlite"))) == 1
+
+
+def test_existing_checkpoint_with_changed_intent_blocks_post(env, decision, monkeypatch):
+    service, broker, _ = env
+    backup = service.store.backup
+
+    def altered(*, intent_id):
+        path = backup(intent_id=intent_id)
+        with closing(sqlite3.connect(path)) as db:
+            db.execute("UPDATE documents SET body='{}' WHERE kind='intent'")
+            db.commit()
+        return backup(intent_id=intent_id)
+
+    monkeypatch.setattr(service.store, "backup", altered)
+    result = service.execute(decision, "tampered-checkpoint")
+    assert result["status"] == "rejected" and broker.submits == 0
+    assert "does not match" in result["error"]
