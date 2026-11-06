@@ -61,7 +61,26 @@ with pytest.MonkeyPatch.context() as patch:
             die()
 
     store.put = put
-    if stage == "cancel":
+    if stage.startswith("adjustment"):
+        if stage == "adjustment_mid":
+
+            def checkpoint(sql):
+                if sql.startswith("INSERT INTO journal") and "explicit_adjustment" in sql:
+                    die()
+
+            store.db.set_trace_callback(checkpoint)
+        else:
+            approve = store.approve_adjustments
+
+            def committed(items):
+                approve(items)
+                die()
+
+            store.approve_adjustments = committed
+        service.acknowledge_adjustment(
+            json.loads(Path(config_path).with_name("fixture-adjustments.json").read_text())
+        )
+    elif stage == "cancel":
         service.kill("Process crash drill")
     elif stage == "activity":
         service.reconcile()

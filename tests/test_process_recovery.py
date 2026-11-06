@@ -17,9 +17,27 @@ from trader.service import Service
 from trader.store import Store
 
 
-@pytest.mark.parametrize("stage", ["prepared", "accepted", "order", "cancel", "activity"])
+@pytest.mark.parametrize(
+    "stage", ["prepared", "accepted", "order", "cancel", "activity", "adjustment", "adjustment_mid"]
+)
 def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, decision, tmp_path, stage):
     service, broker, data = env
+    if stage.startswith("adjustment"):
+        broker.activities.extend(
+            [
+                {"id": "deposit-a", "activity_type": "CSD", "date": "2026-10-21", "net_amount": "1000"},
+                {"id": "deposit-b", "activity_type": "CSD", "date": "2026-10-21", "net_amount": "2000"},
+            ]
+        )
+        broker.raw_account.update(cash="103000", equity="103000")
+        with pytest.raises(LedgerError):
+            service.reconcile()
+        service.kill_path.write_text("Operator reviewing contributions")
+        adjustments = [
+            {"id": "deposit-a", "cash": "1000", "reason": "Verified A"},
+            {"id": "deposit-b", "cash": "2000", "reason": "Verified B"},
+        ]
+        (tmp_path / "fixture-adjustments.json").write_text(json.dumps(adjustments))
     if stage in {"cancel", "activity"}:
         result = service.execute(decision, "process-drill")
         if stage == "activity":
@@ -87,7 +105,18 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
         recovered = Service(service.cfg, reopened, broker, data)
         assert reopened.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert reopened.scope == service.store.scope
-        if stage == "prepared":
+        if stage.startswith("adjustment"):
+            before = len(reopened.items("adjustment"))
+            assert before == (0 if stage == "adjustment_mid" else 2)
+            assert len(reopened.events("explicit_adjustment")) == before
+            recovered.acknowledge_adjustment(adjustments)
+            recovered.acknowledge_adjustment(adjustments)
+            assert recovered.kill_path.exists()
+            assert broker.submits == 0
+            assert len(reopened.items("adjustment")) == 2
+            assert len(reopened.events("explicit_adjustment")) == 2
+            assert reopened.get("audit")["cash"] == "103000"
+        elif stage == "prepared":
             with pytest.raises(LedgerError, match="Unresolved submission"):
                 recovered.execute(decision, "process-drill")
             assert recovered.reservation_summary() == dec("1001")

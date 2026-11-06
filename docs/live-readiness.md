@@ -446,9 +446,9 @@ operator attestation, not independent API verification of delivery.
 - The existing acknowledge-adjustment JSON file may now contain either one object
   or a list of objects for related unresolved activities. A single incomplete
   approval fails without saving; submit all required related adjustments together.
-  Retrying the same batch is safe. An interruption during persistence may leave a
-  subset of preflight-approved entries; the pause remains and the identical batch
-  completes the remainder. Approved entries cannot be silently edited; a later
+  Retrying the same batch is safe. Approvals and audit receipts now commit as one
+  SQLite transaction (see the crash regression below). Approved entries cannot
+  be silently edited; a later
   genuine correction requires a separately audited correction design.
 - Replay now rejects corporate actions that remove all shares but leave orphaned
   cost basis. Matching cash/shares still does not establish economic correctness
@@ -458,3 +458,16 @@ operator attestation, not independent API verification of delivery.
   missing-broker-activity case then passed in the 18-test accounting matrix.
   Ruff/format/whitespace checks passed. Funding-gate commit 05be23f passed all remote
   CI jobs in run 42308483653. New adjustment code is not deployed; no orders made.
+- Actual adjustment SIGKILL regression reproduced a missing audit receipt: the
+  first approval document survived termination between its write and journal log,
+  while exact retry skipped that receipt. Adjustment batches now insert all
+  approval documents and journal receipts in one SQLite transaction. Conflicting
+  inserts fail instead of overwriting history; telemetry emission follows commit.
+- Seven real subprocess crash drills now pass. The two new checkpoints terminate
+  during the approval transaction (no approvals or receipts survive) and after
+  commit (both approvals and both receipts survive). Reopened databases pass
+  integrity checks; exact retries yield two receipts, original experiment/pause
+  remain intact and broker submission count stays zero. These are loopback
+  process tests, not cloud failover or proof of atomic external telemetry delivery.
+- Full offline suite: 451 passed, three opt-in integrations skipped. Ruff lint,
+  formatting and whitespace checks pass. No production deployment or orders.

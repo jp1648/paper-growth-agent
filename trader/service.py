@@ -507,9 +507,7 @@ class Service:
             actual = {p["symbol"]: dec(p["qty"]) for p in snap.positions}
             if actual != {symbol: qty for symbol, qty in ledger["shares"].items() if qty != 0}:
                 raise LedgerError("Proposed adjustments do not reconcile broker positions")
-            for item in pending:
-                self.store.put(item["id"], item, "adjustment")
-                self.store.log("explicit_adjustment", item)
+            self.store.approve_adjustments(pending)
             return self.reconcile()
 
     @traced("service.acknowledge_revision")

@@ -69,6 +69,24 @@ class Store:
             )
         ]
 
+    def approve_adjustments(self, adjustments):
+        """Preflighted approvals and their audit receipts commit as one unit."""
+        stamp = now().isoformat()
+        with self.db:
+            for item in adjustments:
+                body = dumps(item)
+                self.db.execute(
+                    "INSERT INTO documents VALUES (?,?,?,?)",
+                    (self.scope, "adjustment", item["id"], body),
+                )
+                self.db.execute(
+                    "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+                    (self.scope, stamp, "explicit_adjustment", body),
+                )
+        for item in adjustments:
+            emit("document.adjustment", {"key": item["id"], "value": item}, experiment_id=self.scope)
+            emit("explicit_adjustment", item, experiment_id=self.scope)
+
     def log(self, kind, body):
         with self.db:
             self.db.execute(
