@@ -70,15 +70,19 @@ def measurements(root=ROOT):
         database = root / database
     values["outbox_oldest_age_seconds"] = outbox_oldest_age(database.parent / "telemetry-outbox.sqlite")
     day = dt.datetime.now(ZoneInfo("America/New_York")).date().isoformat()
-    with sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=5) as db:
-        used = db.execute(
-            "SELECT coalesce(sum(CAST(json_extract(body,'$.usd') AS REAL)),0) "
-            "FROM documents WHERE scope='global' AND kind='research_spend' "
-            "AND json_extract(body,'$.day')=?",
-            (day,),
-        ).fetchone()[0]
-    limit = float(config["research_daily_cost_usd"])
-    values["daily_model_spend_ratio"] = used / limit if limit else float(used > 0)
+    try:
+        with sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=5) as db:
+            used = db.execute(
+                "SELECT coalesce(sum(CAST(json_extract(body,'$.usd') AS REAL)),0) "
+                "FROM documents WHERE scope='global' AND kind='research_spend' "
+                "AND json_extract(body,'$.day')=?",
+                (day,),
+            ).fetchone()[0]
+        limit = float(config["research_daily_cost_usd"])
+        values["daily_model_spend_ratio"] = used / limit if limit else float(used > 0)
+    except sqlite3.Error:
+        # Unknown spending must alert without suppressing the other health gauges.
+        values["daily_model_spend_ratio"] = 1e12
     return values
 
 

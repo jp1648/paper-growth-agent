@@ -68,3 +68,27 @@ def test_outbox_age_fails_closed_without_reading_event_contents(tmp_path, state)
         assert age == 1e12
     if state == "missing":
         assert not database.exists()
+
+
+@pytest.mark.parametrize("state", ["missing", "corrupt"])
+def test_unreadable_ledger_preserves_other_health_metrics(tmp_path, monkeypatch, state):
+    spec = importlib.util.spec_from_file_location(
+        "always_on_monitor", Path(__file__).parents[1] / "deploy/always-on-monitor.py"
+    )
+    monitor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(monitor)
+    (tmp_path / "state").mkdir()
+    (tmp_path / "config.toml").write_text('research_daily_cost_usd="5"\n')
+    database = tmp_path / "state/ledger.sqlite"
+    if state == "corrupt":
+        database.write_bytes(b"not a database")
+    with sqlite3.connect(tmp_path / "state/telemetry-outbox.sqlite") as db:
+        db.execute("CREATE TABLE outbox(id,body)")
+    monkeypatch.setattr(monitor.subprocess, "run", Mock(return_value=Mock(returncode=1)))
+    values = monitor.measurements(tmp_path)
+    assert values["healthy"] == 0
+    assert 0 <= values["disk_used_ratio"] <= 1
+    assert values["outbox_oldest_age_seconds"] == 0
+    assert values["daily_model_spend_ratio"] == 1e12
+    if state == "missing":
+        assert not database.exists()
