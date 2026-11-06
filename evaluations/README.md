@@ -58,3 +58,27 @@ to pass the cohort; separately test bounded document access or honest abstention
   sufficient-case denominator.
 - Run only through the research evaluator with explicit model-run opt-in, stable
   run IDs and the approved daily budget. No broker or execution graph is involved.
+
+## Separate semantic reviews
+
+The current scoring contract is `financial-provenance-v3`. A candidate's embedded
+`human_review` is rejected; a model output cannot approve itself. A reviewer must
+supply a separate JSON file to `paper-agent evaluate --reviews reviews.json`
+alongside the existing `--suite`, `--responses`, `--output` and `--run-id` options.
+The evaluator reads this file without changing the original recording.
+
+The review file has `version: 1`, `suite_hash`, `recording_hash`, and a `cases`
+object keyed by reviewed case IDs. Each review contains `case_hash`,
+`candidate_hash`, a nonempty `reviewer`, timezone-aware `reviewed_at`, explicit
+booleans `independent`, `claims_supported`, `abstention_reason_correct`, and
+nonempty `notes`. Approval requires all three booleans to be true and all hashes
+to match. Hashes use `trader.evaluation.fingerprint` on the parsed JSON objects;
+they are not hashes of pretty-printed file bytes. Partial review is allowed;
+unreviewed cases remain pending. An invalid or mismatched review cannot produce
+an accepted result. Results retain the review-file content hash for audit.
+
+Hash binding prevents stale approvals from being silently reused; it does not
+authenticate the named reviewer. Before promotion, the operator must verify the
+reviewer's identity and independence and retain the original review file. No
+review has been supplied or claimed by this implementation. Prior v2 results
+must be rescored before comparison under v3; old results are not rewritten.

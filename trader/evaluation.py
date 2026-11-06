@@ -15,6 +15,7 @@ from .models import Decision
 from .research_team import Catalysts, Critique, Research, Valuation
 
 SCHEMAS = {"business": Research, "catalysts": Catalysts, "valuation": Valuation, "adversarial": Critique}
+SCORING_CONTRACT = "financial-provenance-v3"
 
 
 def fingerprint(value):
@@ -101,7 +102,7 @@ def scenario_values(inputs):
     return results
 
 
-def score(case, candidate):
+def score(case, candidate, review=None):
     """Score a recorded candidate. Existence of a citation is not semantic support."""
     failures = []
     reports = candidate.get("reports", {})
@@ -216,18 +217,27 @@ def score(case, candidate):
     mechanically_valid = complete and not failures
     mechanical_pass = not failures
     # Semantic review is explicitly separate from mechanical correctness.
-    review = candidate.get("human_review")
-    reviewed = bool(review and review.get("reviewer") and review.get("reviewed_at"))
+    if candidate.get("human_review") is not None:
+        failures.append("embedded_review_not_accepted")
+    reviewed = review is not None
     if reviewed:
+        if review.get("case_hash") != fingerprint(case) or review.get("candidate_hash") != fingerprint(
+            candidate
+        ):
+            raise ValueError("Semantic review does not match exact case and candidate")
+        if not isinstance(review.get("reviewer"), str) or not review["reviewer"].strip():
+            raise ValueError("Semantic review requires a named independent reviewer")
         timestamp(review["reviewed_at"])
         if (
             review.get("claims_supported") is not True
             or review.get("abstention_reason_correct") is not True
-            or not review.get("notes")
+            or review.get("independent") is not True
+            or not isinstance(review.get("notes"), str)
+            or not review["notes"].strip()
         ):
             failures.append("human_review_failed")
     return {
-        "scoring_contract": "financial-provenance-v2",
+        "scoring_contract": SCORING_CONTRACT,
         "case_id": case["id"],
         "split": case["split"],
         "sufficient_evidence": expected["outcome"] == "complete",
@@ -284,7 +294,7 @@ def summarize(rows):
     }
 
 
-def replay(suite_path, responses_path, output_path, run_id):
+def replay(suite_path, responses_path, output_path, run_id, *, reviews_path=None):
     """Evaluate immutable recorded outputs. Never invokes a model or trading path."""
     suite = load_suite(suite_path)
     recording = json.loads(Path(responses_path).read_text())
@@ -298,6 +308,17 @@ def replay(suite_path, responses_path, output_path, run_id):
             raise ValueError(f"Missing candidate provenance: {field}")
     if recording["mode"] not in {"offline_script", "recorded_model"}:
         raise ValueError("Invalid recording mode")
+    reviews = None
+    if reviews_path is not None:
+        reviews = json.loads(Path(reviews_path).read_text())
+        if (
+            reviews.get("version") != 1
+            or reviews.get("suite_hash") != fingerprint(suite)
+            or reviews.get("recording_hash") != fingerprint(recording)
+            or not isinstance(reviews.get("cases"), dict)
+            or not set(reviews["cases"]).issubset(expected_ids)
+        ):
+            raise ValueError("Reviews must bind the exact suite and recording with known case IDs")
     rows = []
     for case in suite["cases"]:
         candidate = recording["cases"][case["id"]]
@@ -327,7 +348,7 @@ def replay(suite_path, responses_path, output_path, run_id):
             raise ValueError("Invalid stage outcome")
         rows.append(
             {
-                **score(case, candidate),
+                **score(case, candidate, reviews["cases"].get(case["id"]) if reviews else None),
                 "metrics": metrics,
                 "stages": candidate["stages"],
                 "inputs_hash": fingerprint(model_inputs(case)),
@@ -340,10 +361,11 @@ def replay(suite_path, responses_path, output_path, run_id):
         )
     result = {
         "version": 1,
-        "scoring_contract": "financial-provenance-v2",
+        "scoring_contract": SCORING_CONTRACT,
         "run_id": run_id,
         "suite_hash": fingerprint(suite),
         "recording_hash": fingerprint(recording),
+        "reviews_hash": fingerprint(reviews) if reviews is not None else None,
         "provenance": {k: v for k, v in recording.items() if k != "cases"},
         "cases": rows,
         "summary": summarize(rows),
@@ -652,7 +674,7 @@ def run_suite(cfg, suite_path, output_dir, run_id, max_cost, split="development"
 def compare(baseline_path, candidate_path, output_path):
     """Paired comparison only; never silently compare different cases or evidence."""
     baseline, candidate = [json.loads(Path(p).read_text()) for p in (baseline_path, candidate_path)]
-    if any(r.get("scoring_contract") != "financial-provenance-v2" for r in (baseline, candidate)):
+    if any(r.get("scoring_contract") != SCORING_CONTRACT for r in (baseline, candidate)):
         raise ValueError("Comparison requires both recordings rescored under the current scoring contract")
     if baseline["suite_hash"] != candidate["suite_hash"]:
         raise ValueError("Comparison requires identical frozen suites and splits")

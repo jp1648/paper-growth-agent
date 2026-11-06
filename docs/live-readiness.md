@@ -407,3 +407,15 @@ operator attestation, not independent API verification of delivery.
 - Microsoft original HTML exceeds the production 8 MB retrieval bound. Frozen
   extraction tests cannot establish production retrieval success. That remains
   an explicit ingestion gap; no safety bound was raised. Full goal remains NO-GO.
+- Cohort commit 7b13ece passed all remote CI jobs in run 42308031727.
+- Semantic-review boundary: found that candidate-embedded human_review could
+  produce acceptance. Scoring contract financial-provenance-v3 now rejects that
+  path. Independent review is a separate explicit CLI input, bound to exact
+  suite, recording, case and candidate hashes; unknown IDs and stale hashes
+  reject the replay. Partial reviews leave remaining cases pending, and results
+  retain the review content hash. v2 comparisons require rescoring.
+- Seven new regressions cover candidate self-approval and mismatched review
+  bindings. Full offline suite: 426 passed, three opt-in integrations skipped;
+  Ruff lint/format and whitespace checks pass. Operator verification of reviewer
+  identity/independence is still required; hashes do not authenticate people.
+  No actual semantic approval, model call, deployment or order occurred.

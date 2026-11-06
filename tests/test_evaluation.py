@@ -77,7 +77,7 @@ def test_gap_buy_and_false_human_review_fail():
         "claims_supported": False,
         "abstention_reason_correct": True,
     }
-    assert "human_review_failed" in score(case, candidate)["failures"]
+    assert "embedded_review_not_accepted" in score(case, candidate)["failures"]
 
 
 def test_future_sources_and_mismatched_recordings_fail(tmp_path):
@@ -319,17 +319,20 @@ def test_human_review_cannot_be_replaced_by_truthy_strings():
     suite, recording = inputs()
     case = suite["cases"][4]
     candidate = recording["cases"][case["id"]]
-    candidate["human_review"] = {
+    review = {
+        "case_hash": fingerprint(case),
+        "candidate_hash": fingerprint(candidate),
+        "independent": True,
         "reviewer": "fixture reviewer",
         "reviewed_at": "2026-11-06T00:00:00Z",
         "claims_supported": "false",
         "abstention_reason_correct": True,
         "notes": "Fixture only, no real review claimed.",
     }
-    result = score(case, candidate)
+    result = score(case, candidate, review)
     assert result["mechanical_pass"] and result["acceptance"] == "failed"
-    candidate["human_review"]["claims_supported"] = True
-    assert score(case, candidate)["acceptance"] == "passed"
+    review["claims_supported"] = True
+    assert score(case, candidate, review)["acceptance"] == "passed"
 
 
 def test_interruption_retains_budget_and_manifest_without_duplicate_retry(tmp_path, monkeypatch):
@@ -487,3 +490,63 @@ def test_annual_filing_cohort_integrity_and_independent_financial_inputs():
             assert not case["inputs"]["documents"]
             with pytest.raises(ValueError, match="Missing matching annual"):
                 annual_cash_flow(source, entry["period_end"], cutoff)
+
+
+def test_candidate_cannot_self_certify_semantic_acceptance():
+    suite, recording = inputs()
+    case = suite["cases"][4]
+    candidate = recording["cases"][case["id"]]
+    candidate["human_review"] = {
+        "reviewer": "claimed reviewer",
+        "reviewed_at": "2026-11-06T00:00:00Z",
+        "claims_supported": True,
+        "abstention_reason_correct": True,
+        "independent": True,
+        "notes": "Approve myself",
+    }
+    result = score(case, candidate)
+    assert result["acceptance"] == "failed"
+    assert result["semantic_review"] == "pending"
+    assert "embedded_review_not_accepted" in result["failures"]
+
+
+@pytest.mark.parametrize("change", [None, "case", "candidate", "suite", "recording", "unknown_case"])
+def test_separate_review_replay_binds_all_evidence(tmp_path, change):
+    suite, recording = inputs()
+    case = suite["cases"][4]
+    candidate = recording["cases"][case["id"]]
+    review = {
+        "case_hash": fingerprint(case),
+        "candidate_hash": fingerprint(candidate),
+        "reviewer": "offline fixture reviewer",
+        "reviewed_at": "2026-11-06T00:00:00Z",
+        "claims_supported": True,
+        "abstention_reason_correct": True,
+        "independent": True,
+        "notes": "Synthetic test approval only; no real review claimed.",
+    }
+    reviews = {
+        "version": 1,
+        "suite_hash": fingerprint(suite),
+        "recording_hash": fingerprint(recording),
+        "cases": {case["id"]: review},
+    }
+    if change in {"case", "candidate"}:
+        review[change + "_hash"] = "different"
+    elif change in {"suite", "recording"}:
+        reviews[change + "_hash"] = "different"
+    elif change == "unknown_case":
+        reviews["cases"]["unknown"] = review
+    path = tmp_path / "reviews.json"
+    path.write_text(json.dumps(reviews))
+    output = tmp_path / "result.json"
+    if change:
+        with pytest.raises(ValueError, match="review|Review"):
+            replay(SUITE, RECORDING, output, "review-test", reviews_path=path)
+        assert not output.exists()
+    else:
+        result = replay(SUITE, RECORDING, output, "review-test", reviews_path=path)
+        row = next(r for r in result["cases"] if r["case_id"] == case["id"])
+        assert row["acceptance"] == "passed"
+        assert result["reviews_hash"] == fingerprint(reviews)
+        assert result["summary"]["pending_semantic_reviews"] == len(suite["cases"]) - 1

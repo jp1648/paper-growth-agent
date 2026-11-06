@@ -58,6 +58,7 @@ def main(argv=None):
     evaluation.add_argument("--responses", required=True)
     evaluation.add_argument("--output", required=True)
     evaluation.add_argument("--run-id", required=True)
+    evaluation.add_argument("--reviews", help="Separate reviewer-supplied, hash-bound semantic reviews")
     live_eval = sub.add_parser(
         "evaluate-run", help="Explicitly budgeted model research on frozen evidence; no broker"
     )
@@ -89,7 +90,7 @@ def main(argv=None):
     if args.command == "evaluate":
         from .evaluation import replay
 
-        result = replay(args.suite, args.responses, args.output, args.run_id)
+        result = replay(args.suite, args.responses, args.output, args.run_id, reviews_path=args.reviews)
         print(json.dumps(result["summary"], indent=2))
         return 0
     try:
