@@ -449,3 +449,41 @@ def test_comparison_rejects_old_scoring_contract(tmp_path):
     path.write_text(json.dumps(candidate))
     with pytest.raises(ValueError, match="scoring contract"):
         compare(baseline, path, tmp_path / "comparison.json")
+
+
+def test_annual_filing_cohort_integrity_and_independent_financial_inputs():
+    import hashlib
+    from datetime import datetime
+    from decimal import Decimal
+
+    from trader.financials import annual_cash_flow
+
+    path = Path("evaluations/annual-filings-v2.json")
+    manifest = json.loads(Path("evaluations/annual-filings-v2-manifest.json").read_text())
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == manifest["suite_sha256"]
+    suite = load_suite(path)
+    assert len(suite["cases"]) == 4
+    expected = {
+        "AAPL": (111482000000, 12715000000, 15004697000),
+        "MSFT": (136162000000, 64551000000, 7465000000),
+    }
+    for case in suite["cases"]:
+        symbol = case["inputs"]["symbol"]
+        assert case["split"] == ("development" if symbol == "AAPL" else "holdout")
+        assert case["inputs"]["reference_kind"].startswith("hypothetical_non_executable")
+        source = case["inputs"]["sources"][0]
+        entry = next(s for s in manifest["sources"] if s["symbol"] == symbol)
+        cutoff = datetime.fromisoformat(case["cutoff"])
+        if case["expected"]["outcome"] == "complete":
+            doc = case["inputs"]["documents"][0]
+            assert hashlib.sha256(doc["text"].encode()).hexdigest() == entry["frozen_text_sha256"]
+            cfo, capex, shares = map(Decimal, expected[symbol])
+            independent = ((cfo - capex) / shares).quantize(Decimal("0.000001"))
+            result = annual_cash_flow(source, entry["period_end"], cutoff)
+            assert Decimal(result["cash_flow_per_share"]) == independent
+            assert case["expected"]["cash_flow_per_share"] == str(independent)
+            assert all(r["accn"] == entry["accession"] for r in result["facts"].values())
+        else:
+            assert not case["inputs"]["documents"]
+            with pytest.raises(ValueError, match="Missing matching annual"):
+                annual_cash_flow(source, entry["period_end"], cutoff)

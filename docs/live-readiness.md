@@ -391,3 +391,19 @@ operator attestation, not independent API verification of delivery.
   suite: 418 passed, three integrations skipped; combined coverage 82%, 80% floor
   passed. No production calls or deployment. Remote run 42307462274 for the prior
   filing commit was still running when this local verification completed.
+
+- Remote CI run 42307608296 passed backend, dashboard and secret scanning for
+  commit 2a3c6c5, including the filing-response validation changes.
+- Research cohort preparation: annual-filings-v2 adds original FY2025 Apple and
+  Microsoft annual filing text, exact-accession SEC financial records and two
+  labeled missing-evidence variants. Independent fixed-number arithmetic and
+  immutable suite/text hashes pass the 30-case evaluator test suite. Apple is
+  development; Microsoft remains unrun holdout. No paid models were invoked.
+- These are reconstructed historical reasoning exercises with hypothetical
+  scenario prices, not archived point-in-time market data or a backtest. Both
+  sufficient-case rubrics still need independent review, and two companies are
+  insufficient for release promotion. Raw public-source hashes and retrieval
+  limitations are documented in evaluations/README.md and its manifest.
+- Microsoft original HTML exceeds the production 8 MB retrieval bound. Frozen
+  extraction tests cannot establish production retrieval success. That remains
+  an explicit ingestion gap; no safety bound was raised. Full goal remains NO-GO.
