@@ -14,6 +14,10 @@ from .models import dec, dt, dumps, now
 from .observability import traced
 
 
+class EvidenceTooLarge(ValueError):
+    """The complete response cannot be retrieved within the evidence byte bound."""
+
+
 class FilingText(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -65,7 +69,7 @@ class EvidenceProvider:
                 for chunk in response.iter_bytes():
                     size += len(chunk)
                     if size > 8_000_000:
-                        raise ValueError("SEC document exceeds retrieval limit")
+                        raise EvidenceTooLarge("SEC document exceeds retrieval limit")
                     chunks.append(chunk)
                 return httpx.Response(200, content=b"".join(chunks))
 
@@ -186,6 +190,16 @@ class EvidenceProvider:
         cik = int(self.cfg.universe[symbol].cik)
         base = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession.replace('-', '')}/"
         raw = self.request(base + "index.json").json()
+        items = [
+            item
+            for item in raw["directory"]["item"]
+            if re.fullmatch(r"[A-Za-z0-9_.-]+\.(?:htm|html|txt)", item["name"])
+        ]
+        primary = filing.get("primaryDocument")
+        if any(item["name"] == primary for item in items):
+            # The submission bundle duplicates the primary filing and separately listed exhibits.
+            items = [item for item in items if item["name"] != accession + ".txt" or item["name"] == primary]
+            items.sort(key=lambda item: item["name"] != primary)
         return [
             {
                 "url": base + quote(item["name"], safe=""),
@@ -193,8 +207,7 @@ class EvidenceProvider:
                 "published_at": filing.get("acceptanceDateTime", filing["filingDate"]),
                 "form": filing["form"],
             }
-            for item in raw["directory"]["item"]
-            if re.fullmatch(r"[A-Za-z0-9_.-]+\.(?:htm|html|txt)", item["name"])
+            for item in items
         ][:80]
 
     @traced("evidence.document")

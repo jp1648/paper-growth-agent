@@ -21,6 +21,7 @@ from langsmith import tracing_context
 from pydantic import Field
 
 from .alpaca import safe_error
+from .evidence import EvidenceTooLarge
 from .models import Decision, Model, dec, dt, dumps, now
 from .observability import emit, traced
 from .spending import DailyReservation
@@ -398,6 +399,7 @@ class ResearchDesk:
         self.sources = {s["id"]: copy.deepcopy(s) for s in evidence["sources"]}
         self.companies = {context["symbol"]: evidence}
         self.documents, self.texts, self.calculations, self.reports = {}, {}, {}, {}
+        self.unavailable_documents = {}
         self.report_times = {}
         self.reused = []
         self.running = set()
@@ -503,8 +505,22 @@ class ResearchDesk:
                 metadata = self.documents.get(document_id)
                 if metadata is None:
                     raise ValueError("Unknown document; list filing_documents first")
+                if document_id in self.unavailable_documents:
+                    return copy.deepcopy(self.unavailable_documents[document_id])
                 if document_id not in self.texts:
-                    self.texts[document_id] = self.provider.document(metadata)
+                    try:
+                        self.texts[document_id] = self.provider.document(metadata)
+                    except EvidenceTooLarge:
+                        gap = {
+                            "document_id": document_id,
+                            "url": metadata["url"],
+                            "available": False,
+                            "reason": "SEC document exceeds the 8000000-byte retrieval bound; no text was retained. Try the primary filing or a separately listed exhibit. This unavailable document supplies no evidence for any claim.",
+                        }
+                        self.unavailable_documents[document_id] = gap
+                        with self.budget.lock:
+                            self.budget.events.append(("research_evidence_gap", copy.deepcopy(gap)))
+                        return copy.deepcopy(gap)
                 text = self.texts[document_id]
                 start = text.casefold().find(query.casefold()) if query else 0
                 if start < 0:

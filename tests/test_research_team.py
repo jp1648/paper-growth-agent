@@ -736,3 +736,82 @@ def test_full_graph_reserves_all_specialists_after_exhaustive_lead_browsing(env,
     assert broker.submits == 1
     audit = service.store.get("exhaustive-lead", "research_audit")
     assert audit["tool_calls"] == 48 and not audit["stopped"]
+
+
+@pytest.mark.parametrize("primary", ["primary.htm", None])
+def test_primary_filing_precedes_bundle_and_standalone_text_is_preserved(env, primary):
+    service, _, _ = env
+    accession = "0000000001-26-000001"
+    names = [accession + ".txt", "exhibit.txt", "primary.htm"] if primary else [accession + ".txt"]
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                200, json={"directory": {"item": [{"name": name} for name in names]}}
+            )
+        )
+    )
+    provider = EvidenceProvider(service.cfg, service.store, None, client)
+    provider.cfg.sec_user_agent = "Test example@example.com"
+    docs = provider.documents(
+        "ACME",
+        {
+            "accessionNumber": accession,
+            "filingDate": "2026-01-01",
+            "form": "10-K",
+            "primaryDocument": primary,
+        },
+    )
+    assert [doc["name"] for doc in docs] == (
+        ["primary.htm", "exhibit.txt"] if primary else [accession + ".txt"]
+    )
+
+
+def test_oversized_filing_becomes_gap_and_full_graph_finishes_watch(env, decision):
+    from trader.evidence import EvidenceTooLarge
+
+    class OversizedEvidence(Evidence):
+        def document(self, metadata):
+            raise EvidenceTooLarge("SEC document exceeds retrieval limit")
+
+    class GapModel(TeamModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            schema = kwargs["response_format"]["json_schema"]["name"]
+            if schema == "Research":
+                gaps = [
+                    message
+                    for message in messages
+                    if isinstance(message, ToolMessage) and '"available": false' in message.content
+                ]
+                if gaps:
+                    gap = json.loads(gaps[-1].content)
+                    assert "content" not in gap and "id" not in gap
+                    message = AIMessage(
+                        content=json.dumps(
+                            {
+                                "business_quality": "Unverified",
+                                "growth_evidence": "Financial facts only",
+                                "financial_health": "Unverified",
+                                "contrary_evidence": [],
+                                "evidence_ids": ["fixture-sec"],
+                                "missing_information": [gap["reason"]],
+                            }
+                        )
+                    )
+                    message.usage_metadata = {"input_tokens": 100, "output_tokens": 100, "total_tokens": 200}
+                    return ChatResult(generations=[ChatGeneration(message=message)])
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    service, broker, _ = env
+    service.cfg.input_cost_per_million = dec("1")
+    service.cfg.output_cost_per_million = dec("1")
+    proposal = decision.model_copy(update={"evidence_ids": ["fixture-sec"]})
+    model = GapModel(decision=proposal.model_dump(mode="json"), gap=True, unsupported_valuation=True)
+    worker = DeepResearchTeam(service.cfg, service.store, OversizedEvidence(), model)
+    result = build_graph(service, worker).invoke({"symbol": "ACME", "run_key": "oversized-gap"})
+    assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
+    assert result["decision"]["action"] == "WATCH"
+    assert result["valuation"]["calculation_id"] is None
+    assert result["research"]["missing_information"]
+    assert service.store.events("research_evidence_gap")
+    assert not any(source["id"].startswith("passage-") for source in result["evidence"]["sources"])
+    assert broker.submits == 0
