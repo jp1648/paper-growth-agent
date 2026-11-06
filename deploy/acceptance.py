@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 from decimal import ROUND_DOWN
 from zoneinfo import ZoneInfo
 
+import httpx
+
+from trader.accounting import LedgerError
 from trader.alpaca import AlpacaBroker, AlpacaData, safe_error
 from trader.config import Settings
 from trader.evidence import EvidenceProvider
@@ -76,7 +79,18 @@ def confirmed_fill(store, cid):
     return None
 
 
-def run(service, mode, symbol, run_key, research_key=None, reviewed=False, team=None, sleep=time.sleep):
+def run(
+    service,
+    mode,
+    symbol,
+    run_key,
+    research_key=None,
+    reviewed=False,
+    team=None,
+    sleep=time.sleep,
+    *,
+    unrestricted_research=False,
+):
     store, cfg = service.store, service.cfg
     service.require_experiment()
     if not service.kill_path.exists():
@@ -108,24 +122,32 @@ def run(service, mode, symbol, run_key, research_key=None, reviewed=False, team=
                 "status": "started",
                 "at": now(),
                 "research_key": research_key,
+                "unrestricted_research": unrestricted_research,
             }
             store.put(run_key, record, "acceptance")
             store.log("acceptance_started", {"run_key": run_key, **record})
             snapshot = service.reconcile()
             if mode == "research":
                 remaining = spending_status(store, cfg.research_daily_cost_usd)["remaining_usd"]
-                cap = min(D("4.75"), cfg.research_max_cost_usd, remaining - D(".25"))
-                if cap <= 0:
+                cap = (
+                    None
+                    if unrestricted_research
+                    else min(D("4.75"), cfg.research_max_cost_usd, remaining - D(".25"))
+                )
+                if cap is not None and cap <= 0:
                     raise RuntimeError("Insufficient daily budget including acceptance buffer")
                 bounded = cfg.model_copy(
                     update={
-                        "research_max_cost_usd": cap,
+                        "research_max_cost_usd": cfg.research_max_cost_usd if cap is None else cap,
                         "research_max_output_tokens": 5000,
                         "research_max_model_calls": 40,
                     }
                 )
                 worker = team or DeepResearchTeam(
-                    bounded, store, EvidenceProvider(bounded, store, service.data)
+                    bounded,
+                    store,
+                    EvidenceProvider(bounded, store, service.data),
+                    unrestricted_research=unrestricted_research,
                 )
                 quote = research_price(service, symbol)
                 result = worker.run(
@@ -178,7 +200,12 @@ def run(service, mode, symbol, run_key, research_key=None, reviewed=False, team=
                     raise RuntimeError("Paper order failed deterministic admission: " + dumps(submitted))
                 deadline = time.monotonic() + 180
                 while time.monotonic() < deadline:
-                    service.reconcile()
+                    try:
+                        service.reconcile()
+                    except (LedgerError, httpx.HTTPError):
+                        # Broker positions can arrive before their matching fill activities.
+                        sleep(5)
+                        continue
                     order = store.get(cid, "order")
                     fill = confirmed_fill(store, cid)
                     if fill:
@@ -222,6 +249,11 @@ def main():
     parser.add_argument("--listener-stopped", action="store_true", required=True)
     parser.add_argument("--research-key")
     parser.add_argument("--reviewed", action="store_true")
+    parser.add_argument(
+        "--unrestricted-research",
+        action="store_true",
+        help="Supervised test only: remove research spend/count/context/deadline quotas; retain security/data validation. Run under an external watchdog.",
+    )
     args = parser.parse_args()
     cfg = Settings.load(args.config)
     store = Store(cfg.database)
@@ -235,6 +267,7 @@ def main():
                     args.run_key,
                     args.research_key,
                     args.reviewed,
+                    unrestricted_research=args.unrestricted_research,
                 )
             )
         )

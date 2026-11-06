@@ -121,9 +121,11 @@ class ResearchLimit(RuntimeError):
 
 
 class Budget:
-    def __init__(self, cfg, limit=None):
+    def __init__(self, cfg, limit=None, *, unrestricted_research=False):
         self.cfg = cfg
-        self.limit = cfg.research_max_cost_usd if limit is None else limit
+        # Supervised tests rely on the external watchdog; transport and permission guards remain active.
+        self.unrestricted_research = unrestricted_research
+        self.limit = None if unrestricted_research else cfg.research_max_cost_usd if limit is None else limit
         self.started = time.monotonic()
         self.day = now().astimezone(ZoneInfo("America/New_York")).date()
         self.models = self.tools = 0
@@ -133,10 +135,12 @@ class Budget:
         self.events = []
 
     def check(self):
-        if (
-            self.failed
-            or time.monotonic() - self.started >= self.cfg.research_max_seconds
-            or now().astimezone(ZoneInfo("America/New_York")).date() != self.day
+        if self.failed or (
+            not self.unrestricted_research
+            and (
+                time.monotonic() - self.started >= self.cfg.research_max_seconds
+                or now().astimezone(ZoneInfo("America/New_York")).date() != self.day
+            )
         ):
             self.failed = True
             raise ResearchLimit("Research stopped: budget exhausted, deadline reached or a call failed")
@@ -150,9 +154,9 @@ class Budget:
                 dec(size + 2048) * route.input_cost_per_million
                 + dec(self.cfg.research_max_output_tokens) * route.output_cost_per_million
             ) / dec(1000000)
-            if (
-                self.models >= self.cfg.research_max_model_calls
-                or size > self.cfg.research_max_input_bytes
+            if not self.unrestricted_research and (
+                size > self.cfg.research_max_input_bytes
+                or self.models >= self.cfg.research_max_model_calls
                 or self.reserved + reserve > self.limit
             ):
                 self.failed = True
@@ -166,7 +170,7 @@ class Budget:
     def tool(self):
         with self.lock:
             self.check()
-            if self.tools >= self.cfg.research_max_tool_calls:
+            if not self.unrestricted_research and self.tools >= self.cfg.research_max_tool_calls:
                 self.failed = True
                 raise ResearchLimit("Research tool-call limit reached")
             self.tools += 1
@@ -227,9 +231,17 @@ class Guard(AgentMiddleware):
         tools = [
             t for t in request.tools if (t.get("name") if isinstance(t, dict) else t.name) in self.allowed
         ]
-        if self.role != "research_lead" and self.tool_calls >= self.specialist_allowance:
+        if (
+            not self.budget.unrestricted_research
+            and self.role != "research_lead"
+            and self.tool_calls >= self.specialist_allowance
+        ):
             tools = []
-        elif self.role == "research_lead" and self.tool_calls >= self.lead_allowance:
+        elif (
+            not self.budget.unrestricted_research
+            and self.role == "research_lead"
+            and self.tool_calls >= self.lead_allowance
+        ):
             tools = [t for t in tools if (t.get("name") if isinstance(t, dict) else t.name) == "task"]
         payload = {
             "messages": [m.model_dump() for m in messages],
@@ -337,7 +349,7 @@ class Guard(AgentMiddleware):
                     },
                 )
             )
-            if self.budget.reserved > self.budget.limit:
+            if not self.budget.unrestricted_research and self.budget.reserved > self.budget.limit:
                 self.budget.failed = True
 
     @traced("tool.call", inputs=lambda self, request, handler: {"role": self.role, "tool": request.tool_call})
@@ -371,7 +383,7 @@ class Guard(AgentMiddleware):
                 self.running_tasks.add(delegated)
             else:
                 allowance = self.lead_allowance if self.role == "research_lead" else self.specialist_allowance
-                if self.tool_calls >= allowance:
+                if not self.budget.unrestricted_research and self.tool_calls >= allowance:
                     return ToolMessage(
                         content=(
                             "Lead source/planning allowance exhausted. Delegate the remaining required specialists, then return your decision."
@@ -636,7 +648,12 @@ class ResearchDesk:
             system_prompt=MANDATE
             + instructions
             + (
-                " Keep your entire structured report under 600 words, with concise fields and at most four items per list. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. You have at most ten tool calls for this specialist report. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
+                (
+                    ""
+                    if self.budget.unrestricted_research
+                    else " You have at most ten tool calls for this specialist report."
+                )
+                + " Keep your entire structured report under 600 words, with concise fields and at most four items per list. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
                 if role != "research_lead"
                 else ""
             ),
@@ -696,7 +713,11 @@ class ResearchDesk:
             agent = self.agent(role, schema, instructions, tools)
             output = agent.invoke(
                 {"messages": [{"role": "user", "content": dumps(context)}]},
-                {"recursion_limit": self.cfg.research_max_model_calls * 4},
+                {
+                    "recursion_limit": 10000
+                    if self.budget.unrestricted_research
+                    else self.cfg.research_max_model_calls * 4
+                },
             )
             with self.lock:
                 self.reports[role] = self.validate(schema, output.get("structured_response"))
@@ -735,7 +756,7 @@ class ResearchDesk:
             "Delegate to business and catalysts first (they may run concurrently), then valuation, then "
             "adversarial. For targeted news review, call catalysts first; unchanged fresh business/valuation "
             "reports may be reused by the system. All four reports must exist before your final decision. "
-            "You have a bounded auxiliary planning/source allowance; reserve delegation for all four specialists. Delegate evidence gaps rather than browsing exhaustively yourself. Compare with existing holdings and cash, resolve conflicts, "
+            "Use your assigned auxiliary planning/source allowance when enforced; reserve delegation for all four specialists. Delegate evidence gaps rather than browsing exhaustively yourself. Compare with existing holdings and cash, resolve conflicts, "
             "then propose BUY/ADD/HOLD/REDUCE/SELL/WATCH. The critique is mandatory. Use quantity zero for "
             "HOLD/WATCH and whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "
             "invalidation conditions and a future review date. An unresolved material gap blocks BUY/ADD.",
@@ -749,7 +770,11 @@ class ResearchDesk:
         }
         output = lead.invoke(
             {"messages": [{"role": "user", "content": dumps(prompt)}]},
-            {"recursion_limit": self.cfg.research_max_model_calls * 4},
+            {
+                "recursion_limit": 10000
+                if self.budget.unrestricted_research
+                else self.cfg.research_max_model_calls * 4
+            },
         )
         self.budget.check()
         if set(self.reports) != set(ROLES):
@@ -789,8 +814,9 @@ class ResearchDesk:
 
 
 class DeepResearchTeam:
-    def __init__(self, cfg, store, evidence_provider, model=None):
+    def __init__(self, cfg, store, evidence_provider, model=None, *, unrestricted_research=False):
         self.cfg, self.store, self.provider, self.model = cfg, store, evidence_provider, model
+        self.unrestricted_research = unrestricted_research
 
     def models(self):
         cfg = self.cfg
@@ -818,8 +844,10 @@ class DeepResearchTeam:
     @traced("research.run")
     def run(self, context):
         cfg = self.cfg
-        reservation = DailyReservation(self.store, cfg, context["run_key"])
-        budget = Budget(cfg, reservation.allowance)
+        reservation = DailyReservation(
+            self.store, cfg, context["run_key"], unrestricted_research=self.unrestricted_research
+        )
+        budget = Budget(cfg, reservation.allowance, unrestricted_research=self.unrestricted_research)
         desk = None
         try:
             model = self.models()
@@ -846,6 +874,7 @@ class DeepResearchTeam:
                     "tool_calls": budget.tools,
                     "estimated_usd": budget.reserved,
                     "stopped": budget.failed,
+                    "unrestricted_research": self.unrestricted_research,
                 },
                 "research_audit",
             )

@@ -160,3 +160,21 @@ starts an explicitly non-root container; the trader user needs no docker group.
 Set the observability DSN socket host to `/run/trader-cloudsql/INSTANCE_CONNECTION_NAME`.
 Check the full socket pathname including `/.s.PGSQL.5432` is at most 107 bytes
 before starting; long project/instance names may require a shorter socket alias.
+
+## Supervised acceptance pause guard
+
+Render `deploy/acceptance.service` with the exact bound `@PAUSE_PATH@` and a
+private root-owned `@ACCEPTANCE_SCRIPT@`. Install the guard script alongside the
+reviewed acceptance script. The shell script must stop the ordinary listener,
+run the single `trader-acceptance` container synchronously, and contain **no**
+listener restart or EXIT trap: only the unit's chained cleanup may restart it.
+Set a deliberate `RuntimeMaxSec` for the supervised run if needed; it is an
+operator timeout, not a model spending quota.
+
+The unit first saves the exact pause marker durably and disables/stops the
+listener so an interrupted host reboot cannot start it unpaused. Cleanup stops a surviving
+child, atomically restores/fsyncs the original marker, then enables/starts the listener.
+Any cleanup failure prevents the restart. A host reboot still needs operator
+inspection and guarded cleanup after an interrupted smoke; the listener stays
+disabled until its original pause is restored. Pending orders must be reconciled/cancelled by
+the restored paused listener; never blindly resubmit the smoke intent.

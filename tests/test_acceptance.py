@@ -179,3 +179,60 @@ def test_cancel_race_records_confirmed_late_fill(env, decision, monkeypatch):
     assert service.store.get("late-fill", "acceptance")["status"] == "complete"
     assert service.kill_path.exists()
     assert broker.submits == 1
+
+
+def test_unrestricted_reservation_never_disguises_unknown_usage_as_settled(env):
+    from trader.spending import DailyBudgetExceeded, DailyReservation, spending_status
+
+    service, _, _ = env
+    service.cfg.research_daily_cost_usd = acceptance.D(0)
+    reservation = DailyReservation(service.store, service.cfg, "unbounded-crash", unrestricted_research=True)
+    assert reservation.allowance is None
+    saved = service.store.get(reservation.key, "research_spend", scope="global")
+    assert saved["unknown_total"] and saved["status"] == "reserved"
+    assert saved["usd"] == "0" and saved["unrestricted_research"]
+    service.cfg.research_daily_cost_usd = acceptance.D(100)
+    with pytest.raises(DailyBudgetExceeded):
+        DailyReservation(service.store, service.cfg, "normal-after-crash")
+    reservation.finish(acceptance.D(".123"), unknown=True)
+    saved = service.store.get(reservation.key, "research_spend", scope="global")
+    assert saved["status"] == "unknown" and saved["unknown_total"] and saved["usd"] == "0.123"
+    assert spending_status(service.store, acceptance.D(100))["unbounded_unknown_runs"] == 1
+
+
+@pytest.mark.parametrize(
+    "failure", [acceptance.LedgerError("activity delayed"), acceptance.httpx.ReadTimeout("retry")]
+)
+def test_paper_fill_retries_transient_reconciliation_without_resubmission(
+    env, decision, monkeypatch, failure
+):
+    service, broker, _ = env
+    prepare(service, decision)
+    monkeypatch.setattr(acceptance, "now", lambda: broker.at)
+    execute = service.execute
+    reconcile = service.reconcile
+    pending = False
+
+    def submit(*args):
+        nonlocal pending
+        result = execute(*args)
+        broker.fixture_fill(service.client_order_id("explicit-paper-smoke:ACME"), qty="1")
+        pending = True
+        return result
+
+    def delayed():
+        nonlocal pending
+        if pending:
+            pending = False
+            raise failure
+        return reconcile()
+
+    monkeypatch.setattr(service, "execute", submit)
+    monkeypatch.setattr(service, "reconcile", delayed)
+    sleeps = []
+    result = acceptance.run(
+        service, "paper-smoke", "ACME", "delayed-fill", "research-ok", True, sleep=sleeps.append
+    )
+    assert result["status"] == "complete"
+    assert broker.submits == 1 and sleeps == [5]
+    assert service.kill_path.read_text() == "operator pause"

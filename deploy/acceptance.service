@@ -1,0 +1,17 @@
+[Unit]
+Description=Supervised acceptance with durable pause restoration
+Requires=always-on-proxy.service
+After=always-on-proxy.service
+
+[Service]
+Type=exec
+StateDirectory=trader-acceptance
+StateDirectoryMode=0700
+ExecStartPre=/usr/bin/python3 @TRADER_ROOT@/deploy/acceptance-guard.py save @PAUSE_PATH@ /var/lib/trader-acceptance/original-pause
+ExecStartPre=/usr/bin/systemctl disable --now always-on.service
+ExecStart=/bin/bash @ACCEPTANCE_SCRIPT@
+ExecStopPost=/usr/bin/python3 @TRADER_ROOT@/deploy/acceptance-guard.py cleanup @PAUSE_PATH@ /var/lib/trader-acceptance/original-pause
+RuntimeMaxSec=1800
+TimeoutStopSec=60
+KillMode=control-group
+UMask=0077

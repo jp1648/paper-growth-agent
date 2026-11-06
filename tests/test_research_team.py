@@ -815,3 +815,59 @@ def test_oversized_filing_becomes_gap_and_full_graph_finishes_watch(env, decisio
     assert service.store.events("research_evidence_gap")
     assert not any(source["id"].startswith("passage-") for source in result["evidence"]["sources"])
     assert broker.submits == 0
+
+
+def test_explicit_unrestricted_graph_ignores_exhausted_budget_and_count_quotas(env, decision):
+    from trader.spending import DailyBudgetExceeded
+
+    service, broker, _ = env
+    _, model = team(env, decision)
+    service.cfg.research_daily_cost_usd = dec(0)
+    service.cfg.research_max_cost_usd = dec(".000001")
+    service.cfg.research_max_model_calls = 5
+    service.cfg.research_max_tool_calls = 4
+    normal = DeepResearchTeam(service.cfg, service.store, Evidence(), model)
+    with pytest.raises(DailyBudgetExceeded):
+        build_graph(service, normal).invoke({"symbol": "ACME", "run_key": "still-bounded"})
+    worker = DeepResearchTeam(service.cfg, service.store, Evidence(), model, unrestricted_research=True)
+    result = build_graph(service, worker).invoke({"symbol": "ACME", "run_key": "explicit-unrestricted"})
+    assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
+    assert result["calculations"] and broker.submits == 1
+    audit = service.store.get("explicit-unrestricted", "research_audit")
+    assert audit["unrestricted_research"] and not audit["stopped"]
+    assert audit["model_calls"] > 5 and audit["tool_calls"] > 4
+    row = service.store.db.execute(
+        "SELECT body FROM documents WHERE kind='research_spend' AND json_extract(body,'$.run_key')='explicit-unrestricted'"
+    ).fetchone()
+    spend = json.loads(row[0])
+    assert spend["status"] == "settled" and not spend["unknown_total"]
+    assert dec(spend["usd"]) == dec(audit["estimated_usd"]) > service.cfg.research_max_cost_usd
+    assert service.cfg.research_daily_cost_usd == 0
+
+
+def test_unrestricted_removes_local_quotas_but_keeps_permissions():
+    from datetime import date
+    from types import SimpleNamespace
+
+    from trader.research_team import Guard
+
+    cfg = Settings(input_cost_per_million="1", output_cost_per_million="1", research_max_tool_calls=4)
+    budget = Budget(cfg, unrestricted_research=True)
+    budget.started -= 100000
+    budget.day = date(2000, 1, 1)
+    guard = Guard(budget, "business", {"read_source"})
+    request = SimpleNamespace(tool_call={"name": "read_source", "id": "source"})
+    calls = []
+    for _ in range(15):
+        guard.wrap_tool_call(request, lambda request: calls.append(request))
+        budget.model(100)
+    assert len(calls) == budget.tools == budget.models == 15
+    budget.model(cfg.research_max_input_bytes + 1)
+    assert budget.models == 16
+    with pytest.raises(ResearchLimit, match="context"):
+        Budget(cfg).model(cfg.research_max_input_bytes + 1)
+    other = Guard(Budget(cfg, unrestricted_research=True), "business", {"read_source"})
+    with pytest.raises(ResearchLimit, match="permissions"):
+        other.wrap_tool_call(
+            SimpleNamespace(tool_call={"name": "execute", "id": "forbidden"}), lambda request: None
+        )

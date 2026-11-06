@@ -28,25 +28,33 @@ def spending_status(store, limit, at=None):
         "charged_or_reserved_usd": used,
         "remaining_usd": max(dec(0), limit - used),
         "unresolved_runs": sum(r["status"] != "settled" for r in records),
+        "unbounded_unknown_runs": sum(
+            r.get("unrestricted_research", False) and r["status"] != "settled" for r in records
+        ),
     }
 
 
 class DailyReservation:
-    def __init__(self, store, cfg, run_key):
+    def __init__(self, store, cfg, run_key, *, unrestricted_research=False):
         self.store, self.key = store, str(uuid4())
         # Reserve before any API call; a crash keeps the full allowance charged to this day.
         with store.db:
             store.db.execute("BEGIN IMMEDIATE")
             status = spending_status(store, cfg.research_daily_cost_usd)
-            self.allowance = min(cfg.research_max_cost_usd, status["remaining_usd"])
-            if self.allowance <= 0:
+            self.unrestricted_research = unrestricted_research
+            self.allowance = (
+                None if unrestricted_research else min(cfg.research_max_cost_usd, status["remaining_usd"])
+            )
+            if not unrestricted_research and (self.allowance <= 0 or status["unbounded_unknown_runs"]):
                 raise DailyBudgetExceeded("Daily model budget exhausted; monitoring/reconciliation continue")
             self.record = {
                 "run_key": run_key,
                 "experiment_id": store.scope,
                 "day": status["day"],
                 "started_at": now(),
-                "usd": self.allowance,
+                "usd": dec(0) if unrestricted_research else self.allowance,
+                "unrestricted_research": unrestricted_research,
+                "unknown_total": unrestricted_research,
                 "status": "reserved",
             }
             store.db.execute(
@@ -56,7 +64,10 @@ class DailyReservation:
 
     def finish(self, estimated_cost, unknown=False):
         self.record.update(
-            usd=max(self.allowance, estimated_cost) if unknown else estimated_cost,
+            usd=max(self.allowance, estimated_cost)
+            if unknown and not self.unrestricted_research
+            else estimated_cost,
+            unknown_total=unknown,
             status="unknown" if unknown else "settled",
             finished_at=now(),
         )
