@@ -90,6 +90,7 @@ def run(
     sleep=time.sleep,
     *,
     unrestricted_research=False,
+    finalize_from=None,
 ):
     store, cfg = service.store, service.cfg
     service.require_experiment()
@@ -123,6 +124,7 @@ def run(
                 "at": now(),
                 "research_key": research_key,
                 "unrestricted_research": unrestricted_research,
+                "finalize_from": finalize_from,
             }
             store.put(run_key, record, "acceptance")
             store.log("acceptance_started", {"run_key": run_key, **record})
@@ -150,16 +152,17 @@ def run(
                     unrestricted_research=unrestricted_research,
                 )
                 quote = research_price(service, symbol)
-                result = worker.run(
-                    {
-                        "symbol": symbol,
-                        "run_key": run_key,
-                        "fresh": True,
-                        "research_only": True,
-                        "quote": quote,
-                        "current_timestamp": now().isoformat(),
-                        "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": None},
-                    }
+                context = {
+                    "symbol": symbol,
+                    "run_key": run_key,
+                    "fresh": True,
+                    "research_only": True,
+                    "quote": quote,
+                    "current_timestamp": now().isoformat(),
+                    "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": None},
+                }
+                result = (
+                    worker.run(context, finalize_from=finalize_from) if finalize_from else worker.run(context)
                 )
                 if set(result["team_reports"]) != {"business", "catalysts", "valuation", "adversarial"}:
                     raise ValueError("Incomplete specialist team")
@@ -250,11 +253,17 @@ def main():
     parser.add_argument("--research-key")
     parser.add_argument("--reviewed", action="store_true")
     parser.add_argument(
+        "--finalize-from",
+        help="Research only: synthesize a new final decision from a failed run's four completed reports, without repeating investigation",
+    )
+    parser.add_argument(
         "--unrestricted-research",
         action="store_true",
         help="Supervised test only: remove research spend/count/context/deadline quotas; retain security/data validation. Run under an external watchdog.",
     )
     args = parser.parse_args()
+    if args.finalize_from and args.mode != "research":
+        parser.error("--finalize-from is only available for research")
     cfg = Settings.load(args.config)
     store = Store(cfg.database)
     try:
@@ -268,6 +277,7 @@ def main():
                     args.research_key,
                     args.reviewed,
                     unrestricted_research=args.unrestricted_research,
+                    finalize_from=args.finalize_from,
                 )
             )
         )

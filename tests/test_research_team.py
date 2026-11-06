@@ -966,3 +966,125 @@ def test_provider_decision_numeric_schema_and_decimal_runtime_remain_consistent(
             Decision.model_validate({**original, field: value})
     watch = Decision.model_validate({**original, "action": "WATCH", "quantity": 0, "limit_price": 0})
     assert watch.quantity == watch.limit_price == 0
+
+
+def test_finalize_saved_reports_one_call_no_investigation_and_preserves_unknown_hold(env, decision):
+    from trader.spending import DailyReservation
+
+    service, broker, _ = env
+    worker, _ = team(env, decision, gap=True)
+    context = {
+        "symbol": "ACME",
+        "run_key": "failed-parent",
+        "quote": {"historical": True, "executable": False, "reference_price": "100"},
+        "portfolio": {"prior_thesis": None},
+    }
+    worker.run(context)
+    service.store.put(
+        "failed-parent", {"mode": "research", "symbol": "ACME", "status": "failed"}, "acceptance"
+    )
+    source = service.store.get("failed-parent", "research_audit")
+    hold = DailyReservation(service.store, service.cfg, "failed-parent-timeout", unrestricted_research=True)
+    hold.finish(dec("1.23"), unknown=True)
+    original_hold = service.store.get(hold.key, "research_spend", scope="global")
+
+    class NoFetch:
+        def get(self, *args, **kwargs):
+            pytest.fail("Finalization must not fetch SEC/news evidence")
+
+    class FinalModel(TeamModel):
+        fail: bool = False
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            self.calls.append("final")
+            if self.fail:
+                raise TimeoutError("Fixture finalization timeout")
+            assert not kwargs["tools"]
+            prompt = json.loads(messages[1].content)
+            assert set(prompt["reports"]) == set(ROLES)
+            assert prompt["finalize_from"] == "failed-parent"
+            assert prompt["quote"]["reference_price"] == "101"
+            assert prompt["report_times"]
+            message = AIMessage(content=json.dumps(self.decision))
+            message.usage_metadata = {"input_tokens": 100, "output_tokens": 100, "total_tokens": 200}
+            return ChatResult(generations=[ChatGeneration(message=message)])
+
+    from trader.research_team import ROLES
+
+    model = FinalModel(
+        decision=decision.model_copy(update={"evidence_ids": ["fixture-sec"]}).model_dump(mode="json")
+    )
+    recovery = DeepResearchTeam(service.cfg, service.store, NoFetch(), model, unrestricted_research=True)
+    new_context = {
+        **context,
+        "run_key": "finalization",
+        "quote": {"historical": True, "executable": False, "reference_price": "101"},
+    }
+    result = recovery.run(new_context, finalize_from="failed-parent")
+    assert result["decision"]["action"] == "WATCH" and result["decision"]["quantity"] == "0"
+    assert len(model.calls) == 1 and broker.submits == 0
+    assert service.store.get("failed-parent", "research_audit") == source
+    assert service.store.get(hold.key, "research_spend", scope="global") == original_hold
+    audit = service.store.get("finalization", "research_audit")
+    assert audit["model_calls"] == 1 and audit["tool_calls"] == 0
+    assert audit["finalize_from"] == "failed-parent" and audit["quote"] == new_context["quote"]
+    assert len(service.store.events("model_cost")) > 1
+    with pytest.raises(ValueError, match="unused run ID"):
+        recovery.run(new_context, finalize_from="failed-parent")
+    assert len(model.calls) == 1
+    model.decision = {**model.decision, "evidence_ids": ["unknown-reference"]}
+    with pytest.raises(ValueError, match="unknown evidence"):
+        recovery.run({**new_context, "run_key": "rejected-final"}, finalize_from="failed-parent")
+    assert service.store.get("rejected-final", "research_audit")["stopped"]
+    assert service.store.get(hold.key, "research_spend", scope="global") == original_hold
+    before = len(model.calls)
+    for label, stamp in (
+        ("stale", now() - timedelta(hours=service.cfg.research_cache_hours + 1)),
+        ("future", now() + timedelta(minutes=1)),
+    ):
+        service.store.put(
+            "failed-parent",
+            {**source, "team_report_times": dict.fromkeys(ROLES, stamp.isoformat())},
+            "research_audit",
+        )
+        with pytest.raises(ValueError, match="fresh, nonfuture"):
+            recovery.run({**new_context, "run_key": label}, finalize_from="failed-parent")
+    assert len(model.calls) == before
+    invalid = json.loads(json.dumps(source))
+    invalid["reports"]["valuation"]["base_value"] = "99999.99"
+    service.store.put("failed-parent", invalid, "research_audit")
+    with pytest.raises(ValueError, match="deterministic calculation"):
+        recovery.run({**new_context, "run_key": "invalid-calculation"}, finalize_from="failed-parent")
+    assert len(model.calls) == before
+    invalid_source = json.loads(json.dumps(source))
+    invalid_source["reports"]["business"]["evidence_ids"] = ["unrecorded-source"]
+    service.store.put("failed-parent", invalid_source, "research_audit")
+    with pytest.raises(ValueError, match="unknown evidence"):
+        recovery.run({**new_context, "run_key": "invalid-source"}, finalize_from="failed-parent")
+    invalid_calc = json.loads(json.dumps(source))
+    next(iter(invalid_calc["calculations"].values()))["base_value"] = "99999.99"
+    service.store.put("failed-parent", invalid_calc, "research_audit")
+    with pytest.raises(ValueError, match="provenance or values"):
+        recovery.run({**new_context, "run_key": "invalid-saved-calc"}, finalize_from="failed-parent")
+    assert len(model.calls) == before
+    service.store.put("failed-parent", source, "research_audit")
+    model.fail = True
+    with pytest.raises(TimeoutError):
+        recovery.run({**new_context, "run_key": "final-timeout"}, finalize_from="failed-parent")
+    assert service.store.get(hold.key, "research_spend", scope="global") == original_hold
+    row = service.store.db.execute(
+        "SELECT body FROM documents WHERE kind='research_spend' AND json_extract(body,'$.run_key')='final-timeout'"
+    ).fetchone()
+    assert json.loads(row[0])["unknown_total"] and json.loads(row[0])["status"] == "unknown"
+
+
+def test_finalization_client_is_lead_only_180_second_timeout_no_retry(env, monkeypatch):
+    service, _, _ = env
+    service.cfg.input_cost_per_million = dec("1")
+    service.cfg.output_cost_per_million = dec("1")
+    monkeypatch.setenv("OPENAI_API_KEY", "fixture-only")
+    calls = []
+    monkeypatch.setattr("trader.research_team.ChatOpenAI", lambda **kwargs: calls.append(kwargs))
+    worker = DeepResearchTeam(service.cfg, service.store, Evidence())
+    assert set(worker.models(finalizing=True)) == {"research_lead"}
+    assert len(calls) == 1 and calls[0]["timeout"] == 180 and calls[0]["max_retries"] == 0

@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from deepagents import create_deep_agent
 from deepagents.backends import StateBackend
 from deepagents.middleware.subagents import SubAgentMiddleware
+from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, TodoListMiddleware
 from langchain.agents.structured_output import ProviderStrategy
 from langchain_core.messages import AIMessage, ToolMessage
@@ -793,6 +794,58 @@ class ResearchDesk:
                 else self.cfg.research_max_model_calls * 4
             },
         )
+        return self.result(output)
+
+    def finalize(self, audit, report_times):
+        if set(audit["reports"]) != set(ROLES):
+            raise ValueError("Finalization requires all four completed reports")
+        if set(report_times) != set(ROLES) or any(
+            dt(stamp) > now() or now() - dt(stamp) >= timedelta(hours=self.cfg.research_cache_hours)
+            for stamp in report_times.values()
+        ):
+            raise ValueError("Finalization requires fresh, nonfuture report timestamps")
+        for identifier, calculation in audit.get("calculations", {}).items():
+            calculator = next(tool for tool in self.tools() if tool.name == "value_scenarios")
+            actual = calculator.invoke(calculation["inputs"])
+            if actual != calculation or actual["calculation_id"] != identifier:
+                raise ValueError("Saved calculation provenance or values differ")
+        self.reports = {
+            role: self.validate(ROLES[role][0], report) for role, report in audit["reports"].items()
+        }
+        self.report_times = report_times
+        self.reused = list(ROLES)
+        model = self.model["research_lead"] if isinstance(self.model, dict) else self.model
+        lead = create_agent(
+            model=model,
+            tools=[],
+            system_prompt=MANDATE
+            + " Finalize only the supplied completed reports. Do not investigate or invent additional evidence. The price reference is newly observed for this finalization; reports retain their original dates. Return one Decision. WATCH/HOLD require numeric quantity 0 and limit_price 0, never N/A. Unresolved material gaps or unsupported valuation block BUY/ADD. Give a future review date.",
+            response_format=ProviderStrategy(Decision, strict=True),
+            middleware=[Guard(self.budget, "research_lead", set())],
+        )
+        with tracing_context(enabled=False):
+            output = lead.invoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": dumps(
+                                {
+                                    **self.context,
+                                    "reports": self.reports,
+                                    "report_times": report_times,
+                                    "calculations": self.calculations,
+                                    "evidence": self.source_previews(self.sources.values()),
+                                }
+                            ),
+                        }
+                    ]
+                },
+                {"recursion_limit": 2},
+            )
+        return self.result(output)
+
+    def result(self, output):
         self.budget.check()
         if set(self.reports) != set(ROLES):
             raise ValueError("Research lead omitted a required specialist; no executable decision")
@@ -835,9 +888,12 @@ class DeepResearchTeam:
         self.cfg, self.store, self.provider, self.model = cfg, store, evidence_provider, model
         self.unrestricted_research = unrestricted_research
 
-    def models(self):
+    def models(self, *, finalizing=False):
         cfg = self.cfg
-        routes = {role: cfg.research_model(role) for role in ("research_lead", *ROLES)}
+        routes = {
+            role: cfg.research_model(role)
+            for role in (("research_lead",) if finalizing else ("research_lead", *ROLES))
+        }
         if self.model is not None:
             return self.model
         if not os.getenv("OPENAI_API_KEY"):
@@ -852,22 +908,63 @@ class DeepResearchTeam:
                 use_responses_api=True,
                 store=False,
                 max_retries=0,
-                timeout=60,
+                timeout=180 if finalizing else 60,
                 max_tokens=cfg.research_max_output_tokens,
             )
             for role, route in routes.items()
         }
 
     @traced("research.run")
-    def run(self, context):
+    def run(self, context, *, finalize_from=None):
         cfg = self.cfg
+        parent = None
+        if finalize_from:
+            if context["run_key"] == finalize_from or self.store.get(context["run_key"], "research_audit"):
+                raise ValueError("Finalization requires a new, unused run ID")
+            parent_acceptance = self.store.get(finalize_from, "acceptance")
+            parent = self.store.get(finalize_from, "research_audit")
+            if (
+                not parent
+                or not parent_acceptance
+                or parent_acceptance.get("symbol") != context["symbol"]
+                or parent_acceptance.get("mode") != "research"
+                or parent_acceptance.get("status") != "failed"
+            ):
+                raise ValueError(
+                    "Finalization source must be this experiment's failed research for the same symbol"
+                )
+            context = {
+                **context,
+                "finalize_from": finalize_from,
+                "reference_note": "New broker-backed reference for finalization; not the original investigation quote",
+            }
         reservation = DailyReservation(
             self.store, cfg, context["run_key"], unrestricted_research=self.unrestricted_research
         )
         budget = Budget(cfg, reservation.allowance, unrestricted_research=self.unrestricted_research)
         desk = None
         try:
-            model = self.models()
+            model = self.models(finalizing=bool(finalize_from))
+            if parent is not None:
+                sources = copy.deepcopy(parent["sources"])
+                if len({source["id"] for source in sources}) != len(sources):
+                    raise ValueError("Saved sources contain duplicate evidence IDs")
+                desk = ResearchDesk(
+                    cfg,
+                    self.provider,
+                    context,
+                    {"symbol": context["symbol"], "sources": sources},
+                    budget,
+                    model,
+                )
+                report_times = parent.get("team_report_times") or {
+                    event["body"]["role"]: event["at"]
+                    for event in self.store.events("specialist_result")
+                    if event["body"].get("run_key") == finalize_from
+                }
+                if set(report_times) != set(ROLES):
+                    raise ValueError("Saved report timestamps are incomplete")
+                return desk.finalize(parent, report_times)
             evidence = self.provider.get(context["symbol"], fresh=context.get("fresh", False))
             evidence = copy.deepcopy(evidence)
             evidence["sources"].extend(XDiscovery(cfg, self.store).snapshot(context["symbol"]))
@@ -892,6 +989,10 @@ class DeepResearchTeam:
                     "estimated_usd": budget.reserved,
                     "stopped": budget.failed,
                     "unrestricted_research": self.unrestricted_research,
+                    "symbol": context["symbol"],
+                    "quote": context.get("quote"),
+                    "finalize_from": finalize_from,
+                    "team_report_times": desk.report_times if desk else {},
                 },
                 "research_audit",
             )
