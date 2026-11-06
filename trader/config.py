@@ -28,6 +28,7 @@ class Settings(Model):
     broker_url: str = PAPER_URL
     database: str = "state/ledger.sqlite"
     control_dir: str = "~/.local/state/paper-growth-agent"
+    checkpoint_bucket: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$")
     initial_capital: Decimal = Field(default=Decimal(100000), gt=0)
     experiment_weeks: int = Field(default=12, ge=1)
     max_position: Decimal = Field(default=Decimal("0.10"), gt=0, le=1)

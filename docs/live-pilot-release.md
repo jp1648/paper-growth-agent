@@ -25,6 +25,9 @@ The release reviewer must inspect the actual evidence, not just a PASS flag:
 - Complete correction/bust reconciliation, restart, ambiguous submission,
   cancel/fill-race and backup restore evidence. A restored executor must remain
   paused and reconcile before it can submit.
+- Required off-host pre-submission checkpoint replication with verified object
+  generation/hash, restrictive storage IAM and an independent-host restore drill.
+  A missing checkpoint_bucket or successful same-disk backup is insufficient.
 - Verified single-writer fencing across hosts, plus independent alert delivery
   while the executor is unavailable. A filesystem lock on one VM is insufficient.
 

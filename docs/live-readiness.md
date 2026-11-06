@@ -591,3 +591,29 @@ operator attestation, not independent API verification of delivery.
   A checkpoint can predate a POST that never occurred; an unresolved prepared
   intent remains blocked pending broker/operator investigation. Automatic deletion
   is absent and checkpoint storage growth needs operational monitoring.
+- Off-host checkpoint replication implemented as a required step when
+  checkpoint_bucket is configured: GCE metadata credentials, fixed GCS endpoints,
+  disabled redirects/proxy inheritance, create-only generation precondition,
+  exact identity/size verification and streamed SHA-256 read-back of the saved
+  generation. Transport timeouts resolve by read verification without a second
+  POST. Errors reject before broker submission; receipt is journaled before POST.
+- Twelve regressions cover new/existing/ambiguous uploads, missing objects,
+  metadata authentication, redirect rejection, corrupt/truncated/oversized data,
+  wrong identity, required-storage failure and receipt-before-submission ordering.
+  Full offline suite: 508 passed, three integrations skipped; Ruff/whitespace pass.
+- Provisioned private regional GCS recovery storage with uniform bucket access,
+  enforced public access prevention and seven-day soft deletion. Effective VM
+  identity permission check returned only object create/get/list among requested
+  permissions: no delete, object update, bucket update or policy update. Project
+  owners/admins retain their privileges; this is not retention-locked storage.
+- Actual replication of the previously reconciled recovery backup succeeded:
+  38,539,264 bytes, exact generation read back and SHA-256 verified. Downloading
+  that generation onto the local host independently matched the hash and passed
+  SQLite integrity, retaining one experiment, two intents and two activities.
+  Private receipts and restored file remain ignored under state/audit-20261106.
+- Production trading configuration/image are unchanged; automatic required
+  replication is not deployed/enabled yet. Config omission remains local-only for
+  offline/local paper use and is explicitly disallowed by the live-release contract.
+  Full disk-loss failover, independent executor fencing and project-disaster
+  recovery remain unverified. Per-order storage/network cost and ledger growth
+  need monitoring; model-spend limits do not cover those infrastructure charges.

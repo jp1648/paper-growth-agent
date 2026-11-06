@@ -415,6 +415,11 @@ class Service:
             }
             try:
                 checkpoint = self.store.backup(intent_id=cid)
+                if self.cfg.checkpoint_bucket:
+                    from .checkpoints import replicate_checkpoint
+
+                    receipt = replicate_checkpoint(checkpoint, self.cfg.checkpoint_bucket)
+                    self.store.log("execution_checkpoint_replicated", {"client_order_id": cid, **receipt})
                 self.store.log(
                     "execution_checkpoint_saved", {"client_order_id": cid, "file": checkpoint.name}
                 )
