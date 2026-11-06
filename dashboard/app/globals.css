@@ -1238,3 +1238,21 @@ td {
     padding-right: 16px;
   }
 }
+
+.x-credits {
+  margin-bottom: 24px;
+}
+.x-credits > .metrics {
+  padding: 0 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.x-credits > p {
+  margin: 16px 24px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+@media (max-width: 780px) {
+  .x-credits > .metrics {
+    grid-template-columns: 1fr;
+  }
+}

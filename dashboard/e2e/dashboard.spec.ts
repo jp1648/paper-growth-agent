@@ -68,6 +68,14 @@ test("accepted investigation is readable and trace filters work", async ({
   await page.getByRole("button", { name: "Enter observatory" }).click();
   await expect(page.getByRole("button", { name: /Refresh/ })).toBeVisible();
   const original = await (await page.request.get("/api/data")).json();
+  original.snapshot.x_credits = {
+    status: "available",
+    checked_at: "2026-11-06T04:00:00Z",
+    total_balance: 44.71,
+    prepaid_balance: 25,
+    free_balance: 19.71,
+    free_grants: [{ amount: 19.71, expires_at: "2027-02-03T04:19:12Z" }],
+  };
   original.snapshot.runs = [
     {
       id: "accepted-fixture",
@@ -115,6 +123,26 @@ test("accepted investigation is readable and trace filters work", async ({
     }),
   );
   await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "X API credits" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".x-credits").getByText("$44.71", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".x-credits").getByText(/free credits expire/),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "../state/always-on/x-credits-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1100 });
   await page.getByRole("button", { name: "Research", exact: true }).click();
   await page.locator(".run-choice").first().click();
   await expect(

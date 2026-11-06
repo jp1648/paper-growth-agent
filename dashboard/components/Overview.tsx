@@ -1,4 +1,4 @@
-import { Curve, money } from "./DataViews";
+import { Curve, money, time } from "./DataViews";
 import type { Snapshot } from "../lib/types";
 export default function Overview({
   snapshot: s,
@@ -45,6 +45,49 @@ export default function Overview({
           </section>
         ))}
       </div>
+      <section className="panel x-credits">
+        <div className="panel-title">
+          <div>
+            <h2>X API credits</h2>
+            <p>Provider-confirmed account balance · USD</p>
+          </div>
+        </div>
+        {s.x_credits?.status === "available" ? (
+          <>
+            <div className="metrics">
+              {[
+                ["Total remaining", s.x_credits.total_balance],
+                ["Purchased credits", s.x_credits.prepaid_balance],
+                ["Free credits", s.x_credits.free_balance],
+              ].map(([title, value]) => (
+                <div className="metric" key={String(title)}>
+                  <span>{title}</span>
+                  <strong>{money(value)}</strong>
+                </div>
+              ))}
+            </div>
+            {s.x_credits.free_grants?.map((grant, i) => (
+              <p key={i}>
+                {money(grant.amount)} free credits expire{" "}
+                {time(grant.expires_at)}.
+              </p>
+            ))}
+            <p className="muted">
+              Checked {time(s.x_credits.checked_at)} · updates approximately
+              every 5 minutes. Account-wide balance, not this experiment’s
+              spend.
+            </p>
+          </>
+        ) : (
+          <p className="muted">
+            {s.x_credits?.status === "not_configured"
+              ? "X balance access is not configured."
+              : "X balance is temporarily unavailable. Missing data does not mean zero credits."}
+            {s.x_credits?.checked_at &&
+              ` Checked ${time(s.x_credits.checked_at)}.`}
+          </p>
+        )}
+      </section>
       <section className="panel">
         <div className="panel-title">
           <div>

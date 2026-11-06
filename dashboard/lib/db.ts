@@ -1,6 +1,18 @@
 import "server-only";
+import { readXCredits } from "./x-credits.mjs";
 import type { OverviewData, Snapshot, TraceEvent } from "./types";
 import { Pool } from "pg";
+let creditCheck:
+  { expires: number; result: ReturnType<typeof readXCredits> } | undefined;
+function xCredits() {
+  if (!creditCheck || Date.now() >= creditCheck.expires) {
+    creditCheck = {
+      expires: Date.now() + 5 * 60_000,
+      result: readXCredits(process.env.X_BEARER_TOKEN),
+    };
+  }
+  return creditCheck.result;
+}
 const globalDB = globalThis as unknown as { dashboardPool?: Pool };
 function pool() {
   if (!process.env.DATABASE_URL) throw new Error("Database not configured");
@@ -31,7 +43,7 @@ export async function overview(): Promise<OverviewData> {
     WHERE name='dashboard.snapshot' ORDER BY at DESC LIMIT 1`);
   if (!latest.rows.length) return { snapshot: null, at: null };
   return {
-    snapshot: latest.rows[0].payload,
+    snapshot: { ...latest.rows[0].payload, x_credits: await xCredits() },
     at: latest.rows[0].at.toISOString(),
   };
 }

@@ -24,6 +24,14 @@ export interface TraceEvent {
   truncated: boolean;
 }
 export interface Snapshot {
+  x_credits?: {
+    status: string;
+    checked_at: string;
+    prepaid_balance?: number;
+    free_balance?: number;
+    total_balance?: number;
+    free_grants?: { amount: number; expires_at: string }[];
+  };
   generated_at: string;
   portfolio: {
     as_of: string;
