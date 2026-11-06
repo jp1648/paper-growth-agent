@@ -355,3 +355,10 @@ operator attestation, not independent API verification of delivery.
 - This checkpoint remains NO-GO. It does not deploy changes, enable live trading,
   establish investment edge, complete the quality cohort, verify all corporate
   actions/settlement paths, or prove cross-host fencing and failover.
+
+- Remote CI checkpoint: backend and full-history secret scan passed. All four
+  browser cases failed before assertions because Ubuntu denied the downloaded
+  Chromium binary's sandbox namespaces. CI now installs packaged Chrome, which
+  has Ubuntu's AppArmor profile, while retaining chromiumSandbox=true. The Linux
+  browser test additionally requires renderer PID isolation, NoNewPrivs and
+  seccomp filtering. Remote rerun is required before this gate can pass.

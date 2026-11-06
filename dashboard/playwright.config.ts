@@ -12,6 +12,7 @@ export default defineConfig({
       : undefined,
   use: {
     baseURL: process.env.TEST_DASHBOARD_URL || "http://127.0.0.1:3000",
+    channel: process.env.CI ? "chrome" : undefined,
     launchOptions: { chromiumSandbox: true },
   },
   workers: 1,
