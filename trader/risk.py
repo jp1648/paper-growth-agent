@@ -11,8 +11,14 @@ def daily_loss(account, activities, calendar, at, fraction):
     local = at.astimezone(ZoneInfo("America/New_York"))
     result = {"date": local.date().isoformat(), "valid": False, "breached": False}
     try:
-        prior = max(day for day in (d["date"] for d in calendar) if day < result["date"])
-        session = next(d for d in calendar if d["date"] == prior)
+        sessions = {}
+        for session in calendar:
+            day = session["date"]
+            if date.fromisoformat(day).isoformat() != day or day in sessions:
+                raise ValueError("Ambiguous broker calendar")
+            sessions[day] = session
+        prior = max(day for day in sessions if day < result["date"])
+        session = sessions[prior]
         if account.get("balance_asof") != prior or session["close"] != "16:00":
             raise ValueError("Prior-close date or regular-close baseline is unverified")
         baseline = dec(account["last_equity"])
@@ -27,6 +33,8 @@ def daily_loss(account, activities, calendar, at, fraction):
                 stamp = dt(activity["transaction_time"])
                 if stamp > at:
                     raise ValueError("Future capital movement")
+                if stamp == cutoff:
+                    raise ValueError("Capital movement coincides with baseline cutoff")
                 after = stamp > cutoff
             else:
                 day = date.fromisoformat(activity["date"])

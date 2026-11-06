@@ -695,3 +695,17 @@ operator attestation, not independent API verification of delivery.
 - Cleanup verified: both drill VMs and their auto-deleted boot disks are absent;
   the temporary bucket and service account were deleted. The production VM
   remains RUNNING. Raw private evidence remains in ignored state/fencing-drill.
+- Daily-loss boundary audit found duplicate calendar rows could select the first
+  close and hide a conflicting early close. Calendar dates now require canonical
+  dates and unique rows before selecting the baseline. Capital movements exactly
+  at the baseline timestamp are rejected because inclusion in last_equity is
+  ambiguous. Three new negative cases failed before the fix; five regressions
+  now cover these boundaries and actual entry rejection without a broker POST.
+- Rechecked [Alpaca account documentation](https://docs.alpaca.markets/us/reference/getaccount-1):
+  last_equity is documented at 16:00 ET on the previous trading day. This is not
+  evidence that an early-close session should move that timestamp to 13:00.
+  Early-close support remains explicitly blocked pending broker evidence; this
+  change does not silently relax that limit or certify settlement semantics.
+- Full offline verification: 544 passed, three opt-in integrations skipped;
+  Ruff and whitespace checks passed. No deployment, model calls or broker
+  requests occurred in this boundary fix.

@@ -321,3 +321,44 @@ def test_loss_maintenance_leaves_working_protective_sell(env, decision):
     Runner(service, None).maintain()
     assert not broker.cancels
     assert service.store.get(exit_order["client_order_id"], "order")["status"] == "new"
+
+
+@pytest.mark.parametrize("fault", ["duplicate", "conflicting_close", "noncanonical_date", "cutoff_flow"])
+def test_ambiguous_daily_baseline_fails_closed(fault):
+    account = {
+        "last_equity": "100000",
+        "equity": "100000",
+        "balance_asof": "2026-10-20",
+        "intraday_adjustments": "0",
+    }
+    calendar = [{"date": "2026-10-20", "close": "16:00"}]
+    activities = []
+    if fault in {"duplicate", "conflicting_close"}:
+        calendar.append({"date": "2026-10-20", "close": "13:00" if fault == "conflicting_close" else "16:00"})
+    elif fault == "noncanonical_date":
+        calendar[0]["date"] = account["balance_asof"] = "20261020"
+    else:
+        activities = [
+            {"activity_type": "CSW", "transaction_time": "2026-10-20T20:00:00Z", "net_amount": "-10000"}
+        ]
+    result = daily_loss(
+        account, activities, calendar, datetime.fromisoformat("2026-10-21T15:00:00Z"), dec(".02")
+    )
+    assert not result["valid"]
+
+
+def test_conflicting_calendar_blocks_actual_entry(env, decision, monkeypatch):
+    service, broker, _ = env
+    original = broker.calendar
+
+    def conflicting(start, end):
+        rows = original(start, end)
+        if start != end:
+            rows.append({"date": "2026-10-20", "open": "09:30", "close": "13:00"})
+        return rows
+
+    monkeypatch.setattr(broker, "calendar", conflicting)
+    service.reconcile()
+    assert not service.store.get("loss_limit")["daily"]["valid"]
+    assert service.execute(decision, "conflicting-calendar")["status"] == "rejected"
+    assert broker.submits == 0
