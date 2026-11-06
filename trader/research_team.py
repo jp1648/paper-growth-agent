@@ -475,12 +475,28 @@ class ResearchDesk:
 
         @tool
         def read_source(source_id: str, offset: int = 0) -> dict:
-            """Read a 6000-character page of original evidence, including full news articles. Cite source_id; increase offset for more."""
+            """Read original evidence or a derived calculation (including its inputs), 6000 characters/page. Only original source IDs may enter evidence_ids; calculations are not primary evidence."""
             if offset < 0:
                 raise ValueError("Negative source offset")
             with self.lock:
+                if source_id in self.calculations:
+                    text = dumps(self.calculations[source_id])
+                    return {
+                        "calculation_id": source_id,
+                        "kind": "derived_calculation",
+                        "original_source": False,
+                        "note": "Computed from analyst assumptions, not independent primary evidence. Cite original source IDs for factual claims.",
+                        "offset": offset,
+                        "content": text[offset : offset + 6000],
+                        "truncated": offset + 6000 < len(text),
+                    }
                 if source_id not in self.sources:
-                    raise ValueError("Unknown evidence ID")
+                    return {
+                        "available": False,
+                        "error": "unknown_reference",
+                        "requested_id": source_id,
+                        "note": "No evidence or calculation has this ID. Use exact IDs from supplied sources, reports or calculations; this response supports no claim and cannot be cited.",
+                    }
                 text = dumps(self.sources[source_id]["content"])
                 return {
                     "id": source_id,
@@ -702,6 +718,7 @@ class ResearchDesk:
             context = {
                 **self.context,
                 "reports": copy.deepcopy(self.reports),
+                "calculations": copy.deepcopy(self.calculations),
                 "evidence": self.source_previews(self.sources.values()),
                 "assignment": task["messages"][-1].content,
             }

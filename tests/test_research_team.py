@@ -871,3 +871,66 @@ def test_unrestricted_removes_local_quotas_but_keeps_permissions():
         other.wrap_tool_call(
             SimpleNamespace(tool_call={"name": "execute", "id": "forbidden"}), lambda request: None
         )
+
+
+def test_adversarial_reads_calculation_and_recovers_unknown_lookup_without_weakening_citations(env, decision):
+    class CalculationReader(TeamModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            schema = kwargs["response_format"]["json_schema"]["name"]
+            if schema == "Critique":
+                context = json.loads(messages[1].content)
+                calculation_id = context["reports"]["valuation"]["calculation_id"]
+                assert context["calculations"][calculation_id]["inputs"]["cash_flow_per_share"] == "5"
+                replies = [message for message in messages if isinstance(message, ToolMessage)]
+                if len(replies) < 2:
+                    if replies:
+                        derived = json.loads(replies[0].content)
+                        assert derived["kind"] == "derived_calculation" and not derived["original_source"]
+                        assert json.loads(derived["content"]) == context["calculations"][calculation_id]
+                    reference = calculation_id if not replies else "mistyped-evidence-id"
+                    message = AIMessage(
+                        content="",
+                        tool_calls=[
+                            {
+                                "name": "read_source",
+                                "args": {"source_id": reference},
+                                "id": "critic-read-" + str(len(replies)),
+                                "type": "tool_call",
+                            }
+                        ],
+                    )
+                    message.usage_metadata = {"input_tokens": 100, "output_tokens": 100, "total_tokens": 200}
+                    return ChatResult(generations=[ChatGeneration(message=message)])
+                correction = json.loads(replies[-1].content)
+                assert correction["error"] == "unknown_reference" and not correction["available"]
+                assert "id" not in correction and "content" not in correction
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    service, broker, _ = env
+    service.cfg.input_cost_per_million = dec("1")
+    service.cfg.output_cost_per_million = dec("1")
+    model = CalculationReader(
+        decision=decision.model_copy(update={"evidence_ids": ["fixture-sec"]}).model_dump(mode="json")
+    )
+    worker = DeepResearchTeam(service.cfg, service.store, Evidence(), model)
+    result = build_graph(service, worker).invoke({"symbol": "ACME", "run_key": "critic-calculation"})
+    assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
+    assert broker.submits == 1
+    source_ids = {source["id"] for source in result["evidence"]["sources"]}
+    calculation_id = result["valuation"]["calculation_id"]
+    assert calculation_id not in source_ids and "mistyped-evidence-id" not in source_ids
+    desk = ResearchDesk(
+        service.cfg,
+        Evidence(),
+        {"symbol": "ACME", "portfolio": {}},
+        result["evidence"],
+        Budget(service.cfg),
+        model,
+    )
+    desk.calculations.update(result["calculations"])
+    for bad_id in (calculation_id, "mistyped-evidence-id"):
+        with pytest.raises(ValueError, match="unknown evidence"):
+            desk.validate(Valuation, {**result["valuation"], "evidence_ids": [bad_id]})
+    lookup = next(tool for tool in desk.tools() if tool.name == "read_source")
+    with pytest.raises(ValueError, match="Negative source offset"):
+        lookup.invoke({"source_id": calculation_id, "offset": -1})
