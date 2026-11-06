@@ -30,7 +30,7 @@ def _portfolio_report(service):
         sector_values[sector] = sector_values.get(sector, ZERO) + dec(p["market_value"])
     costs = store.events("model_cost")
     data_costs = store.events("data_cost")
-    fills = [a for a in store.items("activity") if a["activity_type"] == "FILL"]
+    fills = [a for a in store.activities() if a["activity_type"] == "FILL"]
     intents = {i.get("broker_order_id"): i for i in store.items("intent") if i.get("broker_order_id")}
     slippage = []
     for fill in fills:
@@ -55,6 +55,7 @@ def _portfolio_report(service):
         for s, value in sector_values.items()
         if equity and value / equity > service.cfg.max_sector
     ]
+    warnings += service.position_review_issues(positions, now())
     statuses = {}
     for intent in store.items("intent"):
         statuses[intent["status"]] = statuses.get(intent["status"], 0) + 1
@@ -93,7 +94,7 @@ def _portfolio_report(service):
         "exposure": exposures,
         "sector_values": sector_values,
         "cash_allocation": cash / equity if equity else None,
-        "gross_turnover_30d": recent_turnover(store.items("activity"), store.active_orders(), now()) / equity
+        "gross_turnover_30d": recent_turnover(store.activities(), store.active_orders(), now()) / equity
         if equity
         else None,
         "open_orders": store.active_orders(),
@@ -171,6 +172,7 @@ def daily_report(service, date=None):
     store.put(date, sample, "daily")
     samples = store.items("daily")
     indexed, peak, max_drawdown = dec(1), dec(1), ZERO
+    total_index, total_peak, total_drawdown = dec(1), dec(1), ZERO
     baseline_index = None
     returns = []
     baseline = samples[0]
@@ -184,13 +186,30 @@ def daily_report(service, date=None):
         daily = (
             (dec(current["comparison_equity"]) - delta_flow) / prior_equity - 1 if prior_equity > 0 else None
         )
+        prior_total = dec(previous["close_equity"]) if previous else dec(store.experiment["initial_capital"])
+        daily_total = (
+            (dec(current["close_equity"]) - delta_flow) / prior_total - 1 if prior_total > 0 else None
+        )
+        total_index = (
+            total_index * (1 + daily_total) if total_index is not None and daily_total is not None else None
+        )
+        if total_index is not None:
+            total_peak = max(total_peak, total_index)
+            total_drawdown = max(total_drawdown, 1 - total_index / total_peak)
         indexed = indexed * (1 + daily) if indexed is not None and daily is not None else None
         if baseline_index is None:
             baseline_index = indexed
         if indexed is not None:
             peak = max(peak, indexed)
             max_drawdown = max(max_drawdown, 1 - indexed / peak)
-        returns.append({"date": current["date"], "equity": current["close_equity"], "return": daily})
+        returns.append(
+            {
+                "date": current["date"],
+                "equity": current["close_equity"],
+                "return": daily,
+                "total_return": daily_total,
+            }
+        )
         previous = current
     baseline_calendar = service.broker.calendar(baseline["date"], baseline["date"])[0]
     # Re-fetch historical baseline so subsequent splits cannot corrupt cached benchmark returns.
@@ -208,6 +227,9 @@ def daily_report(service, date=None):
         if indexed is not None and baseline_index
         else None,
         experiment_price_return=indexed - 1 if indexed is not None else None,
+        experiment_total_return=total_index - 1 if total_index is not None else None,
+        total_return_max_drawdown=total_drawdown,
+        total_return_method="Flow-adjusted close equity including net distributions and broker fees; model/data costs excluded. Benchmarks below are price-only, not comparable total returns.",
         max_drawdown=max_drawdown,
         benchmarks=benchmarks,
         marks=marks,

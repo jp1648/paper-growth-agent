@@ -163,6 +163,9 @@ class AlpacaData:
             symbol=symbol,
             bid=raw["bp"],
             ask=raw["ap"],
+            # Provider sizes are shares since 2025-11-03; older round-lot quotes are not executable here.
+            bid_size=raw.get("bs") if dt(raw["t"]).date().isoformat() >= "2025-11-03" else None,
+            ask_size=raw.get("as") if dt(raw["t"]).date().isoformat() >= "2025-11-03" else None,
             timestamp=dt(raw["t"]),
             source="Alpaca",
             feed=feed,

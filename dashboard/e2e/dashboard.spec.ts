@@ -181,3 +181,42 @@ test("accepted investigation is readable and trace filters work", async ({
     ).toHaveAttribute("aria-pressed", "true");
   }
 });
+
+test("long trace loads every event and full details require authentication", async ({
+  page,
+  request,
+}) => {
+  test.skip(!password, "Requires isolated fixture dashboard");
+  await page.goto("/login");
+  await page.getByLabel("Workspace password").fill(password!);
+  await page.getByRole("button", { name: "Enter observatory" }).click();
+  await page.getByRole("button", { name: "Traces", exact: true }).click();
+  await page.locator(".run-choice").filter({ hasText: "long-fixture" }).click();
+  await expect(page.locator(".trace-row")).toHaveCount(100);
+  await page
+    .getByRole("button", { name: "Load older events", exact: true })
+    .click();
+  await expect(page.locator(".trace-row")).toHaveCount(200);
+  await page
+    .getByRole("button", { name: "Load older events", exact: true })
+    .click();
+  await expect(page.locator(".trace-row")).toHaveCount(205);
+  await expect(
+    page.getByRole("button", { name: "Load older events", exact: true }),
+  ).toHaveCount(0);
+  await page.locator(".trace-row").first().locator("summary").click();
+  const href = await page
+    .getByRole("link", { name: "Open complete event (new tab)" })
+    .first()
+    .getAttribute("href");
+  expect(href).toBeTruthy();
+  expect((await request.get(href!)).status()).toBe(401);
+  const full = await page.request.get(href!);
+  expect(full.headers()["cache-control"]).toContain("no-store");
+  expect((await full.json()).event.payload.end_marker).toBe("FULL_EVENT_END");
+  expect(
+    (
+      await page.request.get("/api/data?run=long-fixture&cursor=invalid")
+    ).status(),
+  ).toBe(400);
+});

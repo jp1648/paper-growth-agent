@@ -154,6 +154,8 @@ class FixtureData:
             symbol=symbol,
             bid=self.bid,
             ask=self.ask,
+            bid_size=D("1000"),
+            ask_size=D("1000"),
             timestamp=self.at,
             source="offline fixture",
             feed="iex",

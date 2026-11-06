@@ -115,6 +115,8 @@ class Quote(Model):
     symbol: str
     bid: Decimal = Field(gt=0)
     ask: Decimal = Field(gt=0)
+    bid_size: Decimal | None = Field(default=None, ge=0)
+    ask_size: Decimal | None = Field(default=None, ge=0)
     timestamp: datetime
     source: str
     feed: str

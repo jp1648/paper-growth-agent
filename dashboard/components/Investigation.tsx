@@ -32,12 +32,18 @@ export default function Investigation({
   tab,
   events,
   traceError,
+  hasOlder,
+  traceLoading,
+  loadOlder,
   setTab,
 }: {
   run: ResearchRun | undefined;
   tab: string;
   events: TraceEvent[];
   traceError: string;
+  hasOlder: boolean;
+  traceLoading: boolean;
+  loadOlder: () => void;
   setTab: (tab: string) => void;
 }) {
   const [filter, setFilter] = useState("All events");
@@ -299,21 +305,29 @@ export default function Investigation({
               ))}
             </div>
             <p>
-              {visible.length} of {events.length} loaded events · latest 100
-              available here
+              {visible.length} of {events.length} loaded events
             </p>
           </div>
           <p className="muted">
             Events are shown chronologically. A start without an end can mean
             interrupted or still running.
           </p>
+          {hasOlder && (
+            <button onClick={loadOlder} disabled={traceLoading}>
+              {traceLoading ? "Loading events…" : "Load older events"}
+            </button>
+          )}
+          {traceLoading && <p role="status">Loading trace events…</p>}
           {traceError && (
             <p role="alert" className="error">
               {traceError}
             </p>
           )}
           {visible.map((e, i) => (
-            <details className="trace-row" key={`${e.span_id}-${e.at}-${i}`}>
+            <details
+              className="trace-row"
+              key={e.event_id ?? `${e.span_id}-${e.at}-${i}`}
+            >
               <summary>
                 <span
                   className={
@@ -335,8 +349,21 @@ export default function Investigation({
               <pre>{payload(e.detail)}</pre>
               {e.truncated && (
                 <p className="notice">
-                  Preview limited to 12,000 characters. Full event remains in
-                  Postgres.
+                  Preview limited to 12,000 characters.{" "}
+                  {e.event_id && (
+                    <a
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      href={
+                        "/api/data?run=" +
+                        encodeURIComponent(run.id) +
+                        "&event=" +
+                        encodeURIComponent(e.event_id)
+                      }
+                    >
+                      Open complete event (new tab)
+                    </a>
+                  )}
                 </p>
               )}
             </details>

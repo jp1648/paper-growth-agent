@@ -63,6 +63,14 @@ def check(
     ):
         reasons.append("Security halted or halt status unavailable/stale")
     reference = quote.ask if decision.side == "buy" else quote.bid
+    spread = (quote.ask - quote.bid) / ((quote.ask + quote.bid) / 2)
+    if spread > settings.max_spread_fraction:
+        reasons.append("Quoted spread exceeds execution limit")
+    displayed = quote.ask_size if decision.side == "buy" else quote.bid_size
+    if displayed is None or displayed <= 0:
+        reasons.append("Displayed executable quote size unavailable")
+    elif decision.quantity > displayed * settings.max_quote_participation:
+        reasons.append("Order exceeds displayed quote participation limit")
     if abs(decision.limit_price / reference - 1) > settings.price_tolerance:
         reasons.append("Limit price outside configured quote tolerance")
     if decision.next_review <= at:
@@ -75,14 +83,26 @@ def check(
         reasons.append("ADD requires a position")
     if any(o["symbol"] == decision.symbol for o in orders):
         reasons.append("Outstanding order already exists for this symbol")
+    protective_exit = decision.side == "sell" and decision.exit_reason in {
+        "risk",
+        "thesis_invalid",
+        "catalyst_failed",
+    }
     if (
-        settings.cooldown_hours > 0
+        not protective_exit
+        and settings.cooldown_hours > 0
         and last_trade
         and at - dt(last_trade) < timedelta(hours=settings.cooldown_hours)
     ):
         reasons.append("Symbol cooldown is active")
     notional = decision.quantity * decision.limit_price
-    if equity > 0 and recent_turnover(activities, orders, at) + notional > equity * settings.turnover_30d:
+    if notional > equity * settings.max_order_equity:
+        reasons.append("Order exceeds per-order equity limit")
+    if (
+        not protective_exit
+        and equity > 0
+        and recent_turnover(activities, orders, at) + notional > equity * settings.turnover_30d
+    ):
         reasons.append("Rolling 30-day gross turnover ceiling exceeded")
     if decision.side == "buy":
         # Alpaca cash is the cash ledger, not margin buying power and not net of open-order holds.

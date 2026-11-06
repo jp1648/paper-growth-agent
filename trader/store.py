@@ -7,7 +7,7 @@ import os
 import sqlite3
 import tempfile
 import threading
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 from .models import TERMINAL, dec, dt, dumps, now
@@ -83,6 +83,33 @@ class Store:
             run_key=body.get("run_key") if isinstance(body, dict) else None,
         )
 
+    def activities(self):
+        """Effective broker activities; original records and approved revision chains remain intact."""
+        result = []
+        revisions = self.items("broker_revision")
+        for original in self.items("activity"):
+            current = original
+            # Each approval names its exact predecessor, so unrelated/replayed approvals cannot apply.
+            remaining = [r for r in revisions if "sequence" not in r]
+            while True:
+                matches = [r for r in remaining if r["before"] == current]
+                if not matches:
+                    break
+                if len(matches) != 1:
+                    raise RuntimeError("Conflicting broker activity revisions")
+                current = matches[0]["after"]
+                remaining.remove(matches[0])
+            ordered = sorted(
+                (r for r in revisions if "sequence" in r and r["before"]["id"] == original["id"]),
+                key=lambda r: r["sequence"],
+            )
+            for revision in ordered:
+                if revision["before"] != current:
+                    raise RuntimeError("Broker revision predecessor mismatch")
+                current = revision["after"]
+            result.append(current)
+        return result
+
     def backup(self):
         """Publish a consistent SQLite backup once per UTC day, including WAL transactions."""
         directory = self.path.parent / "backups"
@@ -94,10 +121,12 @@ class Store:
         os.close(fd)
         temporary = Path(name)
         try:
-            with sqlite3.connect(temporary) as target:
+            with closing(sqlite3.connect(temporary)) as target:
                 self.db.backup(target)
                 if target.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise RuntimeError("Backup integrity check failed")
+                # Publish one closed database, not a file depending on temporary WAL sidecars.
+                target.execute("PRAGMA journal_mode=DELETE")
             os.replace(temporary, destination)
         finally:
             temporary.unlink(missing_ok=True)
@@ -116,8 +145,12 @@ class Store:
 
     def order(self, order):
         old = self.get(order["client_order_id"], "order")
+        corrected = old and any(
+            revision.get("order_before") == old and revision.get("order_after") == order
+            for revision in self.items("broker_revision")
+        )
         if old:
-            if dec(order["filled_qty"]) < dec(old["filled_qty"]):
+            if not corrected and dec(order["filled_qty"]) < dec(old["filled_qty"]):
                 return
             if dt(order["updated_at"] or order["created_at"]) < dt(old["updated_at"] or old["created_at"]):
                 return

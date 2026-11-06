@@ -135,3 +135,21 @@ def test_sec_rejects_untrusted_origin_before_network(url):
     provider = EvidenceProvider(Settings(sec_user_agent="Test contact@example.org"), None, None, client)
     with pytest.raises(ValueError, match="SEC evidence URLs"):
         provider.request(url)
+
+
+@pytest.mark.parametrize(
+    "stamp,expected", [("2026-10-21T15:00:00Z", D("123")), ("2025-11-02T15:00:00Z", None)]
+)
+def test_quote_sizes_use_shares_without_round_lot_multiplication(keys, monkeypatch, stamp, expected):
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(
+                200, json={"quote": {"bp": 99, "ap": 100, "bs": 123, "as": 456, "t": stamp}}
+            )
+        )
+    )
+    data = AlpacaData(Settings(), client)
+    monkeypatch.setattr(data, "halt_status", lambda symbol: (False, AT))
+    quote = data.quote("ACME")
+    assert quote.bid_size == expected
+    assert quote.ask_size == (D(456) if expected is not None else None)

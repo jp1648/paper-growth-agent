@@ -22,6 +22,8 @@ class Runner:
         if phase in {"preopen", "weekly"} or not thesis:
             return True, phase
         reviewed = dt(thesis["reviewed_at"])
+        if reviewed > now():
+            return True, "future-dated thesis requires fresh review"
         if now() - reviewed < timedelta(minutes=self.cfg.event_debounce_minutes):
             return False, "debounced"
         decision = thesis["decision"]
@@ -34,11 +36,14 @@ class Runner:
             return True, "review deadline"
         news = self.service.data.news(symbol, reviewed.isoformat())
         # New external evidence can warrant research; price by itself only checks saved thresholds.
-        if any(dt(a["created_at"]) > reviewed for a in news):
+        if any(reviewed < dt(a["created_at"]) <= now() for a in news):
             return True, "new news evidence"
         quote = self.service.data.quote(symbol)
-        if quote.delayed or (now() - quote.timestamp).total_seconds() > self.cfg.quote_max_age_seconds:
-            return False, "stale quote"
+        if (
+            quote.delayed
+            or not -5 <= (now() - quote.timestamp).total_seconds() <= self.cfg.quote_max_age_seconds
+        ):
+            return False, "stale or future-dated quote"
         move = abs(quote.ask / dec(thesis["reference_price"]) - 1)
         if move >= self.cfg.price_trigger:
             return True, "configured price-move threshold crossed"
@@ -88,7 +93,12 @@ class Runner:
             )
         self.store.put("heartbeat", {"at": current})
         self.service.cancel_expired()
-        self.service.reconcile()
+        snapshot = self.service.reconcile()
+        issues = self.service.position_review_issues(snapshot.positions, now())
+        previous_review = self.store.get("position_review")
+        if previous_review is None or previous_review.get("issues") != issues:
+            self.store.log("position_review_changed", {"issues": issues})
+        self.store.put("position_review", {"at": now(), "issues": issues})
         self.store.backup()
         try:
             from .notifications import notify_fills

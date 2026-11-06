@@ -23,6 +23,7 @@ from pydantic import Field
 
 from .alpaca import safe_error
 from .evidence import EvidenceTooLarge
+from .financials import annual_cash_flow
 from .models import Decision, Model, dec, dt, dumps, now
 from .observability import emit, traced
 from .spending import DailyReservation
@@ -114,7 +115,10 @@ ROLES = {
         Valuation,
         (
             "Use business and catalyst findings. Call value_scenarios with explicitly "
-            "justified cash-flow assumptions. Return its calculation_id and exact bear/base/bull values. "
+            "justified cash-flow assumptions. Supply financial_source_id and financial_period_end from original "
+            "structured facts: matched annual USD operating cash flow, USD capex and diluted weighted-average shares. "
+            "cash_flow_per_share must equal (CFO-capex)/shares rounded to six decimals. The historical proxy "
+            "does not establish normalized earnings; discuss debt, dilution, SBC and nonrecurring items. Return its calculation_id and exact bear/base/bull values. "
             "Explain sensitivity and expectations embedded in today's price. If this simplified "
             "cash-flow model is inappropriate or inputs are insufficient, return null for calculation_id "
             "and all three values and explain the limitation in method. Never manufacture value."
@@ -494,7 +498,8 @@ class ResearchDesk:
             context.get("trigger") == "new news evidence"
             and self.prior.get("team_reports")
             and all(
-                r in times and now() - dt(times[r]) < timedelta(hours=cfg.research_cache_hours)
+                r in times
+                and timedelta(0) <= now() - dt(times[r]) < timedelta(hours=cfg.research_cache_hours)
                 for r in ("business", "valuation")
             )
         )
@@ -654,12 +659,27 @@ class ResearchDesk:
         @tool
         def value_scenarios(
             cash_flow_per_share: str,
+            financial_source_id: str,
+            financial_period_end: str,
             growth_rates: list[str],
             discount_rate: str,
             terminal_multiples: list[str],
             years: int,
         ) -> dict:
             """Decimal DCF: annual per-share cash flows plus terminal cash-flow multiple. Three ordered bear/base/bull cases; rates are fractions. Justify inputs using cited evidence."""
+            with self.lock:
+                source = copy.deepcopy(self.sources.get(financial_source_id))
+                target_sources = {item["id"] for item in self.companies[self.context["symbol"]]["sources"]}
+            if not source:
+                raise ValueError("Unknown financial evidence")
+            if financial_source_id not in target_sources:
+                raise ValueError("Financial evidence must belong to the company being valued")
+            provenance = annual_cash_flow(source, financial_period_end, self.evaluation_at or now())
+            if dec(cash_flow_per_share) != dec(provenance["cash_flow_per_share"]):
+                raise ValueError(
+                    "Cash flow must equal source-derived annual per-share proxy: "
+                    + provenance["cash_flow_per_share"]
+                )
             cash, discount = dec(cash_flow_per_share), dec(discount_rate)
             growth, multiples = list(map(dec, growth_rates)), list(map(dec, terminal_multiples))
             if (
@@ -680,11 +700,14 @@ class ResearchDesk:
             if list(map(dec, values)) != sorted(map(dec, values)):
                 raise ValueError("Scenarios must be ordered bear <= base <= bull")
             result = {
+                "financial_provenance": provenance,
                 "bear_value": values[0],
                 "base_value": values[1],
                 "bull_value": values[2],
                 "inputs": {
                     "cash_flow_per_share": cash_flow_per_share,
+                    "financial_source_id": financial_source_id,
+                    "financial_period_end": financial_period_end,
                     "growth_rates": growth_rates,
                     "discount_rate": discount_rate,
                     "terminal_multiples": terminal_multiples,
@@ -724,6 +747,9 @@ class ResearchDesk:
                     raise ValueError("Unsupported valuation must leave all values unknown")
                 return result
             calculation = self.calculations.get(result["calculation_id"])
+            provenance = (calculation or {}).get("financial_provenance")
+            if not provenance or provenance["source_id"] not in result["evidence_ids"]:
+                raise ValueError("Valuation must cite its financial input provenance")
             if not calculation or any(
                 result[k] != calculation[k] for k in ("bear_value", "base_value", "bull_value")
             ):

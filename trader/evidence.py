@@ -80,8 +80,11 @@ class EvidenceProvider:
         cached = self.store.get(symbol, "evidence_cache")
         if (
             cached
+            and cached.get("sec_schema") == 2
             and not fresh
-            and now() - dt(cached["fetched_at"]) < timedelta(hours=self.cfg.research_cache_hours)
+            and timedelta(0)
+            <= now() - dt(cached["fetched_at"])
+            < timedelta(hours=self.cfg.research_cache_hours)
         ):
             return cached
         bundle = self.fetch(symbol)
@@ -99,6 +102,7 @@ class EvidenceProvider:
             "Revenues",
             "RevenueFromContractWithCustomerExcludingAssessedTax",
             "NetIncomeLoss",
+            "WeightedAverageNumberOfDilutedSharesOutstanding",
             "NetCashProvidedByUsedInOperatingActivities",
             "PaymentsToAcquirePropertyPlantAndEquipment",
             "CashAndCashEquivalentsAtCarryingValue",
@@ -117,11 +121,16 @@ class EvidenceProvider:
         ):
             response = self.request(url)
             raw = response.json(parse_float=dec)
+            if str(raw.get("cik", "")).zfill(10) != cik:
+                raise ValueError("SEC response company identity does not match configured CIK")
             if kind == "facts":
                 values = {}
-                for taxonomy in raw["facts"].values():
+                namespaces = {}
+                for namespace, taxonomy in raw["facts"].items():
                     for tag, entry in taxonomy.items():
-                        if tag in tags:
+                        expected = "dei" if tag == "EntityCommonStockSharesOutstanding" else "us-gaap"
+                        if tag in tags and namespace == expected:
+                            namespaces[tag] = namespace
                             values[tag] = {
                                 unit: sorted(
                                     [v for v in records if v.get("filed", "") <= now().date().isoformat()],
@@ -133,13 +142,16 @@ class EvidenceProvider:
                 if not values:
                     raise ValueError("SEC evidence lacks usable financial facts")
                 content = {
+                    "cik": cik,
                     "entity": raw["entityName"],
                     "facts": values,
+                    "fact_taxonomies": namespaces,
                     "caution": "Facts may repeat/restated; compare matching fiscal durations and units; do not sum overlapping YTD periods.",
                 }
             else:
                 recent = raw["filings"]["recent"]
                 content = {
+                    "cik": cik,
                     "name": raw["name"],
                     "sic_description": raw.get("sicDescription"),
                     "filings": [
@@ -161,6 +173,8 @@ class EvidenceProvider:
             )
         news = self.data.news(symbol, (now() - timedelta(days=7)).isoformat())
         for article in news:
+            if not now() - timedelta(days=7) <= dt(article["created_at"]) <= now():
+                continue
             sources.append(
                 {
                     "id": "news-"
@@ -175,6 +189,7 @@ class EvidenceProvider:
                 }
             )
         bundle = {
+            "sec_schema": 2,
             "symbol": symbol,
             "fetched_at": now().isoformat(),
             "sources": sources,

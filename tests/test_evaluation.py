@@ -25,8 +25,12 @@ def test_frozen_suite_has_development_holdout_and_all_required_cases():
         exposed = model_inputs(case)
         assert "expected" not in exposed and "split" not in exposed
         result = score(case, recording["cases"][case["id"]])
-        assert result["mechanical_pass"], result
-        assert result["acceptance"] == "pending_human_review"
+        if case["expected"].get("valuation_required"):
+            assert result["failures"] == ["unverified_financial_provenance"]
+            assert result["acceptance"] == "failed"
+        else:
+            assert result["mechanical_pass"], result
+            assert result["acceptance"] == "pending_human_review"
 
 
 def test_independent_calculation_oracle():
@@ -116,7 +120,7 @@ def test_cli_replay_cannot_construct_broker_or_touch_operational_config(tmp_path
     )
     assert exit_code == 0
     result = json.loads(output.read_text())
-    assert result["summary"]["mechanical_passes"] == 16
+    assert result["summary"]["mechanical_passes"] == 12
     assert result["summary"]["pending_semantic_reviews"] == 16
     assert not result["summary"]["investment_performance_measured"]
     with pytest.raises(FileExistsError):
@@ -131,13 +135,11 @@ def test_failures_are_included_in_cost_denominator(tmp_path):
     result = replay(SUITE, path, tmp_path / "result.json", "costs")
     assert result["summary"]["known_cost_usd"] == "2"
     assert result["summary"]["unknown_cost_calls"] == 1
-    assert result["summary"]["known_cost_per_completed_decision"] == str(
-        __import__("decimal").Decimal(2) / 13
-    )
+    assert result["summary"]["known_cost_per_completed_decision"] == str(__import__("decimal").Decimal(2) / 9)
 
 
 def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeypatch):
-    from test_research_team import TeamModel
+    from test_research_team import TeamModel, financial_facts
 
     from trader import alpaca, observability
     from trader.config import Settings
@@ -161,7 +163,8 @@ def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeyp
     suite, recording = inputs()
     case = suite["cases"][0]
     case["inputs"]["sources"][0]["content"] = {
-        "filings": [{"accessionNumber": "0000000001-26-000001", "form": "10-K", "filingDate": "2026-01-01"}]
+        "facts": financial_facts(),
+        "filings": [{"accessionNumber": "0000000001-26-000001", "form": "10-K", "filingDate": "2026-01-01"}],
     }
     case["inputs"]["documents"] = [
         {
@@ -213,11 +216,12 @@ def test_comparison_rejects_different_evidence_and_reports_regression(tmp_path):
     replay(SUITE, RECORDING, baseline, "baseline")
     candidate = json.loads(baseline.read_text())
     candidate["run_id"] = "candidate"
-    candidate["cases"][0]["mechanical_pass"] = False
+    changed = next(row for row in candidate["cases"] if row["mechanical_pass"])
+    changed["mechanical_pass"] = False
     path = tmp_path / "candidate.json"
     path.write_text(json.dumps(candidate))
     result = compare(baseline, path, tmp_path / "comparison.json")
-    assert result["regressions"] == [candidate["cases"][0]["case_id"]]
+    assert result["regressions"] == [changed["case_id"]]
     assert not result["promotion_recommended"]
     candidate["cases"][0]["inputs_hash"] = "different"
     path.write_text(json.dumps(candidate))
@@ -313,7 +317,7 @@ def test_rubric_cannot_leak_through_inputs_and_future_documents_rejected(tmp_pat
 
 def test_human_review_cannot_be_replaced_by_truthy_strings():
     suite, recording = inputs()
-    case = suite["cases"][0]
+    case = suite["cases"][4]
     candidate = recording["cases"][case["id"]]
     candidate["human_review"] = {
         "reviewer": "fixture reviewer",
@@ -393,4 +397,55 @@ def test_cli_process_success_exit_status(tmp_path):
         text=True,
         check=True,
     )
-    assert json.loads(result.stdout)["mechanical_passes"] == 16
+    assert json.loads(result.stdout)["mechanical_passes"] == 12
+
+
+@pytest.mark.parametrize(
+    "mutation", ["none", "missing", "changed_fact", "changed_cash", "unknown_source", "uncited_source"]
+)
+def test_evaluator_requires_exact_frozen_financial_provenance(mutation):
+    from test_research_team import financial_facts
+
+    from trader.evaluation import timestamp
+    from trader.financials import annual_cash_flow
+
+    suite, recording = inputs()
+    case = suite["cases"][0]
+    source = case["inputs"]["sources"][0]
+    source["content"] = {"facts": financial_facts()}
+    candidate = recording["cases"][case["id"]]
+    valuation = candidate["reports"]["valuation"]
+    calculation = candidate["calculations"][valuation["calculation_id"]]
+    calculation["inputs"].update(financial_source_id=source["id"], financial_period_end="2025-12-31")
+    calculation["financial_provenance"] = annual_cash_flow(source, "2025-12-31", timestamp(case["cutoff"]))
+    if mutation == "missing":
+        calculation.pop("financial_provenance")
+    elif mutation == "changed_fact":
+        calculation["financial_provenance"]["facts"]["NetCashProvidedByUsedInOperatingActivities"]["val"] = (
+            60000
+        )
+    elif mutation == "changed_cash":
+        calculation["inputs"]["cash_flow_per_share"] = "500"
+    elif mutation == "unknown_source":
+        calculation["inputs"]["financial_source_id"] = "invented"
+    elif mutation == "uncited_source":
+        valuation["evidence_ids"] = ["fixture-news"]
+    result = score(case, candidate)
+    if mutation == "none":
+        assert result["mechanical_pass"], result
+    else:
+        assert "unverified_financial_provenance" in result["failures"]
+        assert not result["mechanical_pass"]
+
+
+def test_comparison_rejects_old_scoring_contract(tmp_path):
+    from trader.evaluation import compare
+
+    baseline = tmp_path / "baseline.json"
+    replay(SUITE, RECORDING, baseline, "baseline")
+    candidate = json.loads(baseline.read_text())
+    candidate.pop("scoring_contract")
+    path = tmp_path / "old.json"
+    path.write_text(json.dumps(candidate))
+    with pytest.raises(ValueError, match="scoring contract"):
+        compare(baseline, path, tmp_path / "comparison.json")

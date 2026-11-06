@@ -44,6 +44,12 @@ def main(argv=None):
     kill.add_argument("--reason", required=True)
     adjust = sub.add_parser("acknowledge-adjustment")
     adjust.add_argument("file")
+    revision = sub.add_parser("acknowledge-revision")
+    revision.add_argument("file")
+    notification = sub.add_parser(
+        "resolve-notification", help="Record delivery evidence without sending a message"
+    )
+    notification.add_argument("file")
     costs = sub.add_parser("record-data-cost")
     costs.add_argument("usd")
     costs.add_argument("--reason", required=True)
@@ -99,6 +105,12 @@ def dispatch(args):
     try:
         cfg = Settings.load(args.config)
         store = Store(cfg.database)
+        if args.command == "resolve-notification":
+            from .notifications import resolve_delivery
+
+            result = resolve_delivery(store, json.loads(Path(args.file).read_text()))
+            print(dumps(result))
+            return 0
         service = Service(cfg, store, AlpacaBroker(cfg), AlpacaData(cfg))
         if args.command == "init":
             result = service.initialize(args.new_experiment)
@@ -130,6 +142,8 @@ def dispatch(args):
                 )
             elif args.command == "acknowledge-adjustment":
                 result = service.acknowledge_adjustment(json.loads(Path(args.file).read_text()))
+            elif args.command == "acknowledge-revision":
+                result = service.acknowledge_revision(json.loads(Path(args.file).read_text()))
             elif args.command == "record-data-cost":
                 from .models import dec
 
@@ -179,6 +193,9 @@ def dispatch(args):
             store.log("error", {"command": args.command, "error": message})
         print(message, file=sys.stderr)
         return 1
+    finally:
+        if store:
+            store.db.close()
     return 0
 
 

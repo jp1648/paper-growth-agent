@@ -15,6 +15,7 @@ export interface ResearchRun {
   sources: { id: string; title?: string; type?: string; url?: string }[];
 }
 export interface TraceEvent {
+  event_id?: string;
   at: string;
   name: string;
   phase: string;

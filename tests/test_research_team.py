@@ -16,6 +16,24 @@ from trader.research import build_graph
 from trader.research_team import Budget, DeepResearchTeam, ResearchDesk, ResearchLimit, Valuation
 
 
+def financial_facts():
+    record = {
+        "start": "2025-01-01",
+        "end": "2025-12-31",
+        "filed": "2026-01-01",
+        "form": "10-K",
+        "accn": "0000000001-26-000001",
+    }
+    return {
+        tag: {unit: [{**record, "val": value}]}
+        for tag, unit, value in (
+            ("NetCashProvidedByUsedInOperatingActivities", "USD", 600),
+            ("PaymentsToAcquirePropertyPlantAndEquipment", "USD", 100),
+            ("WeightedAverageNumberOfDilutedSharesOutstanding", "shares", 100),
+        )
+    }
+
+
 class Evidence:
     def get(self, symbol, fresh=False):
         return {
@@ -24,13 +42,14 @@ class Evidence:
                 {
                     "id": "fixture-sec",
                     "content": {
+                        "facts": financial_facts(),
                         "filings": [
                             {
                                 "accessionNumber": "0000000001-26-000001",
                                 "form": "10-K",
                                 "filingDate": "2026-01-01",
                             }
-                        ]
+                        ],
                     },
                 }
             ],
@@ -187,6 +206,8 @@ class TeamModel(BaseChatModel):
                     "value_scenarios",
                     {
                         "cash_flow_per_share": "5",
+                        "financial_source_id": refs[0],
+                        "financial_period_end": "2025-12-31",
                         "growth_rates": ["0", ".1", ".2"],
                         "discount_rate": ".1",
                         "terminal_multiples": ["10", "15", "20"],
@@ -400,14 +421,16 @@ def test_decimal_valuation_and_fabricated_calculation_rejected():
     tools = {t.name: t for t in desk.tools()}
     calc = tools["value_scenarios"].invoke(
         {
-            "cash_flow_per_share": "10",
+            "cash_flow_per_share": "5",
+            "financial_source_id": "fixture-sec",
+            "financial_period_end": "2025-12-31",
             "growth_rates": ["0", "0", "0"],
             "discount_rate": ".1",
             "terminal_multiples": ["0", "0", "0"],
             "years": 1,
         }
     )
-    assert calc["base_value"] == "9.09"
+    assert calc["base_value"] == "4.55"
     output = {k: calc[k] for k in ("calculation_id", "bear_value", "base_value", "bull_value")} | {
         "method": "DCF",
         "assumptions": [],

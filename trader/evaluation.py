@@ -10,6 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
+from .financials import annual_cash_flow
 from .models import Decision
 from .research_team import Catalysts, Critique, Research, Valuation
 
@@ -165,6 +166,20 @@ def score(case, candidate):
                     failures.append("incorrect_calculation")
             except (KeyError, TypeError, ValueError, ArithmeticError):
                 failures.append("missing_or_invalid_calculation")
+            try:
+                inputs = calc["inputs"]
+                source_id = inputs["financial_source_id"]
+                provenance = annual_cash_flow(
+                    originals[source_id], inputs["financial_period_end"], timestamp(case["cutoff"])
+                )
+                if (
+                    calc.get("financial_provenance") != provenance
+                    or Decimal(inputs["cash_flow_per_share"]) != Decimal(provenance["cash_flow_per_share"])
+                    or source_id not in valuation["evidence_ids"]
+                ):
+                    failures.append("unverified_financial_provenance")
+            except (KeyError, TypeError, ValueError, ArithmeticError):
+                failures.append("unverified_financial_provenance")
         if decision["action"] in {"BUY", "ADD"} and (
             reports["adversarial"]["unresolved_material_gaps"] or valuation["calculation_id"] is None
         ):
@@ -212,6 +227,7 @@ def score(case, candidate):
         ):
             failures.append("human_review_failed")
     return {
+        "scoring_contract": "financial-provenance-v2",
         "case_id": case["id"],
         "split": case["split"],
         "sufficient_evidence": expected["outcome"] == "complete",
@@ -324,6 +340,7 @@ def replay(suite_path, responses_path, output_path, run_id):
         )
     result = {
         "version": 1,
+        "scoring_contract": "financial-provenance-v2",
         "run_id": run_id,
         "suite_hash": fingerprint(suite),
         "recording_hash": fingerprint(recording),
@@ -635,6 +652,8 @@ def run_suite(cfg, suite_path, output_dir, run_id, max_cost, split="development"
 def compare(baseline_path, candidate_path, output_path):
     """Paired comparison only; never silently compare different cases or evidence."""
     baseline, candidate = [json.loads(Path(p).read_text()) for p in (baseline_path, candidate_path)]
+    if any(r.get("scoring_contract") != "financial-provenance-v2" for r in (baseline, candidate)):
+        raise ValueError("Comparison requires both recordings rescored under the current scoring contract")
     if baseline["suite_hash"] != candidate["suite_hash"]:
         raise ValueError("Comparison requires identical frozen suites and splits")
     left = {r["case_id"]: r for r in baseline["cases"]}

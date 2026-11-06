@@ -30,6 +30,9 @@ def check_health(cfg):
             age = (now() - dt(item["at"])).total_seconds()
             if not -5 <= age <= max(300, cfg.poll_seconds * 5):
                 raise ValueError("Monitoring or reconciliation is stale")
+        review = read(experiment["id"], "position_review")
+        if review and review.get("issues"):
+            raise ValueError("Held-position review requires operator attention")
 
 
 def main():

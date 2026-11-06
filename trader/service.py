@@ -8,7 +8,7 @@ import httpx
 
 from .accounting import LedgerError, replay, reserved
 from .alpaca import safe_error
-from .models import TERMINAL, ZERO, Decision, dec, dt, now
+from .models import TERMINAL, ZERO, Decision, dec, dt, dumps, now
 from .observability import traced
 from .risk import check
 
@@ -120,8 +120,9 @@ class Service:
                     if intent:
                         self.validate_order(order, intent)
                     self.store.order(order)
+                effective = {a["id"]: a for a in self.store.activities()}
                 for a in snap.activities:
-                    prior = self.store.get(a["id"], "activity")
+                    prior = effective.get(a["id"])
                     if prior and prior != a:
                         raise LedgerError(f"Broker revised activity {a['id']}; audited correction required")
                     if not prior:
@@ -158,7 +159,7 @@ class Service:
                         raise LedgerError("External order in dedicated account; cancel and investigate")
                 adjustments = {x["id"]: x for x in self.store.items("adjustment")}
                 ledger = replay(
-                    self.store.experiment["initial_capital"], self.store.items("activity"), adjustments
+                    self.store.experiment["initial_capital"], self.store.activities(), adjustments
                 )
                 if abs(ledger["cash"] - dec(snap.account["cash"])) > dec("0.02"):
                     raise LedgerError(
@@ -239,13 +240,15 @@ class Service:
             clock,
             calendar,
             self.store.active_orders(),
-            self.store.items("activity"),
+            self.store.activities(),
             last["at"] if last else None,
             recon.get("ok", False),
             self.kill_path.exists(),
             self.store.experiment["ends_at"],
             checked_at,
         )
+        if decision.side == "buy":
+            reasons.extend(self.position_review_issues(snapshot.positions, checked_at))
         return (
             reasons,
             quote,
@@ -260,6 +263,23 @@ class Service:
                 ),
             },
         )
+
+    def position_review_issues(self, positions, at):
+        """Budget-independent entry restrictions, never an instruction to liquidate."""
+        issues = []
+        for position in positions:
+            if dec(position["qty"]) <= 0:
+                continue
+            symbol = position["symbol"]
+            thesis = self.store.get(symbol, "thesis")
+            try:
+                if not thesis or dt(thesis["reviewed_at"]) > at:
+                    issues.append(f"{symbol}: held position lacks a valid reviewed thesis")
+                elif dt(thesis["decision"]["next_review"]) <= at:
+                    issues.append(f"{symbol}: held-position review overdue")
+            except (KeyError, TypeError, ValueError):
+                issues.append(f"{symbol}: held-position review metadata invalid")
+        return sorted(issues)
 
     def client_order_id(self, intent_key):
         return "pg-" + hashlib.sha256(f"{self.store.scope}:{intent_key}".encode()).hexdigest()[:40]
@@ -289,7 +309,21 @@ class Service:
                 self.store.log("decision", result)
                 return result
             # Serialization covers fresh reconciliation, risk evaluation, journal commit and POST.
+            research_reasons = []
+            research = self.store.get(intent_key, "research_result")
+            if research:
+                if research["decision"] != decision.model_dump(mode="json"):
+                    research_reasons.append("Decision does not match immutable research")
+                completed = dt(research["research_completed_at"])
+                if not timedelta(0) <= now() - completed < timedelta(hours=self.cfg.research_cache_hours):
+                    research_reasons.append("Research is stale or future-dated")
+                elif any(
+                    dt(item["created_at"]) > completed
+                    for item in self.data.news(decision.symbol, completed.isoformat())
+                ):
+                    research_reasons.append("New news requires research review")
             reasons, quote, risk_context = self.evaluate(decision)
+            reasons.extend(research_reasons)
             result = {
                 "client_order_id": cid,
                 "decision": decision.model_dump(mode="json"),
@@ -421,6 +455,62 @@ class Service:
                 raise ValueError("Adjustment must reference a recorded broker activity")
             self.store.put(adjustment["id"], adjustment, "adjustment")
             self.store.log("explicit_adjustment", adjustment)
+            return self.reconcile()
+
+    @traced("service.acknowledge_revision")
+    def acknowledge_revision(self, revision):
+        """Approve exact broker evidence, never a guessed cash/position patch."""
+        with self.lock():
+            self.require_experiment()
+            if not self.kill_path.exists():
+                raise ValueError("Pause trading before approving broker revisions")
+            before, after = revision.get("before"), revision.get("after")
+            if not revision.get("reason") or not before or not after or before["id"] != after["id"]:
+                raise ValueError("Revision requires reason and exact before/after activity with same ID")
+            identifier = hashlib.sha256(dumps(revision).encode()).hexdigest()
+            if self.store.get(identifier, "broker_revision"):
+                return self.reconcile()
+            current = next((a for a in self.store.activities() if a["id"] == before["id"]), None)
+            if current != before or before == after:
+                raise ValueError("Revision predecessor does not match current audited activity")
+            tracked = [o["client_order_id"] for o in self.store.items("order")]
+            snap = self.broker.snapshot(self.store.experiment["started_at"], tracked)
+            if snap.account["id"] != self.account_id:
+                raise LedgerError("Broker account identity does not match experiment")
+            if next((a for a in snap.activities if a["id"] == after["id"]), None) != after:
+                raise ValueError("Replacement does not match current broker activity")
+            if before["activity_type"] == "FILL" or after["activity_type"] == "FILL":
+                if any(
+                    before.get(k) != after.get(k) for k in ("activity_type", "order_id", "symbol", "side")
+                ):
+                    raise ValueError("Fill revision cannot change approved order identity")
+                order_before, order_after = revision.get("order_before"), revision.get("order_after")
+                if not order_before or not order_after or order_after["id"] != after["order_id"]:
+                    raise ValueError("Fill revision requires exact before/after broker order")
+                cid = order_after["client_order_id"]
+                if self.store.get(cid, "order") != order_before:
+                    raise ValueError("Order predecessor does not match audited order")
+                if next((o for o in snap.orders if o["client_order_id"] == cid), None) != order_after:
+                    raise ValueError("Replacement does not match current broker order")
+                intent = self.store.get(cid, "intent")
+                if not intent:
+                    raise ValueError("Fill revision has no approved intent")
+                self.validate_order(order_after, intent)
+            elif revision.get("order_before") or revision.get("order_after"):
+                raise ValueError("Non-fill revision cannot revise an order")
+            replay(
+                self.store.experiment["initial_capital"],
+                [after if a["id"] == before["id"] else a for a in self.store.activities()],
+                {x["id"]: x for x in self.store.items("adjustment")},
+            )
+            # Approval order disambiguates corrections that later return to an earlier value.
+            approved = {
+                **revision,
+                "sequence": 1
+                + max((r.get("sequence", 0) for r in self.store.items("broker_revision")), default=0),
+            }
+            self.store.put(identifier, approved, "broker_revision")
+            self.store.log("broker_revision_approved", {"id": identifier, **approved})
             return self.reconcile()
 
     def reservation_summary(self):
