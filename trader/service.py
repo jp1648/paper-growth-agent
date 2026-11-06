@@ -11,7 +11,7 @@ from .alpaca import safe_error
 from .evidence import EvidenceProvider
 from .models import TERMINAL, ZERO, Decision, dec, dt, dumps, now
 from .observability import traced
-from .risk import check
+from .risk import check, daily_loss
 
 
 class Service:
@@ -218,6 +218,26 @@ class Service:
                 raise
 
     def update_loss_limit(self, snapshot, audit):
+        from zoneinfo import ZoneInfo
+
+        stamp = now()
+        day = stamp.astimezone(ZoneInfo("America/New_York")).date()
+        try:
+            calendar = self.broker.calendar((day - timedelta(days=20)).isoformat(), day.isoformat())
+            daily = daily_loss(
+                snapshot.account, self.store.activities(), calendar, stamp, self.cfg.max_daily_loss_fraction
+            )
+        except (httpx.HTTPError, ValueError, TypeError, RuntimeError, KeyError) as error:
+            daily = {"date": day.isoformat(), "valid": False, "breached": False, "error": safe_error(error)}
+        if daily["valid"]:
+            baseline = {"equity": str(daily["baseline_equity"]), "date": daily["baseline_date"]}
+            saved = self.store.get(daily["date"], "daily_loss_baseline")
+            if saved and (
+                dec(saved["equity"]) != dec(baseline["equity"]) or saved["date"] != baseline["date"]
+            ):
+                daily.update(valid=False, error="Broker revised the frozen daily loss baseline")
+            elif not saved:
+                self.store.put(daily["date"], baseline, "daily_loss_baseline")
         initial = dec(self.store.experiment["initial_capital"])
         pnl = dec(snapshot.account["equity"]) - initial - dec(audit["capital_flows"])
         threshold = initial * self.cfg.max_cumulative_loss_fraction
@@ -228,7 +248,8 @@ class Service:
             "pnl": pnl,
             "threshold_usd": threshold,
             "breached": breached,
-            "latched": breached or prior.get("latched", False),
+            "daily": daily,
+            "latched": breached or daily["breached"] or prior.get("latched", False),
             "basis": "Flow-adjusted broker equity loss against original experiment capital",
         }
         self.store.put("loss_limit", status)
@@ -270,7 +291,9 @@ class Service:
         if decision.side == "buy":
             reasons.extend(self.position_review_issues(snapshot.positions, checked_at))
             if self.store.get("loss_limit")["latched"]:
-                reasons.append("Cumulative loss limit latched; operator review required")
+                reasons.append("Portfolio loss limit latched; operator review required")
+            if not self.store.get("loss_limit")["daily"]["valid"]:
+                reasons.append("Daily loss baseline unavailable; new exposure blocked")
         return (
             reasons,
             quote,
@@ -485,6 +508,8 @@ class Service:
             limit = self.store.get("loss_limit")
             if limit["breached"]:
                 raise ValueError("Cannot resume while cumulative loss limit remains breached")
+            if not limit["daily"]["valid"] or limit["daily"]["breached"]:
+                raise ValueError("Cannot resume with unavailable or breached daily loss baseline")
             if limit["latched"]:
                 released = {**limit, "latched": False, "released_at": now()}
                 self.store.put("loss_limit", released)

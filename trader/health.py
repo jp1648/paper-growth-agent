@@ -33,7 +33,9 @@ def check_health(cfg):
         review = read(experiment["id"], "position_review")
         limit = read(experiment["id"], "loss_limit")
         if limit and limit.get("latched"):
-            raise ValueError("Cumulative loss limit requires operator attention")
+            raise ValueError("Portfolio loss limit requires operator attention")
+        if limit and not limit.get("daily", {}).get("valid", True):
+            raise ValueError("Daily loss baseline requires operator attention")
         if review and review.get("issues"):
             raise ValueError("Held-position review requires operator attention")
 

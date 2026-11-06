@@ -1,10 +1,13 @@
 """Cumulative loss controls use audited flows and survive restart without liquidation."""
 
+from datetime import datetime
+
 import pytest
 
 from trader.health import check_health
 from trader.models import dec
 from trader.reports import portfolio_report
+from trader.risk import daily_loss
 from trader.runner import Runner
 from trader.service import Service
 from trader.store import Store
@@ -22,6 +25,7 @@ def fee(service, broker, amount):
 @pytest.mark.parametrize("amount,blocked", [("9999.99", False), ("10000", True), ("10000.01", True)])
 def test_cumulative_loss_boundary(env, decision, amount, blocked):
     service, broker, _ = env
+    service.cfg.max_daily_loss_fraction = dec("1")
     fee(service, broker, amount)
     result = service.execute(decision, "after-loss")
     assert result["status"] == ("rejected" if blocked else "submitted")
@@ -109,7 +113,135 @@ def test_unrealized_loss_triggers_limit_and_health_without_research(env, decisio
     service.cfg.research_daily_cost_usd = dec(0)
     Runner(service, None).maintain()
     assert service.store.get("loss_limit")["pnl"] == "-500"
-    with pytest.raises(ValueError, match="Cumulative loss limit"):
+    with pytest.raises(ValueError, match="Portfolio loss limit"):
         check_health(service.cfg)
-    assert any("Cumulative loss limit" in item for item in portfolio_report(service)["risk_reviews"])
+    assert any("Portfolio loss limit" in item for item in portfolio_report(service)["risk_reviews"])
     assert len(broker.orders) == 1
+
+
+@pytest.mark.parametrize("amount,blocked", [("1999.99", False), ("2000", True), ("2000.01", True)])
+def test_daily_loss_boundary(env, decision, amount, blocked):
+    service, broker, _ = env
+    fee(service, broker, amount)
+    assert service.execute(decision, "daily-boundary")["status"] == ("rejected" if blocked else "submitted")
+    limit = service.store.get("loss_limit")
+    assert not limit["breached"]
+    assert limit["daily"]["breached"] is blocked
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("last_equity", None),
+        ("last_equity", "NaN"),
+        ("last_equity", "0"),
+        ("last_equity", "Infinity"),
+        ("balance_asof", "2026-10-19"),
+        ("balance_asof", "2026-10-21"),
+        ("intraday_adjustments", "100"),
+    ],
+)
+def test_invalid_daily_baseline_blocks_entry_but_not_owned_exit(env, decision, field, value):
+    service, broker, _ = env
+    entry = service.execute(decision, "entry")
+    broker.fixture_fill(entry["client_order_id"])
+    broker.raw_account[field] = value
+    result = service.execute(decision.model_copy(update={"action": "ADD"}), "bad-baseline")
+    assert result["status"] == "rejected"
+    assert not service.store.get("loss_limit")["daily"]["valid"]
+    result = service.execute(decision.model_copy(update={"action": "SELL", "exit_reason": "risk"}), "exit")
+    assert result["status"] == "submitted"
+
+
+def test_same_day_baseline_revision_cannot_silently_reset_limit(env, decision):
+    service, broker, _ = env
+    broker.raw_account["last_equity"] = "99999"
+    for _ in range(2):
+        service.reconcile()
+        assert not service.store.get("loss_limit")["daily"]["valid"]
+    assert service.execute(decision, "changed-baseline")["status"] == "rejected"
+    assert service.store.get("2026-10-21", "daily_loss_baseline")["equity"] == "100000"
+
+
+def test_baseline_numeric_format_is_not_a_revision(env):
+    service, broker, _ = env
+    broker.raw_account["last_equity"] = "100000.00"
+    service.reconcile()
+    assert service.store.get("loss_limit")["daily"]["valid"]
+
+
+def test_missing_calendar_baseline_fails_closed_and_health_flags_it(env, decision, monkeypatch):
+    service, broker, _ = env
+    original = broker.calendar
+    monkeypatch.setattr(broker, "calendar", lambda start, end: [] if start != end else original(start, end))
+    Runner(service, None).maintain()
+    with pytest.raises(ValueError, match="Daily loss baseline"):
+        check_health(service.cfg)
+    assert service.execute(decision, "missing-calendar")["status"] == "rejected"
+
+
+def test_daily_breach_latches_across_new_day_and_restart(env, monkeypatch):
+    service, broker, data = env
+    fee(service, broker, "2000")
+    broker.raw_account.update(last_equity="98000", balance_asof="2026-10-21")
+    monkeypatch.setattr("trader.service.now", lambda: datetime.fromisoformat("2026-10-22T15:00:00+00:00"))
+    reopened = Store(service.cfg.database)
+    try:
+        fresh = Service(service.cfg, reopened, broker, data)
+        fresh.reconcile()
+        limit = reopened.get("loss_limit")
+        assert limit["daily"]["pnl"] == "0" and limit["latched"]
+        fresh.resume()
+        assert not reopened.get("loss_limit")["latched"]
+    finally:
+        reopened.db.close()
+
+
+def test_daily_baseline_covers_weekend_dst_and_capital_flows():
+    account = {
+        "last_equity": "100000",
+        "equity": "108000",
+        "balance_asof": "2026-10-30",
+        "intraday_adjustments": "0",
+    }
+    calendar = [{"date": "2026-10-30", "close": "16:00"}]
+    at = datetime.fromisoformat("2026-11-02T15:00:00+00:00")
+    activities = [{"activity_type": "CSD", "date": "2026-11-01", "net_amount": "10000"}]
+    result = daily_loss(account, activities, calendar, at, dec(".02"))
+    assert result["valid"] and result["breached"] and result["pnl"] == dec(-2000)
+    # Friday close was 20:00 UTC before the DST change, not 21:00 UTC.
+    activities[0].update(transaction_time="2026-10-30T20:30:00+00:00")
+    assert daily_loss(account, activities, calendar, at, dec(".02"))["breached"]
+    activities[0].pop("transaction_time")
+    activities[0]["date"] = "2026-10-30"
+    assert not daily_loss(account, activities, calendar, at, dec(".02"))["valid"]
+    calendar[0]["close"] = "13:00"
+    assert not daily_loss(account, [], calendar, at, dec(".02"))["valid"]
+
+
+@pytest.mark.parametrize(
+    "stamp,valid,pnl",
+    [
+        ("2026-10-20T19:59:59+00:00", True, "-10000"),
+        ("2026-10-20T20:00:01+00:00", True, "0"),
+        ("2026-10-22T20:00:01+00:00", False, None),
+    ],
+)
+def test_withdrawal_cutoff_and_future_activity(stamp, valid, pnl):
+    account = {
+        "last_equity": "100000",
+        "equity": "90000",
+        "balance_asof": "2026-10-20",
+        "intraday_adjustments": "0",
+    }
+    activities = [{"activity_type": "CSW", "transaction_time": stamp, "net_amount": "-10000"}]
+    result = daily_loss(
+        account,
+        activities,
+        [{"date": "2026-10-20", "close": "16:00"}],
+        datetime.fromisoformat("2026-10-21T15:00:00+00:00"),
+        dec(".02"),
+    )
+    assert result["valid"] is valid
+    if valid:
+        assert result["pnl"] == dec(pnl)

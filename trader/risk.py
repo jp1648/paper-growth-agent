@@ -1,9 +1,54 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import InvalidOperation
 from zoneinfo import ZoneInfo
 
 from .accounting import recent_turnover, remaining, reserved
 from .models import ZERO, dec, dt
+
+
+def daily_loss(account, activities, calendar, at, fraction):
+    """Use broker prior-close equity, never the first balance observed after downtime."""
+    local = at.astimezone(ZoneInfo("America/New_York"))
+    result = {"date": local.date().isoformat(), "valid": False, "breached": False}
+    try:
+        prior = max(day for day in (d["date"] for d in calendar) if day < result["date"])
+        session = next(d for d in calendar if d["date"] == prior)
+        if account.get("balance_asof") != prior or session["close"] != "16:00":
+            raise ValueError("Prior-close date or regular-close baseline is unverified")
+        baseline = dec(account["last_equity"])
+        if baseline <= 0 or dec(account["intraday_adjustments"]) != 0:
+            raise ValueError("Prior-close equity or intraday adjustments are unsupported")
+        cutoff = datetime.fromisoformat(prior + "T16:00:00").replace(tzinfo=local.tzinfo)
+        flows = ZERO
+        for activity in activities:
+            if activity["activity_type"] not in {"CSD", "CSW"}:
+                continue
+            if activity.get("transaction_time"):
+                stamp = dt(activity["transaction_time"])
+                if stamp > at:
+                    raise ValueError("Future capital movement")
+                after = stamp > cutoff
+            else:
+                day = date.fromisoformat(activity["date"])
+                if day > local.date() or day == cutoff.date():
+                    raise ValueError("Capital movement cannot be placed relative to prior close")
+                after = day > cutoff.date()
+            if after:
+                flows += dec(activity["net_amount"])
+        pnl = dec(account["equity"]) - baseline - flows
+        threshold = baseline * fraction
+        result.update(
+            valid=True,
+            baseline_equity=baseline,
+            baseline_date=prior,
+            capital_flows=flows,
+            pnl=pnl,
+            threshold_usd=threshold,
+            breached=pnl <= -threshold,
+        )
+    except (KeyError, ValueError, TypeError, InvalidOperation, StopIteration) as error:
+        result["error"] = f"Daily loss baseline unavailable: {type(error).__name__}"
+    return result
 
 
 def check(

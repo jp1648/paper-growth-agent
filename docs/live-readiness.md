@@ -488,3 +488,30 @@ operator attestation, not independent API verification of delivery.
 - Full offline suite after the loss gate: 459 passed, three opt-in integrations
   skipped; Ruff lint/format and whitespace checks passed. No paid model calls,
   broker orders or deployment occurred. New gate deployment verification pending.
+- Daily loss gate now uses broker last_equity and balance_asof matched to the
+  prior trading date in the broker calendar, rather than first-observed equity.
+  A read-only paper-account check at 2026-11-06T23:08:40Z confirmed these fields
+  are supplied and balance_asof matched November 5. Official account reference:
+  https://docs.alpaca.markets/us/reference/getaccount-1 (last_equity is prior-day
+  16:00 ET equity). This observation does not verify every account/market regime.
+- The provisional paper daily threshold is 2% of prior-close equity. Audited
+  CSD/CSW flows after the prior close are excluded. Date-only flows on the cutoff
+  date, missing/stale/non-finite baselines, unexplained intraday_adjustments and
+  prior early closes block new exposure instead of guessing. Prior early-close
+  baseline semantics and other transfer activity types still need broker-backed
+  evidence. Date-only CSD/CSW uses its broker activity date as the economic date;
+  delayed/backdated posting semantics remain a live-release verification gap.
+- A valid baseline is frozen per New York date; subsequent broker revisions
+  cannot silently reset it, even after an invalid observation. A breach latches
+  across restart/day rollover; explicit resume needs a valid unbreached daily
+  and cumulative check. Protective exits retain existing gates; this still does
+  not cancel working orders or guarantee a maximum realized loss through gaps.
+- Eighteen additional regressions cover the daily boundary, unavailable baseline,
+  health signal, frozen-baseline revisions, restart/day rollover, weekend/DST
+  cutoff and capital movements. Full offline suite: 477 passed, three opt-in
+  integrations skipped. Earlier cumulative-loss commit 81e0488 passed remote CI
+  runs 42309685494 and 42309677847. Daily changes are not deployed; no paid models
+  or orders were used. All sixteen requirements remain active; status NO-GO.
+- Eight selected safety mutations were caught, including disabled loss-latch
+  entry enforcement and disabled daily-baseline entry enforcement. This tests
+  the actual execution rejection path, not just calculation output.

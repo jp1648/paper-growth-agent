@@ -58,7 +58,9 @@ def _portfolio_report(service):
     warnings += service.position_review_issues(positions, now())
     loss_limit = store.get("loss_limit")
     if loss_limit and loss_limit["latched"]:
-        warnings.append("Cumulative loss limit latched; new exposure blocked pending operator review")
+        warnings.append("Portfolio loss limit latched; new exposure blocked pending operator review")
+    if loss_limit and not loss_limit.get("daily", {}).get("valid", True):
+        warnings.append("Daily loss baseline unavailable; new exposure blocked")
     statuses = {}
     for intent in store.items("intent"):
         statuses[intent["status"]] = statuses.get(intent["status"], 0) + 1

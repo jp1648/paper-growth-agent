@@ -34,6 +34,7 @@ class Settings(Model):
     max_sector: Decimal = Field(default=Decimal("0.40"), gt=0, le=1)
     max_positions: int = Field(default=10, ge=1)
     max_cumulative_loss_fraction: Decimal = Field(default=Decimal("0.10"), gt=0, le=1)
+    max_daily_loss_fraction: Decimal = Field(default=Decimal("0.02"), gt=0, le=1)
     turnover_30d: Decimal = Field(default=Decimal("1.0"), gt=0)
     cooldown_hours: int = Field(default=24, ge=0)
     price_tolerance: Decimal = Field(default=Decimal("0.005"), ge=0, le=Decimal("0.05"))

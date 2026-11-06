@@ -24,6 +24,12 @@ MUTATIONS = {
         "if False:",
     ),
     "reservation": ("trader/service.py", "        return amount\n", "        return ZERO\n"),
+    "loss_latch": ("trader/service.py", 'if self.store.get("loss_limit")["latched"]:', "if False:"),
+    "daily_baseline": (
+        "trader/service.py",
+        'if not self.store.get("loss_limit")["daily"]["valid"]:',
+        "if False:",
+    ),
 }
 
 
@@ -51,6 +57,7 @@ def main():
                         "tests/test_execution.py",
                         "tests/test_live_readiness.py",
                         "tests/test_financials.py",
+                        "tests/test_loss_limits.py",
                         "--junitxml=mutation.xml",
                     ],
                     cwd=target,
