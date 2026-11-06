@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal, Protocol
+from typing import Annotated, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema, field_validator, model_validator
 
 D = Decimal
 ZERO = D("0")
@@ -52,8 +52,13 @@ class Model(BaseModel):
 class Decision(Model):
     symbol: str = Field(pattern=r"^[A-Z][A-Z0-9.\-]{0,9}$")
     action: Literal["BUY", "ADD", "HOLD", "REDUCE", "SELL", "WATCH"]
-    quantity: Decimal = Field(ge=0)
-    limit_price: Decimal = Field(ge=0)
+    quantity: Annotated[Decimal, WithJsonSchema({"type": "integer", "minimum": 0})] = Field(
+        ge=0, description="Whole shares. Use numeric 0 for WATCH or HOLD."
+    )
+    limit_price: Annotated[Decimal, WithJsonSchema({"type": "number", "minimum": 0})] = Field(
+        ge=0,
+        description="USD per share, with at most two decimal places. Use numeric 0 for WATCH or HOLD; never N/A or text.",
+    )
     business_attraction: str = Field(min_length=1)
     price_attraction: str = Field(min_length=1)
     why_now: str = Field(min_length=1)
@@ -70,7 +75,9 @@ class Decision(Model):
     evidence_ids: list[str] = Field(min_length=1)
     assumptions: list[str]
     expected_outcome: str = Field(min_length=1)
-    confidence: Decimal = Field(ge=0, le=1)
+    confidence: Annotated[Decimal, WithJsonSchema({"type": "number", "minimum": 0, "maximum": 1})] = Field(
+        ge=0, le=1
+    )
 
     @field_validator("next_review")
     @classmethod

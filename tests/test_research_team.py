@@ -934,3 +934,35 @@ def test_adversarial_reads_calculation_and_recovers_unknown_lookup_without_weake
     lookup = next(tool for tool in desk.tools() if tool.name == "read_source")
     with pytest.raises(ValueError, match="Negative source offset"):
         lookup.invoke({"source_id": calculation_id, "offset": -1})
+
+
+def test_provider_decision_numeric_schema_and_decimal_runtime_remain_consistent(decision):
+    from langchain.agents.structured_output import ProviderStrategy
+
+    from trader.models import Decision
+
+    properties = ProviderStrategy(Decision, strict=True).schema_spec.json_schema["properties"]
+    assert properties["quantity"]["type"] == "integer" and properties["quantity"]["minimum"] == 0
+    assert properties["limit_price"]["type"] == "number" and properties["limit_price"]["minimum"] == 0
+    assert properties["confidence"]["type"] == "number"
+    assert properties["confidence"]["minimum"] == 0 and properties["confidence"]["maximum"] == 1
+    assert all("anyOf" not in properties[field] for field in ("quantity", "limit_price", "confidence"))
+    assert "numeric 0" in properties["limit_price"]["description"]
+    original = decision.model_dump(mode="json")
+    assert (
+        Decision.model_validate(original) == decision
+    )  # Existing numeric-string journal/API callers survive.
+    for field, value in (
+        ("limit_price", "N/A — no order proposed"),
+        ("quantity", "N/A"),
+        ("confidence", "high"),
+        ("quantity", "-1"),
+        ("quantity", "1.5"),
+        ("limit_price", "-1"),
+        ("limit_price", "100.001"),
+        ("confidence", "1.1"),
+    ):
+        with pytest.raises(ValueError):
+            Decision.model_validate({**original, field: value})
+    watch = Decision.model_validate({**original, "action": "WATCH", "quantity": 0, "limit_price": 0})
+    assert watch.quantity == watch.limit_price == 0

@@ -775,7 +775,7 @@ class ResearchDesk:
             "reports may be reused by the system. All four reports must exist before your final decision. "
             "Use your assigned auxiliary planning/source allowance when enforced; reserve delegation for all four specialists. Delegate evidence gaps rather than browsing exhaustively yourself. Compare with existing holdings and cash, resolve conflicts, "
             "then propose BUY/ADD/HOLD/REDUCE/SELL/WATCH. The critique is mandatory. Use quantity zero for "
-            "HOLD/WATCH and whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "
+            "HOLD/WATCH and numeric limit_price zero (never N/A). Use whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "
             "invalidation conditions and a future review date. An unresolved material gap blocks BUY/ADD.",
             [t for t in self.tools() if t.name != "value_scenarios"],
             subagents,
