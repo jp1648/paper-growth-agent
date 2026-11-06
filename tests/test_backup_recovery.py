@@ -33,7 +33,7 @@ def test_restored_backup_preserves_pause_and_never_repeats_submission(env, decis
         service.store.backup()  # Deliberately leave the daily backup older than the order.
     submit = broker.submit
 
-    def capture_before_post(payload):
+    def capture_before_post(payload, **kwargs):
         nonlocal backup
         if backup is None:
             backup = (
@@ -41,7 +41,7 @@ def test_restored_backup_preserves_pause_and_never_repeats_submission(env, decis
                 if stage == "checkpoint_then_filled"
                 else service.store.backup()
             )
-        return submit(payload)
+        return submit(payload, **kwargs)
 
     broker.submit = capture_before_post
     result = service.execute(decision, "restore-drill")

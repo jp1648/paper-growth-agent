@@ -31,7 +31,9 @@ def die():
 
 class Broker:
     def __getattr__(self, name):
-        def invoke(*args):
+        def invoke(*args, before_send=None):
+            if before_send is not None:
+                before_send()
             response = httpx.post(endpoint + "/" + name, json=list(args), timeout=5)
             response.raise_for_status()
             value = response.json()

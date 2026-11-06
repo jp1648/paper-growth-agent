@@ -10,7 +10,7 @@ from .accounting import LedgerError, replay, reserved
 from .alpaca import safe_error
 from .evidence import EvidenceProvider
 from .executor_owner import ExecutionFenceError
-from .models import TERMINAL, ZERO, Decision, dec, dt, dumps, now
+from .models import TERMINAL, ZERO, Decision, SubmissionPreflightError, dec, dt, dumps, now
 from .observability import traced
 from .risk import check, daily_loss
 
@@ -431,35 +431,41 @@ class Service:
                 self.store.put(cid, result, "intent")
                 self.store.log("execution_checkpoint_failed", result)
                 return result
-            # Disk work can outlast quote/session validity; recheck the saved risk inputs at submission time.
-            last = self.store.get(decision.symbol, "last_trade")
-            reasons = check(
-                self.cfg,
-                decision,
-                risk_context["snapshot"],
-                quote,
-                risk_context["asset"],
-                risk_context["clock"],
-                risk_context["calendar"],
-                self.store.active_orders(),
-                self.store.activities(),
-                last["at"] if last else None,
-                self.store.get("reconciliation")["ok"],
-                self.kill_path.exists(),
-                self.store.experiment["ends_at"],
-                now(),
-            )
-            if reasons:
-                result.update(status="rejected", reasons=reasons)
-                self.store.put(cid, result, "intent")
-                return result
-            # Kill can be activated without waiting for this account lock.
-            if self.kill_path.exists():
-                result.update(status="rejected", reasons=["Kill switch activated before submission"])
-                self.store.put(cid, result, "intent")
-                return result
+
+            def before_send():
+                # Recheck after all checkpoint/ownership I/O, immediately before the HTTP POST.
+                try:
+                    last = self.store.get(decision.symbol, "last_trade")
+                    reasons = check(
+                        self.cfg,
+                        decision,
+                        risk_context["snapshot"],
+                        quote,
+                        risk_context["asset"],
+                        risk_context["clock"],
+                        risk_context["calendar"],
+                        self.store.active_orders(),
+                        self.store.activities(),
+                        last["at"] if last else None,
+                        self.store.get("reconciliation")["ok"],
+                        self.kill_path.exists(),
+                        self.store.experiment["ends_at"],
+                        now(),
+                    )
+                except Exception as error:
+                    raise SubmissionPreflightError(
+                        ["Submission risk check failed: " + type(error).__name__]
+                    ) from error
+                if reasons:
+                    raise SubmissionPreflightError(reasons)
+
             try:
-                order = self.broker.submit(payload)
+                order = self.broker.submit(payload, before_send=before_send)
+            except SubmissionPreflightError as error:
+                result.update(status="rejected", reasons=error.reasons)
+                self.store.put(cid, result, "intent")
+                self.store.log("submission_preflight_rejected", result)
+                return result
             except ExecutionFenceError as error:
                 result.update(status="rejected", reasons=[str(error)])
                 self.store.put(cid, result, "intent")

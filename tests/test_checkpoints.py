@@ -127,9 +127,9 @@ def test_replication_receipt_is_journaled_before_order(env, decision, monkeypatc
     )
     submit = broker.submit
 
-    def checked(payload):
+    def checked(payload, **kwargs):
         assert service.store.events("execution_checkpoint_replicated")[0]["body"]["generation"] == "123"
-        return submit(payload)
+        return submit(payload, **kwargs)
 
     monkeypatch.setattr(broker, "submit", checked)
     assert service.execute(decision, "offhost-success")["status"] == "submitted"

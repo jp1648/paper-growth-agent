@@ -1,5 +1,9 @@
+import json
+from datetime import timedelta
+
 import httpx
 import pytest
+from conftest import AT
 
 from trader.alpaca import AlpacaBroker
 from trader.executor_owner import ExecutionFenceError, verify_executor_owner
@@ -85,7 +89,7 @@ def test_broker_mutations_fenced_but_reads_remain_available(env, monkeypatch, me
 def test_known_fence_denial_is_not_an_ambiguous_submission(env, decision, monkeypatch):
     service, broker, _ = env
 
-    def denied(payload):
+    def denied(payload, **kwargs):
         raise ExecutionFenceError("Fixture revoked ownership")
 
     monkeypatch.setattr(broker, "submit", denied)
@@ -94,3 +98,55 @@ def test_known_fence_denial_is_not_an_ambiguous_submission(env, decision, monkey
     assert broker.submits == 0 and service.reservation_summary() == 0
     assert service.store.events("execution_fenced")
     assert not service.store.events("submission_uncertain")
+
+
+@pytest.mark.parametrize(
+    "case", ["healthy", "stale_clock", "stale_quote", "session_closed", "pause", "check_error"]
+)
+def test_final_risk_check_runs_after_ownership_io_before_actual_transport(env, decision, monkeypatch, case):
+    service, scripted, _ = env
+    service.cfg.checkpoint_bucket = "private-recovery"
+    service.cfg.executor_fence = True
+    monkeypatch.setenv("ALPACA_PAPER_API_KEY", "fixture")
+    monkeypatch.setenv("ALPACA_PAPER_SECRET_KEY", "fixture")
+    monkeypatch.setattr("trader.checkpoints.replicate_checkpoint", lambda *args: {"generation": "123"})
+    sent = []
+    submit = scripted.submit
+
+    def transport(request):
+        sent.append(request.method)
+        return httpx.Response(200, json=submit(json.loads(request.read())))
+
+    def ownership(_):
+        if case in {"stale_clock", "stale_quote", "session_closed"}:
+            seconds = {"stale_clock": 31, "stale_quote": 61, "session_closed": 6 * 3600}[case]
+            monkeypatch.setattr("trader.service.now", lambda: AT + timedelta(seconds=seconds))
+        elif case == "pause":
+            service.kill_path.write_text("Pause while ownership verification was in flight")
+        elif case == "check_error":
+
+            def failed(*args):
+                raise RuntimeError("Fixture risk check failure")
+
+            monkeypatch.setattr("trader.service.check", failed)
+
+    monkeypatch.setattr("trader.alpaca.verify_executor_owner", ownership)
+    with httpx.Client(transport=httpx.MockTransport(transport)) as client:
+        real = AlpacaBroker(service.cfg, client)
+        monkeypatch.setattr(scripted, "submit", real.submit)
+        result = service.execute(decision, "transport-boundary")
+    if case == "healthy":
+        assert result["status"] == "submitted" and sent == ["POST"]
+    else:
+        assert result["status"] == "rejected" and sent == []
+        assert service.reservation_summary() == 0
+        assert service.store.events("submission_preflight_rejected")
+        assert not service.store.events("submission_uncertain")
+        expected = {
+            "stale_clock": "broker clock stale",
+            "stale_quote": "Quote delayed, stale",
+            "session_closed": "Outside broker calendar",
+            "pause": "Kill switch",
+            "check_error": "risk check failed",
+        }[case]
+        assert any(expected in reason for reason in result["reasons"])

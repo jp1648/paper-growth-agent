@@ -636,3 +636,21 @@ operator attestation, not independent API verification of delivery.
   verified before any ownership transfer; in-flight broker calls need reconciliation.
   Transfer tooling, cross-host partition/restart drills, and a final risk freshness
   check after ownership-network I/O remain open before deployment/live acceptance.
+- Closed the transport-freshness gap above: the broker protocol now supports a
+  before_send callback, invoked by the actual Alpaca adapter after cloud ownership
+  verification and immediately before HTTP submission. Service reruns shared risk
+  checks using the saved evidence and current time/pause state at that boundary.
+  Rejections and callback faults are recorded as known pre-submission rejections;
+  they never issue the order HTTP request or retain an ambiguous reservation.
+- Six actual-adapter/mock-transport regressions advance time or pause/fail the
+  risk check during ownership verification. They prove stale broker clock, stale
+  quote, closed regular session, pause and risk exceptions cannot reach POST;
+  the healthy path submits once. The scripted broker, protocol, wrappers and
+  subprocess RPC adapter all honor the callback; seven SIGKILL drills still pass.
+- Full offline suite: 525 passed, three integrations skipped; Ruff and whitespace
+  checks passed. Previous owner-guard commit 77bd6c8 passed both remote CI runs
+  42312717114 and 42312711359. No cloud changes, deployment or paid calls occurred
+  in this step. Network transit after dispatch remains outside the local check;
+  broker regular-session/limit behavior and cancellation reconciliation still apply.
+- Ten selected safety mutations were caught. Disabling the actual adapter's
+  final callback caused five failing transport-boundary regressions.

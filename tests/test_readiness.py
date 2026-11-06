@@ -175,8 +175,8 @@ def test_mismatched_submission_keeps_unknown_intent(env, decision):
     service, broker, _ = env
     original = broker.submit
 
-    def corrupt(payload):
-        order = original(payload)
+    def corrupt(payload, **kwargs):
+        order = original(payload, **kwargs)
         order["client_order_id"] = "unexpected"
         return order
 

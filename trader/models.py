@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Protocol
@@ -11,6 +12,12 @@ D = Decimal
 ZERO = D("0")
 PAPER_URL = "https://paper-api.alpaca.markets"
 TERMINAL = {"filled", "canceled", "expired", "rejected", "replaced"}
+
+
+class SubmissionPreflightError(RuntimeError):
+    def __init__(self, reasons):
+        self.reasons = reasons
+        super().__init__("Submission preflight rejected")
 
 
 def now() -> datetime:
@@ -144,7 +151,7 @@ class PaperBroker(Protocol):
     def open_orders(self) -> list[dict]: ...
     def snapshot(self, after: str, tracked_ids: list[str]) -> Snapshot: ...
     def lookup(self, client_id: str) -> dict | None: ...
-    def submit(self, payload: dict) -> dict: ...
+    def submit(self, payload: dict, *, before_send: Callable[[], None] | None = None) -> dict: ...
     def cancel(self, order_id: str) -> None: ...
     def clock(self) -> dict: ...
     def calendar(self, start: str, end: str) -> list[dict]: ...

@@ -51,7 +51,9 @@ class ScriptedBroker:
     def lookup(self, cid):
         return copy.deepcopy(self.orders.get(cid))
 
-    def submit(self, payload):
+    def submit(self, payload, *, before_send=None):
+        if before_send is not None:
+            before_send()
         self.submits += 1
         order = {
             **payload,

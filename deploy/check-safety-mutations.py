@@ -31,6 +31,7 @@ MUTATIONS = {
         "if False:",
     ),
     "loss_cancel": ("trader/service.py", 'or (loss_blocked and o["side"] == "buy")', "or False"),
+    "transport_preflight": ("trader/alpaca.py", "if before_send is not None:", "if False:"),
 }
 
 
@@ -59,6 +60,7 @@ def main():
                         "tests/test_live_readiness.py",
                         "tests/test_financials.py",
                         "tests/test_loss_limits.py",
+                        "tests/test_executor_owner.py",
                         "--junitxml=mutation.xml",
                     ],
                     cwd=target,

@@ -21,13 +21,15 @@ class AlpacaBroker:
         self.headers = {"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret}
 
     @traced("alpaca.request")
-    def request(self, method, path, **kwargs):
+    def request(self, method, path, *, before_send=None, **kwargs):
         # Check each call as well as startup; never accept redirects or arbitrary URLs.
         Settings.model_validate(self.settings.model_dump())
         if not path.startswith("/v2/"):
             raise ValueError("Invalid trading path")
         if method.upper() != "GET" and self.settings.executor_fence:
             verify_executor_owner(self.settings.checkpoint_bucket)
+        if before_send is not None:
+            before_send()
         response = self.client.request(
             method, PAPER_URL + path, headers=self.headers, follow_redirects=False, **kwargs
         )
@@ -51,10 +53,10 @@ class AlpacaBroker:
                 return None
             raise
 
-    def submit(self, payload):
+    def submit(self, payload, *, before_send=None):
         if payload.get("type") != "limit" or payload.get("extended_hours") is not False:
             raise ValueError("Only regular-hours limit orders allowed")
-        return self.request("POST", "/v2/orders", json=payload)
+        return self.request("POST", "/v2/orders", json=payload, before_send=before_send)
 
     def cancel(self, order_id):
         self.request("DELETE", f"/v2/orders/{order_id}")
