@@ -1026,3 +1026,215 @@ td {
     display: block;
   }
 }
+
+/* Investigation reading hierarchy: brief first, complete records on demand. */
+.investigation-heading h2 {
+  margin-top: 12px;
+  font-size: 22px;
+}
+.investigation-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 0 24px 16px;
+  color: #566a60;
+  font-size: 12px;
+}
+.investigation-stats strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.run-metadata {
+  margin: 0 24px 24px;
+  color: #566a60;
+  font-size: 12px;
+}
+.run-metadata summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+.run-metadata code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding-top: 8px;
+}
+.decision-brief {
+  margin: 0 24px 20px;
+  padding: 24px;
+  border: 1px solid #cadfd4;
+  border-left: 4px solid var(--teal);
+  border-radius: 8px;
+  background: #f1f7f3;
+}
+.decision-brief h3 {
+  font-size: 25px;
+  line-height: 1.3;
+  margin: 0 0 16px;
+  letter-spacing: -0.5px;
+}
+.decision-brief p {
+  font-size: 14px;
+  line-height: 1.75;
+  margin: 0;
+  color: #344d41;
+}
+.decision-brief .decision-footnote {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #d9e5dd;
+  font-size: 12px;
+}
+.research-warning {
+  margin: 0 24px 24px;
+  padding: 16px 20px;
+  background: #fff8e9;
+  border: 1px solid #e4c993;
+  border-radius: 7px;
+  color: #72531c;
+}
+.research-warning p {
+  margin: 5px 0 0;
+  font-size: 13px;
+}
+.finding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0 24px 24px;
+}
+.finding-grid > .finding {
+  background: #fafbf9;
+  border: 1px solid var(--line);
+  padding: 20px;
+  border-radius: 8px;
+}
+.finding {
+  line-height: 1.75;
+  font-size: 14px;
+  color: #344d41;
+  overflow-wrap: anywhere;
+}
+.finding h3 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 15px;
+}
+.finding ul {
+  padding-left: 20px;
+}
+.finding li {
+  margin-bottom: 12px;
+}
+.research-section {
+  margin: 0 24px;
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.research-section > h3 {
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+.research-section > p {
+  font-size: 14px;
+  color: #566a60;
+  line-height: 1.75;
+}
+.research-section > .finding h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #566a60;
+}
+.research-disclosure {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 16px;
+  margin-top: 12px;
+}
+.research-disclosure > summary {
+  cursor: pointer;
+  padding: 16px 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.research-disclosure[open] > summary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.research-disclosure > .finding {
+  margin-bottom: 20px;
+}
+.research-disclosure .details-grid {
+  margin: 16px 0;
+  gap: 24px;
+}
+.research-disclosure .details-grid dt {
+  color: #566a60;
+  font-size: 12px;
+}
+.research-disclosure .details-grid dd {
+  color: #344d41;
+  font-size: 14px;
+}
+.trace-toolbar {
+  margin: 0 24px 20px;
+}
+.trace-toolbar [role="group"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.trace-toolbar button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid #cbd8cf;
+  background: white;
+  border-radius: 6px;
+  color: #344d41;
+}
+.trace-toolbar button[aria-pressed="true"] {
+  background: #e6f1eb;
+  border-color: var(--teal);
+  font-weight: 600;
+}
+.trace-toolbar p {
+  color: #566a60;
+  font-size: 12px;
+}
+.investigation .trace-row summary {
+  min-height: 44px;
+}
+.investigation .text-button {
+  min-height: 44px;
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .finding-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 780px) {
+  .investigation-heading {
+    flex-wrap: wrap;
+  }
+  .decision-brief,
+  .research-warning,
+  .finding-grid,
+  .research-section,
+  .trace-toolbar,
+  .run-metadata {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+  .decision-brief {
+    padding: 20px;
+  }
+  .decision-brief h3 {
+    font-size: 22px;
+  }
+  .investigation-stats {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

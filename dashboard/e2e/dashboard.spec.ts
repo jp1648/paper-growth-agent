@@ -58,3 +58,98 @@ test("private dashboard, research filtering, traces and responsive layout", asyn
   await expect(page).toHaveURL(/\/login/);
   expect((await page.request.get("/api/data")).status()).toBe(401);
 });
+
+test("accepted investigation is readable and trace filters work", async ({
+  page,
+}) => {
+  test.skip(!password, "Requires isolated fixture dashboard");
+  await page.goto("/login");
+  await page.getByLabel("Workspace password").fill(password!);
+  await page.getByRole("button", { name: "Enter observatory" }).click();
+  await expect(page.getByRole("button", { name: /Refresh/ })).toBeVisible();
+  const original = await (await page.request.get("/api/data")).json();
+  original.snapshot.runs = [
+    {
+      id: "accepted-fixture",
+      status: "accepted",
+      cost: "1.25",
+      model_calls: 3,
+      tool_calls: 2,
+      decision: {
+        symbol: "AAPL",
+        action: "WATCH",
+        why_now: "Wait for verified valuation inputs.",
+        business_attraction: "Recurring revenue supports the business.",
+        price_attraction: "Fair value is not established.",
+        expected_outcome: "Review updated filings.",
+        evidence_ids: ["source-1"],
+      },
+      reports: {
+        business: { conclusion: "Complete findings preserved." },
+        adversarial: {
+          unresolved_material_gaps: true,
+          conclusion: "Missing valuation evidence.",
+        },
+      },
+      calculations: {},
+      sources: [{ id: "source-1", title: "Company filing" }],
+    },
+  ];
+  const events = [
+    { name: "model.call", phase: "end" },
+    { name: "tool.search", phase: "end" },
+    { name: "research.failed", phase: "error" },
+  ].map((e, i) => ({
+    ...e,
+    at: "2026-11-06T04:00:00Z",
+    span_id: String(i),
+    parent_span_id: null,
+    detail: '{"ok":true}',
+    truncated: false,
+  }));
+  await page.route("**/api/data*", (route) =>
+    route.fulfill({
+      json: new URL(route.request().url()).searchParams.has("run")
+        ? { events }
+        : original,
+    }),
+  );
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await page.getByRole("button", { name: "Research", exact: true }).click();
+  await page.locator(".run-choice").first().click();
+  await expect(
+    page.getByRole("heading", { name: "WATCH — no trade proposed" }),
+  ).toBeVisible();
+  await expect(page.getByText("Material evidence gaps remain")).toBeVisible();
+  const report = page.locator("details").filter({
+    has: page.locator("summary", {
+      hasText: "Business quality & financial health",
+    }),
+  });
+  await expect(report).not.toHaveAttribute("open", "");
+  await report.locator("summary").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Complete findings preserved.")).toBeVisible();
+  await report.locator("summary").click();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: `../state/always-on/investigation-${width}.png`,
+      fullPage: true,
+    });
+  }
+  await page.getByRole("button", { name: "Inspect execution trace" }).click();
+  await expect(page.locator(".trace-row")).toHaveCount(3);
+  for (const filter of ["Failures", "Models", "Tools"]) {
+    await page.getByRole("button", { name: filter, exact: true }).click();
+    await expect(page.locator(".trace-row")).toHaveCount(1);
+    await expect(
+      page.getByRole("button", { name: filter, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+  }
+});

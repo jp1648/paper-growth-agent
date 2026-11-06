@@ -229,6 +229,7 @@ export default function Observatory({
                     )}
                   </section>
                   <Investigation
+                    key={run?.id}
                     run={run}
                     tab={tab}
                     events={events}
