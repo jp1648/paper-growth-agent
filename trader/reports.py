@@ -56,6 +56,9 @@ def _portfolio_report(service):
         if equity and value / equity > service.cfg.max_sector
     ]
     warnings += service.position_review_issues(positions, now())
+    loss_limit = store.get("loss_limit")
+    if loss_limit and loss_limit["latched"]:
+        warnings.append("Cumulative loss limit latched; new exposure blocked pending operator review")
     statuses = {}
     for intent in store.items("intent"):
         statuses[intent["status"]] = statuses.get(intent["status"], 0) + 1
@@ -78,6 +81,7 @@ def _portfolio_report(service):
         },
         "research_spending": spending_status(store, service.cfg.research_daily_cost_usd),
         "reconciliation": store.get("reconciliation"),
+        "loss_limit": loss_limit,
         "kill_switch": service.kill_path.exists(),
         "cash": cash,
         "reserved_for_buys": reserved,

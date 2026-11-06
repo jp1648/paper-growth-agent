@@ -209,12 +209,31 @@ class Service:
                             )
                 self.store.put("snapshot", snap)
                 self.store.put("audit", ledger)
+                self.update_loss_limit(snap, ledger)
                 self.store.put("reconciliation", {"ok": True, "at": now(), "reason": None})
                 self.store.log("reconciled", {"cash": snap.account["cash"], "equity": snap.account["equity"]})
                 return snap
             except Exception as error:
                 self.pause_reconciliation(safe_error(error))
                 raise
+
+    def update_loss_limit(self, snapshot, audit):
+        initial = dec(self.store.experiment["initial_capital"])
+        pnl = dec(snapshot.account["equity"]) - initial - dec(audit["capital_flows"])
+        threshold = initial * self.cfg.max_cumulative_loss_fraction
+        prior = self.store.get("loss_limit") or {}
+        breached = pnl <= -threshold
+        status = {
+            "at": now(),
+            "pnl": pnl,
+            "threshold_usd": threshold,
+            "breached": breached,
+            "latched": breached or prior.get("latched", False),
+            "basis": "Flow-adjusted broker equity loss against original experiment capital",
+        }
+        self.store.put("loss_limit", status)
+        if status["latched"] and not prior.get("latched"):
+            self.store.log("loss_limit_breached", status)
 
     @traced("service.evaluate")
     def evaluate(self, decision, snapshot=None):
@@ -250,6 +269,8 @@ class Service:
         )
         if decision.side == "buy":
             reasons.extend(self.position_review_issues(snapshot.positions, checked_at))
+            if self.store.get("loss_limit")["latched"]:
+                reasons.append("Cumulative loss limit latched; operator review required")
         return (
             reasons,
             quote,
@@ -259,6 +280,7 @@ class Service:
                 "asset": asset,
                 "clock": clock,
                 "calendar": calendar,
+                "loss_limit": self.store.get("loss_limit"),
                 "settings": self.cfg.model_dump(
                     mode="json", exclude={"sec_user_agent", "database", "control_dir"}
                 ),
@@ -460,6 +482,13 @@ class Service:
     def resume(self):
         with self.lock():
             self.reconcile()
+            limit = self.store.get("loss_limit")
+            if limit["breached"]:
+                raise ValueError("Cannot resume while cumulative loss limit remains breached")
+            if limit["latched"]:
+                released = {**limit, "latched": False, "released_at": now()}
+                self.store.put("loss_limit", released)
+                self.store.log("loss_limit_released", released)
             self.kill_path.unlink(missing_ok=True)
             self.store.log("kill_switch_resumed", {})
 

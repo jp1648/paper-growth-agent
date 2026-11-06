@@ -471,3 +471,20 @@ operator attestation, not independent API verification of delivery.
   process tests, not cloud failover or proof of atomic external telemetry delivery.
 - Full offline suite: 451 passed, three opt-in integrations skipped. Ruff lint,
   formatting and whitespace checks pass. No production deployment or orders.
+- Cumulative portfolio loss gate: successful reconciliation computes broker equity
+  minus original experiment capital and audited external capital flows. A loss of
+  10% of original capital (provisional configurable paper default) latches a block
+  on new purchases. Deposits cannot dilute the threshold and withdrawals are not
+  investment losses. Recovery/restart does not clear the latch; explicit operator
+  resume can release it only after reconciliation shows the breach has ended.
+  Reports expose the state and independent health checks flag operator attention.
+- Eight regressions cover threshold boundaries, deposits, withdrawals, restart,
+  explicit recovery, unrealized losses with zero model budget, and protective
+  exits. Existing exit gates remain; reconciliation never liquidates positions.
+  This gate does not cancel already-working orders, implement a daily loss or
+  high-water drawdown limit, or count separately paid operating costs. The 10%
+  setting is not an approved live risk parameter. Production remains unchanged.
+- Prior adjustment-transaction commit 9595c3a passed remote CI run 42309044206.
+- Full offline suite after the loss gate: 459 passed, three opt-in integrations
+  skipped; Ruff lint/format and whitespace checks passed. No paid model calls,
+  broker orders or deployment occurred. New gate deployment verification pending.
