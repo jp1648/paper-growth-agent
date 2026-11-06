@@ -654,3 +654,22 @@ operator attestation, not independent API verification of delivery.
   broker regular-session/limit behavior and cancellation reconciliation still apply.
 - Ten selected safety mutations were caught. Disabling the actual adapter's
   final callback caused five failing transport-boundary regressions.
+- Added explicit CLI ownership transfer planning/application. It reads the owner
+  at an exact object generation, verifies pinned source identity, refuses every
+  source state except TERMINATED, requires a RUNNING target, rechecks source
+  shutdown immediately before publication and applies with the reviewed generation
+  precondition. The new record retains previous identity/generation and the
+  command verifies read-back. It never stops/starts a VM or clears a pause.
+- Fourteen regressions cover read-only planning, RUNNING/STOPPING/SUSPENDED/
+  REPAIRING/UNKNOWN source states, timeout, changed VM identity, source restart,
+  stopped target, missing/stale generation, update conflict without retry and
+  successful conditional transfer/audit/idempotence. Full offline suite: 539
+  passed, three opt-in integrations skipped; Ruff/whitespace checks passed.
+- Ran the real CLI in read-only mode against the current VM/owner object; result
+  was unchanged at the existing generation. No ownership transfer, shutdown,
+  startup, deployment or broker mutation occurred. Prior transport-preflight
+  commit d8a9803 passed remote CI runs 42313063339 and 42313058535.
+- This is not a completed two-host failover drill or autonomous leader election.
+  Operators must coordinate against concurrent old-host restart, verify the new
+  paused ledger and reconcile in-flight requests. Cross-host fault evidence and
+  production enablement remain open; all sixteen requirements remain active.
