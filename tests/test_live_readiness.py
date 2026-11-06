@@ -296,3 +296,33 @@ def test_zero_quantity_bust_remains_blocked_without_verified_contract(env, decis
     assert service.store.get("audit")["cash"] == "99000"
     assert not service.store.items("broker_revision")
     assert broker.submits == 1
+
+
+@pytest.mark.parametrize("change", ["filing", "unavailable", "bad_time", "unchanged"])
+def test_execution_rechecks_filings_and_retains_check(env, decision, monkeypatch, change):
+    service, broker, _ = env
+    graph = build_graph(service, FixtureTeam(decision))
+    graph.invoke({"symbol": "ACME", "run_key": "filings", "research_only": True})
+    research = service.store.get("filings", "research_result")
+    research["evidence"]["fetched_at"] = (AT - timedelta(minutes=5)).isoformat()
+    if change == "bad_time":
+        research["evidence"]["fetched_at"] = (AT + timedelta(seconds=1)).isoformat()
+    service.store.put("filings", research, "research_result")
+    checks = []
+
+    def check(symbol, since):
+        checks.append((symbol, since))
+        if change == "unavailable":
+            raise TimeoutError("SEC timeout")
+        return [{"accessionNumber": "new-amendment"}] if change == "filing" else []
+
+    monkeypatch.setattr(service, "filings_since", check)
+    result = service.execute(decision, "filings")
+    assert result["status"] == ("submitted" if change == "unchanged" else "rejected")
+    assert broker.submits == (1 if change == "unchanged" else 0)
+    assert result["filing_check"]
+    if change != "bad_time":
+        assert checks == [("ACME", AT - timedelta(minutes=5))]
+    if change == "unchanged":
+        service.execute(decision, "filings")
+        assert len(checks) == 1  # Existing intents reconcile without new freshness gates.

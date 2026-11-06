@@ -92,6 +92,7 @@ class EvidenceProvider:
         return bundle
 
     def fetch(self, symbol):
+        started_at = now()
         if symbol not in self.cfg.universe:
             raise ValueError("Symbol outside configured research universe")
         if not self.cfg.sec_user_agent or "@" not in self.cfg.sec_user_agent:
@@ -191,11 +192,32 @@ class EvidenceProvider:
         bundle = {
             "sec_schema": 2,
             "symbol": symbol,
-            "fetched_at": now().isoformat(),
+            "fetched_at": started_at.isoformat(),
             "sources": sources,
             "news_coverage": "Up to 50 recent vendor articles; absence is not proof of no material news",
         }
         return bundle
+
+    @traced("evidence.filings_since")
+    def filings_since(self, symbol, since):
+        cik = self.cfg.universe[symbol].cik.zfill(10)
+        raw = self.request(f"https://data.sec.gov/submissions/CIK{cik}.json").json()
+        if str(raw.get("cik", "")).zfill(10) != cik:
+            raise ValueError("SEC response company identity does not match configured CIK")
+        recent = raw["filings"]["recent"]
+        changed = []
+        for i, form in enumerate(recent["form"]):
+            if form.removesuffix("/A") not in {"10-K", "10-Q", "8-K", "20-F", "6-K"}:
+                continue
+            filing = {key: values[i] for key, values in recent.items()}
+            accepted = dt(filing["acceptanceDateTime"])
+            if accepted > now():
+                raise ValueError("SEC filing acceptance is future-dated")
+            if accepted >= dt(since):
+                if not filing.get("accessionNumber"):
+                    raise ValueError("SEC filing lacks accession")
+                changed.append(filing)
+        return changed
 
     @traced("evidence.documents")
     def documents(self, symbol, filing):

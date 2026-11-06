@@ -8,6 +8,7 @@ import httpx
 
 from .accounting import LedgerError, replay, reserved
 from .alpaca import safe_error
+from .evidence import EvidenceProvider
 from .models import TERMINAL, ZERO, Decision, dec, dt, dumps, now
 from .observability import traced
 from .risk import check
@@ -284,6 +285,10 @@ class Service:
     def client_order_id(self, intent_key):
         return "pg-" + hashlib.sha256(f"{self.store.scope}:{intent_key}".encode()).hexdigest()[:40]
 
+    def filings_since(self, symbol, since):
+        with httpx.Client(timeout=30, follow_redirects=False) as client:
+            return EvidenceProvider(self.cfg, self.store, self.data, client).filings_since(symbol, since)
+
     @traced("service.execute")
     def execute(self, decision, intent_key, evidence=None):
         decision = Decision.model_validate(decision)
@@ -310,6 +315,7 @@ class Service:
                 return result
             # Serialization covers fresh reconciliation, risk evaluation, journal commit and POST.
             research_reasons = []
+            filing_check = None
             research = self.store.get(intent_key, "research_result")
             if research:
                 if research["decision"] != decision.model_dump(mode="json"):
@@ -322,6 +328,18 @@ class Service:
                     for item in self.data.news(decision.symbol, completed.isoformat())
                 ):
                     research_reasons.append("New news requires research review")
+                if not research_reasons:
+                    try:
+                        since = dt(research["evidence"]["fetched_at"])
+                        if since > completed:
+                            raise ValueError("Evidence collection is after research completion")
+                        filings = self.filings_since(decision.symbol, since)
+                        filing_check = {"since": since, "checked_at": now(), "filings": filings}
+                        if filings:
+                            research_reasons.append("New SEC filing requires research review")
+                    except Exception as error:  # noqa: BLE001 - unavailable evidence blocks execution
+                        filing_check = {"checked_at": now(), "error": safe_error(error)}
+                        research_reasons.append("SEC filing freshness could not be verified")
             reasons, quote, risk_context = self.evaluate(decision)
             reasons.extend(research_reasons)
             result = {
@@ -331,6 +349,7 @@ class Service:
                 "evidence": evidence,
                 "quote": quote.model_dump(mode="json"),
                 "risk_context": risk_context,
+                "filing_check": filing_check,
                 "status": "rejected" if reasons else "prepared",
                 "time_in_force": self.cfg.time_in_force,
                 "reasons": reasons,

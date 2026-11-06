@@ -72,3 +72,55 @@ def test_provider_omits_future_and_out_of_window_news(env, monkeypatch):
     news = [s for s in bundle["sources"] if s["id"].startswith("news-")]
     assert len(news) == 1
     assert news[0]["published_at"] == (AT - timedelta(days=1)).isoformat()
+
+
+@pytest.mark.parametrize(
+    "offset,form,expected", [(-1, "10-K", 0), (0, "10-K/A", 1), (1, "8-K", 1), (1, "4", 0)]
+)
+def test_filing_freshness_uses_acceptance_time(env, monkeypatch, offset, form, expected):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    source = provider(env, monkeypatch)
+    monkeypatch.setattr("trader.evidence.now", lambda: AT)
+    since = AT - timedelta(minutes=5)
+    raw = {
+        "cik": 1,
+        "filings": {
+            "recent": {
+                "form": [form],
+                "accessionNumber": ["0000000001-26-000001"],
+                "acceptanceDateTime": [(since + timedelta(seconds=offset)).isoformat()],
+            }
+        },
+    }
+    monkeypatch.setattr(source, "request", lambda url: httpx.Response(200, json=raw))
+    assert len(source.filings_since("ACME", since)) == expected
+
+
+@pytest.mark.parametrize(
+    "fault", ["identity", "missing_time", "naive", "future", "missing_accession", "unequal_arrays"]
+)
+def test_filing_freshness_rejects_unverifiable_response(env, monkeypatch, fault):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    source = provider(env, monkeypatch)
+    monkeypatch.setattr("trader.evidence.now", lambda: AT)
+    recent = {"form": ["10-Q/A"], "accessionNumber": ["amendment"], "acceptanceDateTime": [AT.isoformat()]}
+    raw = {"cik": 2 if fault == "identity" else 1, "filings": {"recent": recent}}
+    if fault == "missing_time":
+        del recent["acceptanceDateTime"]
+    elif fault == "naive":
+        recent["acceptanceDateTime"] = ["2026-10-21T14:59:00"]
+    elif fault == "future":
+        recent["acceptanceDateTime"] = [(AT + timedelta(seconds=1)).isoformat()]
+    elif fault == "missing_accession":
+        recent["accessionNumber"] = [""]
+    elif fault == "unequal_arrays":
+        recent["accessionNumber"] = []
+    monkeypatch.setattr(source, "request", lambda url: httpx.Response(200, json=raw))
+    with pytest.raises((ValueError, KeyError, IndexError)):
+        source.filings_since("ACME", AT - timedelta(minutes=5))

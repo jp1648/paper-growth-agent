@@ -204,6 +204,7 @@ def env(tmp_path, monkeypatch):
     broker, data = ScriptedBroker(), FixtureData()
     store = Store(cfg.database)
     service = Service(cfg, store, broker, data)
+    monkeypatch.setattr(service, "filings_since", lambda symbol, since: [])
     service.initialize()
     yield service, broker, data
     store.db.close()

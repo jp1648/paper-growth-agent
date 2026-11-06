@@ -1268,3 +1268,24 @@ def test_filing_lookup_handles_text_sources_without_inventing_accessions():
     with pytest.raises(ValueError, match="Accession"):
         lookup.invoke({"symbol": "ACME", "accession": "../../.env"})
     provider.documents.assert_called_once()
+
+
+def test_research_retains_oldest_evidence_time_for_execution(env, decision, monkeypatch):
+    from conftest import AT
+
+    service, _, _ = env
+    worker, _ = team(env, decision)
+    original = worker.provider.get
+
+    def evidence(symbol, fresh=False):
+        bundle = original(symbol, fresh)
+        bundle["fetched_at"] = (AT - timedelta(minutes=5)).isoformat()
+        bundle["sources"][0]["retrieved_at"] = (AT - timedelta(minutes=10)).isoformat()
+        return bundle
+
+    monkeypatch.setattr(worker.provider, "get", evidence)
+    checked = []
+    monkeypatch.setattr(service, "filings_since", lambda symbol, since: checked.append(since) or [])
+    result = build_graph(service, worker).invoke({"symbol": "ACME", "run_key": "old-source"})
+    assert result["execution"]["status"] == "submitted"
+    assert checked == [AT - timedelta(minutes=10)]

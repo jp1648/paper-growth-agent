@@ -362,3 +362,25 @@ operator attestation, not independent API verification of delivery.
   has Ubuntu's AppArmor profile, while retaining chromiumSandbox=true. The Linux
   browser test additionally requires renderer PID isolation, NoNewPrivs and
   seccomp filtering. Remote rerun is required before this gate can pass.
+
+- Remote run 42306993412 passed backend, secrets and dashboard at commit
+  60d8934. All four browser tests ran successfully with sandboxed packaged Chrome,
+  including Linux PID namespace, NoNewPrivs and seccomp assertions. This verifies
+  CI, not the deployed dashboard.
+- Filing freshness: research-backed execution now retrieves fresh SEC submissions
+  and rejects relevant filings/amendments accepted since evidence collection,
+  including during the investigation. Missing, malformed, future-dated or
+  unavailable filing evidence blocks execution. The check and matching filings
+  are retained in the decision record; existing intents still reconcile without
+  a new freshness check. Research results preserve the earliest collection/source
+  timestamp instead of treating completion as the start of evidence freshness.
+  Legacy results without collection timestamps require new research.
+- This covers 10-K/Q, 8-K, 20-F, 6-K and amendments. It is not a guarantee of
+  zero publication latency or coverage of every material disclosure. SEC describes
+  the submissions API as updated throughout the day with possible processing
+  delays: https://www.sec.gov/search-filings/edgar-application-programming-interfaces.
+  No new model calls, broker orders or production deployment in this batch.
+- Filing-freshness verification: 409 offline tests passed, three opt-in integrations
+  skipped. An additional full-graph regression then passed proving the oldest
+  source timestamp reaches the execution check. Ruff lint/format and whitespace
+  checks passed. New remote CI/deployment verification remains pending.

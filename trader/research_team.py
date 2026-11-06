@@ -467,6 +467,7 @@ class ResearchDesk:
     """One bounded investigation. Workers share evidence, never the SQLite connection or broker."""
 
     def __init__(self, cfg, provider, context, evidence, budget, model, *, evaluation_at=None):
+        self.started_at = now()
         self.evaluation_at = dt(evaluation_at) if evaluation_at else None
         self.cfg, self.provider, self.context, self.budget, self.model = cfg, provider, context, budget, model
         self.lock = threading.RLock()
@@ -1028,7 +1029,15 @@ class ResearchDesk:
             "catalysts": self.reports["catalysts"],
             "critique": self.reports["adversarial"],
             "team_reports": self.reports,
-            "evidence": {"symbol": self.context["symbol"], "sources": list(self.sources.values())},
+            "evidence": {
+                "symbol": self.context["symbol"],
+                "fetched_at": min(
+                    [dt(self.context.get("current_timestamp", self.started_at))]
+                    + [dt(s["retrieved_at"]) for s in self.sources.values() if s.get("retrieved_at")]
+                    + [dt(c["fetched_at"]) for c in self.companies.values() if c.get("fetched_at")]
+                ).isoformat(),
+                "sources": list(self.sources.values()),
+            },
             "calculations": self.calculations,
             "reused_reports": self.reused,
             "team_report_times": self.report_times,
