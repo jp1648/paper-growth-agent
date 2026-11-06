@@ -44,6 +44,8 @@ uv run paper-agent research AAPL --run-key first-aapl-review
 
 **That command can submit a paper order.** It does not ask for manual approval for each trade. Reuse the same run key when retrying an interrupted logical decision; changing its contents under the same key is rejected. The model has no broker tools, no access to credentials, and cannot alter the deterministic risk gate. Missing evidence or model refusals do not become trades.
 
+For isolated research benchmarks that cannot submit orders, see [research evaluation](docs/evaluation.md). Offline replay needs no credentials; model runs require explicit opt-in and share the daily budget.
+
 ## Run in Docker on your Mac
 
 Docker must be running and the Mac must stay awake with network access. From this repository, use the wrapper so the container runs as your host user:

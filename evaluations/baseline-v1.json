@@ -1,0 +1,477 @@
+{
+  "version": 1,
+  "name": "frozen-research-baseline-v1",
+  "description": "Synthetic accounting and orchestration cases; not historical investment returns. Holdout cases are reserved for comparison, not prompt tuning.",
+  "cases": [
+    {
+      "id": "adequate-cash-flow",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-adequate-cash-flow",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Audited annual cash flow per share is USD 5. All amounts use the same fiscal year. Debt adjustments are already reflected in the equity cash-flow basis."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "complete",
+        "allowed_actions": [
+          "WATCH",
+          "BUY"
+        ],
+        "required_evidence_ids": [
+          "source-adequate-cash-flow"
+        ],
+        "failure_category": null,
+        "abstention_reason": null,
+        "valuation_required": true,
+        "cash_flow_per_share": "5"
+      },
+      "kind": "model"
+    },
+    {
+      "id": "adequate-contrary-view",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-adequate-contrary-view",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Annual equity cash flow is USD 5 per share. A customer represents 20% of sales. Contract renewals remain uncertain."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "complete",
+        "allowed_actions": [
+          "WATCH",
+          "BUY"
+        ],
+        "required_evidence_ids": [
+          "source-adequate-contrary-view"
+        ],
+        "failure_category": null,
+        "abstention_reason": null,
+        "valuation_required": true,
+        "cash_flow_per_share": "5"
+      },
+      "kind": "model"
+    },
+    {
+      "id": "adequate-flat-growth",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-adequate-flat-growth",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Annual equity cash flow is USD 5 per share; zero growth is the base assumption, not an observed forecast."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "complete",
+        "allowed_actions": [
+          "WATCH",
+          "BUY"
+        ],
+        "required_evidence_ids": [
+          "source-adequate-flat-growth"
+        ],
+        "failure_category": null,
+        "abstention_reason": null,
+        "valuation_required": true,
+        "cash_flow_per_share": "5"
+      },
+      "kind": "model"
+    },
+    {
+      "id": "adequate-high-price",
+      "split": "holdout",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-adequate-high-price",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Annual equity cash flow is USD 5 per share. The reference price is USD 120; a positive valuation is not necessarily an attractive entry."
+          }
+        ],
+        "reference_price": "120",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "complete",
+        "allowed_actions": [
+          "WATCH",
+          "BUY"
+        ],
+        "required_evidence_ids": [
+          "source-adequate-high-price"
+        ],
+        "failure_category": null,
+        "abstention_reason": null,
+        "valuation_required": true,
+        "cash_flow_per_share": "5"
+      },
+      "kind": "model"
+    },
+    {
+      "id": "overlapping-ytd",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-overlapping-ytd",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Operating cash flow is USD 40m for six months and USD 70m for nine months. No comparable fourth-quarter or annual values are available. Do not sum these overlapping periods."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-overlapping-ytd"
+        ],
+        "failure_category": null,
+        "abstention_reason": "Operating cash flow is USD 40m for six months and USD 70m for nine months. No comparable fourth-quarter or annual values are available. Do not sum these overlapping periods."
+      },
+      "kind": "model"
+    },
+    {
+      "id": "ambiguous-restatement",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-ambiguous-restatement",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Two filings report different annual cash flow for the same period. The amendment provides no reconciliation in the supplied material."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-ambiguous-restatement"
+        ],
+        "failure_category": null,
+        "abstention_reason": "Two filings report different annual cash flow for the same period. The amendment provides no reconciliation in the supplied material."
+      },
+      "kind": "model"
+    },
+    {
+      "id": "negative-cash-flow",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-negative-cash-flow",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Annual equity cash flow per share is USD -2. No credible path to positive normalized cash flow is documented."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-negative-cash-flow"
+        ],
+        "failure_category": null,
+        "abstention_reason": "Annual equity cash flow per share is USD -2. No credible path to positive normalized cash flow is documented."
+      },
+      "kind": "model"
+    },
+    {
+      "id": "missing-share-count",
+      "split": "holdout",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-missing-share-count",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Operating cash flow and capex are supplied, but there is no reliable diluted share count or equity cash-flow bridge."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-missing-share-count"
+        ],
+        "failure_category": null,
+        "abstention_reason": "Operating cash flow and capex are supplied, but there is no reliable diluted share count or equity cash-flow bridge."
+      },
+      "kind": "model"
+    },
+    {
+      "id": "contradictory-news",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-contradictory-news",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "A news report claims a major contract was won. The company filing says negotiations remain unresolved. No signed agreement is supplied."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-contradictory-news"
+        ],
+        "failure_category": null,
+        "abstention_reason": "A news report claims a major contract was won. The company filing says negotiations remain unresolved. No signed agreement is supplied."
+      },
+      "kind": "model"
+    },
+    {
+      "id": "stale-reference-price",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-stale-reference-price",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "The only price reference is thirty days old. No executable quote exists. Current valuation attractiveness is unknown."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-stale-reference-price"
+        ],
+        "failure_category": null,
+        "abstention_reason": "The only price reference is thirty days old. No executable quote exists. Current valuation attractiveness is unknown."
+      },
+      "kind": "model"
+    },
+    {
+      "id": "missing-primary-passage",
+      "split": "holdout",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-missing-primary-passage",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Only filing metadata is available. No passage substantiates the claimed margin improvement."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-missing-primary-passage"
+        ],
+        "failure_category": null,
+        "abstention_reason": "Only filing metadata is available. No passage substantiates the claimed margin improvement."
+      },
+      "kind": "model"
+    },
+    {
+      "id": "provider-timeout",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-provider-timeout",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "The research provider timed out before returning a report."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "reject",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [],
+        "failure_category": "provider_timeout",
+        "abstention_reason": null
+      },
+      "kind": "fault"
+    },
+    {
+      "id": "malformed-report",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-malformed-report",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "The specialist returned an incomplete JSON document."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "reject",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [],
+        "failure_category": "invalid_schema",
+        "abstention_reason": null
+      },
+      "kind": "fault"
+    },
+    {
+      "id": "unknown-citation",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-unknown-citation",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "The candidate cited a source ID that is not in the frozen evidence set."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "reject",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [],
+        "failure_category": "unknown_citation",
+        "abstention_reason": null
+      },
+      "kind": "fault"
+    },
+    {
+      "id": "unit-mismatch",
+      "split": "holdout",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-unit-mismatch",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "Cash flow is reported in EUR but market capitalization is in USD. No as-of FX rate is supplied."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-unit-mismatch"
+        ],
+        "failure_category": null,
+        "abstention_reason": "Cash flow is reported in EUR but market capitalization is in USD. No as-of FX rate is supplied."
+      },
+      "kind": "model"
+    },
+    {
+      "id": "future-amendment-excluded",
+      "split": "development",
+      "cutoff": "2026-11-01T20:00:00Z",
+      "inputs": {
+        "symbol": "ACME",
+        "sources": [
+          {
+            "id": "source-future-amendment-excluded",
+            "available_at": "2026-10-30T20:00:00Z",
+            "content": "The available filing omits a required debt adjustment. A later amendment is not available at the decision cutoff."
+          }
+        ],
+        "reference_price": "40",
+        "reference_kind": "historical_non_executable"
+      },
+      "expected": {
+        "outcome": "abstain",
+        "allowed_actions": [
+          "WATCH"
+        ],
+        "required_evidence_ids": [
+          "source-future-amendment-excluded"
+        ],
+        "failure_category": null,
+        "abstention_reason": "The available filing omits a required debt adjustment. A later amendment is not available at the decision cutoff."
+      },
+      "kind": "model"
+    }
+  ]
+}

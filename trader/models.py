@@ -64,7 +64,11 @@ class Decision(Model):
     why_now: str = Field(min_length=1)
     catalysts: list[str] = Field(min_length=1)
     thesis_development: str = Field(min_length=1)
-    holding_period_days: int = Field(ge=1, le=730)
+    holding_period_days: int = Field(
+        ge=0,
+        le=730,
+        description="Use 0 for WATCH when no holding is proposed; use 1–730 days for other actions.",
+    )
     next_review: datetime
     add_if: str = Field(min_length=1)
     reduce_if: str = Field(min_length=1)
@@ -72,7 +76,10 @@ class Decision(Model):
     exit_reason: Literal[
         "none", "thesis_invalid", "valuation", "catalyst_failed", "better_opportunity", "risk"
     ]
-    evidence_ids: list[str] = Field(min_length=1)
+    evidence_ids: list[str] = Field(
+        min_length=1,
+        description="Exact original source IDs only. Never include calculation IDs; cite calculations in narrative fields or calculation_id.",
+    )
     assumptions: list[str]
     expected_outcome: str = Field(min_length=1)
     confidence: Annotated[Decimal, WithJsonSchema({"type": "number", "minimum": 0, "maximum": 1})] = Field(
@@ -86,6 +93,8 @@ class Decision(Model):
 
     @model_validator(mode="after")
     def valid_trade(self):
+        if self.action != "WATCH" and self.holding_period_days == 0:
+            raise ValueError("A non-WATCH decision requires a positive holding period")
         if self.quantity != self.quantity.to_integral_value():
             raise ValueError("Whole shares required")
         if self.action in {"BUY", "ADD", "REDUCE", "SELL"}:

@@ -414,6 +414,8 @@ def test_decimal_valuation_and_fabricated_calculation_rejected():
     assert kind == "research_rejected_report"
     assert rejected["unknown_evidence_ids"] == ["fabricated-source"]
     assert rejected["schema"] == "Valuation"
+    with pytest.raises(ValueError, match="unknown evidence"):
+        desk.validate(Valuation, output | {"evidence_ids": ["fixture-sec", calc["calculation_id"]]})
     with pytest.raises(ValueError, match="deterministic"):
         desk.validate(Valuation, output | {"base_value": "1000"})
     with pytest.raises(ValueError, match="Unknown document"):
@@ -968,7 +970,10 @@ def test_provider_decision_numeric_schema_and_decimal_runtime_remain_consistent(
     assert watch.quantity == watch.limit_price == 0
 
 
-def test_finalize_saved_reports_one_call_no_investigation_and_preserves_unknown_hold(env, decision):
+@pytest.mark.parametrize("normal_parent", [False, True])
+def test_finalize_saved_reports_one_call_no_investigation_and_preserves_unknown_hold(
+    env, decision, normal_parent
+):
     from trader.spending import DailyReservation
 
     service, broker, _ = env
@@ -980,9 +985,14 @@ def test_finalize_saved_reports_one_call_no_investigation_and_preserves_unknown_
         "portfolio": {"prior_thesis": None},
     }
     worker.run(context)
-    service.store.put(
-        "failed-parent", {"mode": "research", "symbol": "ACME", "status": "failed"}, "acceptance"
-    )
+    if not normal_parent:
+        service.store.put(
+            "failed-parent", {"mode": "research", "symbol": "ACME", "status": "failed"}, "acceptance"
+        )
+    else:
+        saved = service.store.get("failed-parent", "research_audit")
+        saved["stopped"] = True
+        service.store.put("failed-parent", saved, "research_audit")
     source = service.store.get("failed-parent", "research_audit")
     hold = DailyReservation(service.store, service.cfg, "failed-parent-timeout", unrestricted_research=True)
     hold.finish(dec("1.23"), unknown=True)
@@ -1088,3 +1098,85 @@ def test_finalization_client_is_lead_only_180_second_timeout_no_retry(env, monke
     worker = DeepResearchTeam(service.cfg, service.store, Evidence())
     assert set(worker.models(finalizing=True)) == {"research_lead"}
     assert len(calls) == 1 and calls[0]["timeout"] == 180 and calls[0]["max_retries"] == 0
+
+
+def test_watch_has_no_forced_holding_period_but_trades_keep_positive_period(decision):
+    from langchain.agents.structured_output import ProviderStrategy
+
+    from trader.models import Decision
+
+    properties = ProviderStrategy(Decision, strict=True).schema_spec.json_schema["properties"]
+    assert properties["holding_period_days"]["minimum"] == 0
+    raw = decision.model_dump(mode="json")
+    watch = Decision.model_validate(
+        {**raw, "action": "WATCH", "quantity": 0, "limit_price": 0, "holding_period_days": 0}
+    )
+    assert watch.holding_period_days == 0
+    for action in ["BUY", "ADD", "REDUCE", "SELL", "HOLD"]:
+        with pytest.raises(ValueError, match="positive holding period"):
+            Decision.model_validate({**raw, "action": action, "holding_period_days": 0})
+    with pytest.raises(ValueError):
+        Decision.model_validate({**raw, "holding_period_days": -1})
+
+
+def test_citation_correction_is_bounded_and_preserves_guards(decision):
+    from unittest.mock import Mock
+
+    from trader.models import Decision
+    from trader.research_team import UnknownEvidence
+
+    cfg = Settings()
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    valid = decision.model_dump(mode="json") | {"evidence_ids": ["fixture-sec"]}
+    invalid = valid | {"evidence_ids": ["document-navigation", "calculation-derived"]}
+    state = {"messages": [{"role": "user", "content": "Research"}]}
+    config = {"recursion_limit": 12}
+
+    def output(report):
+        return {"structured_response": report, "messages": [AIMessage(content=json.dumps(report))]}
+
+    agent = Mock()
+    agent.invoke.side_effect = [output(invalid), output(valid)]
+    assert desk.invoke_report(agent, Decision, state, config)["structured_response"] == valid
+    correction = json.loads(agent.invoke.call_args.args[0]["messages"][-1]["content"])
+    assert correction["registered_source_ids"] == ["fixture-sec"]
+    assert correction["rejected_ids"] == ["calculation-derived", "document-navigation"]
+    assert agent.invoke.call_args.args[1] == config
+    assert any(kind == "research_rejected_report" for kind, _ in desk.budget.events)
+    agent.reset_mock()
+    agent.invoke.side_effect = [output(invalid), output(invalid)]
+    with pytest.raises(UnknownEvidence):
+        desk.invoke_report(agent, Decision, state, config)
+    assert agent.invoke.call_count == 2
+    agent.reset_mock()
+    agent.invoke.side_effect = TimeoutError("unknown provider outcome")
+    with pytest.raises(TimeoutError):
+        desk.invoke_report(agent, Decision, state, config)
+    assert agent.invoke.call_count == 1
+    agent.reset_mock()
+    agent.invoke.side_effect = [output(invalid)]
+    desk.budget.failed = True
+    with pytest.raises(ResearchLimit):
+        desk.invoke_report(agent, Decision, state, config)
+    assert agent.invoke.call_count == 1
+
+
+def test_filing_lookup_handles_text_sources_without_inventing_accessions():
+    from unittest.mock import Mock
+
+    cfg = Settings()
+    provider = Mock()
+    bundle = {"sources": [{"id": "text", "content": "No original filing is available."}]}
+    desk = ResearchDesk(cfg, provider, {"symbol": "ACME", "portfolio": {}}, bundle, Budget(cfg), None)
+    lookup = next(t for t in desk.tools() if t.name == "filing_documents")
+    assert lookup.invoke({"symbol": "ACME", "accession": "0000000001-26-000001"}) == []
+    provider.documents.assert_not_called()
+    desk.companies["ACME"]["sources"] += Evidence().get("ACME")["sources"]
+    provider.documents.return_value = []
+    assert lookup.invoke({"symbol": "ACME", "accession": "0000000001-26-000001"}) == []
+    provider.documents.assert_called_once()
+    with pytest.raises(ValueError, match="Accession"):
+        lookup.invoke({"symbol": "ACME", "accession": "../../.env"})
+    provider.documents.assert_called_once()
