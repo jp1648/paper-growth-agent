@@ -1033,3 +1033,19 @@ operator attestation, not independent API verification of delivery.
   mobile screenshot inspected, without horizontal overflow. Disposable database
   removed in finally. No production data, credentials, deployment or trading state
   changed. Actual independent accounting review remains outstanding.
+
+- Broker-history preflight (local, not deployed): the audit run reproduced two
+  failures: contradictory same-ID activities were accepted, and missing historical
+  activity did not latch the external pause. Reconciliation now validates the
+  entire incoming activity set before importing orders/activities. Identical
+  overlaps are deduplicated; conflicting IDs, missing historical IDs and unapproved
+  revisions fail with a persistent pause. Existing operator pause text is retained.
+- Recovery regressions verify history is unchanged, new activities preceding a
+  revision are not partially imported, reservations remain held, restart does not
+  clear the pause, and explicit resume requires successful reconciliation. Ordinary
+  delayed fill convergence retains its existing automatic reconciliation behavior;
+  this change does not permanently latch every transient provider error.
+- Full offline suite passed 601 tests with three opt-in skips; the additional
+  partial-import regression then passed with all 30 execution tests. Ruff and
+  whitespace checks pass. No paid calls, broker requests, deployment or new orders.
+  Full trade-bust/reopened-order provider semantics remain unsupported and blocked.

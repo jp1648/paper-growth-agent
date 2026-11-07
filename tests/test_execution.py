@@ -262,6 +262,7 @@ def test_fill_event_before_activity_pauses_then_recovers(env, decision):
     )
     with pytest.raises(LedgerError, match="cumulative fill"):
         service.reconcile()
+    assert not service.kill_path.exists()
     broker.orders[cid]["filled_qty"] = "0"
     broker.fixture_fill(cid)
     service.reconcile()
@@ -341,3 +342,99 @@ def test_broker_time_in_force_must_match_approved_intent(env, decision):
     service.cfg.time_in_force = "ioc"
     order["time_in_force"] = "day"
     service.validate_order(order, result)  # Later config changes do not rewrite the approval.
+
+
+def test_missing_historical_activity_blocks_even_when_balances_match(env, decision):
+    service, broker, _ = env
+    result = service.execute(decision, "missing-history")
+    broker.fixture_fill(result["client_order_id"])
+    service.reconcile()
+    original = copy.deepcopy(broker.activities)
+    saved = service.store.activities()
+    broker.activities = []
+    with pytest.raises(LedgerError, match="missing.*historical|Historical.*missing"):
+        service.reconcile()
+    assert service.store.activities() == saved
+    assert service.store.get("reconciliation")["ok"] is False
+    assert service.kill_path.exists()
+    assert broker.submits == 1
+    broker.activities = original
+    service.reconcile()
+    assert service.store.get("reconciliation")["ok"] is True
+    assert service.kill_path.exists()
+    assert service.store.activities() == saved
+    assert broker.submits == 1
+
+
+def test_conflicting_duplicate_activity_rejected_before_recording(env, decision):
+    service, broker, _ = env
+    result = service.execute(decision, "duplicate-history")
+    broker.fixture_fill(result["client_order_id"])
+    original = copy.deepcopy(broker.activities)
+    conflicting = {**original[0], "price": "1"}
+    broker.activities.insert(0, conflicting)
+    with pytest.raises(LedgerError, match="Conflicting.*activities"):
+        service.reconcile()
+    assert service.store.activities() == []
+    assert service.kill_path.exists()
+    broker.activities = original
+    service.reconcile()
+    assert service.store.activities() == original
+    assert broker.submits == 1
+
+
+def test_identical_activity_overlap_is_recorded_once(env, decision):
+    service, broker, _ = env
+    result = service.execute(decision, "overlapping-history")
+    broker.fixture_fill(result["client_order_id"])
+    original = copy.deepcopy(broker.activities)
+    broker.activities.extend(copy.deepcopy(original))
+    service.reconcile()
+    service.reconcile()
+    assert service.store.activities() == original
+    assert len(service.store.events("broker_activity")) == 1
+    assert not service.kill_path.exists()
+    assert broker.submits == 1
+
+
+def test_history_failure_preserves_operator_pause_across_restart(env, decision):
+    service, broker, data = env
+    result = service.execute(decision, "history-restart")
+    broker.fixture_fill(result["client_order_id"])
+    service.reconcile()
+    original = copy.deepcopy(broker.activities)
+    service.kill_path.write_text("Operator investigation in progress")
+    broker.activities = []
+    with pytest.raises(LedgerError, match="Historical"):
+        service.reconcile()
+    broker.activities = original
+    restarted = Service(service.cfg, Store(service.cfg.database), broker, data)
+    try:
+        restarted.reconcile()
+        assert restarted.kill_path.read_text() == "Operator investigation in progress"
+        denied = restarted.execute(decision, "new-after-history-recovery")
+        assert denied["status"] == "rejected"
+        assert "Kill switch is active" in denied["reasons"]
+        assert broker.submits == 1
+        restarted.resume()
+        assert not restarted.kill_path.exists()
+    finally:
+        restarted.store.db.close()
+
+
+def test_revision_preflight_does_not_partially_import_new_activities(env, decision):
+    service, broker, _ = env
+    result = service.execute(decision, "revision-preflight")
+    broker.fixture_fill(result["client_order_id"], qty="5", status="partially_filled")
+    service.reconcile()
+    saved = service.store.activities()
+    broker.fixture_fill(result["client_order_id"], qty="5")
+    broker.activities[0] = {**broker.activities[0], "price": "1"}
+    broker.activities.reverse()  # New activity arrives before the revised historical one.
+    with pytest.raises(LedgerError, match="revised activity"):
+        service.reconcile()
+    assert service.store.activities() == saved
+    assert len(service.store.events("broker_activity")) == 1
+    assert service.kill_path.exists()
+    assert service.reservation_summary() > 0
+    assert broker.submits == 1

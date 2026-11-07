@@ -16,6 +16,10 @@ from .observability import traced
 from .risk import check, daily_loss
 
 
+class BrokerHistoryError(LedgerError):
+    """A material history discrepancy requires operator review before resuming."""
+
+
 class Service:
     def __init__(self, settings, store, broker, data):
         self.cfg, self.store, self.broker, self.data = settings, store, broker, data
@@ -117,18 +121,31 @@ class Service:
                 snap = self.broker.snapshot(self.store.experiment["started_at"], sorted(set(tracked)))
                 if snap.account["id"] != self.account_id:
                     raise LedgerError("Broker account identity does not match experiment")
+                incoming = {}
+                for activity in snap.activities:
+                    identifier = activity["id"]
+                    if identifier in incoming and incoming[identifier] != activity:
+                        raise BrokerHistoryError(f"Conflicting broker activities share ID {identifier}")
+                    incoming[identifier] = activity
+                effective = {a["id"]: a for a in self.store.activities()}
+                missing = effective.keys() - incoming.keys()
+                if missing:
+                    raise BrokerHistoryError(
+                        f"Historical broker activities missing: {', '.join(sorted(missing))}; review required"
+                    )
+                for identifier, activity in incoming.items():
+                    if identifier in effective and effective[identifier] != activity:
+                        raise BrokerHistoryError(
+                            f"Broker revised activity {identifier}; audited correction required"
+                        )
                 known = {o["client_order_id"]: o for o in snap.orders}
                 for order in snap.orders:
                     intent = self.store.get(order["client_order_id"], "intent")
                     if intent:
                         self.validate_order(order, intent)
                     self.store.order(order)
-                effective = {a["id"]: a for a in self.store.activities()}
-                for a in snap.activities:
-                    prior = effective.get(a["id"])
-                    if prior and prior != a:
-                        raise LedgerError(f"Broker revised activity {a['id']}; audited correction required")
-                    if not prior:
+                for a in incoming.values():
+                    if a["id"] not in effective:
                         self.store.put(a["id"], a, "activity")
                         self.store.log("broker_activity", a)
                 for intent in self.store.items("intent"):
@@ -216,6 +233,8 @@ class Service:
                 self.store.log("reconciled", {"cash": snap.account["cash"], "equity": snap.account["equity"]})
                 return snap
             except Exception as error:
+                if isinstance(error, BrokerHistoryError) and not self.kill_path.exists():
+                    self.kill_path.write_text(safe_error(error))
                 self.pause_reconciliation(safe_error(error))
                 raise
 
