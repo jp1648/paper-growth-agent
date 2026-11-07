@@ -2,11 +2,11 @@
 
 A Python agent using Deep Agents for research and LangGraph for the trading workflow for active growth, business-quality and undervaluation research, with days-to-months holding periods and autonomous **paper-only** execution. Alpaca's dedicated paper account is authoritative for orders, fills, cash and positions. SQLite stores the decision journal and a reconciled audit ledger. There is no production execution simulator.
 
-**Status:** implemented and validated with offline fixtures. No broker trade or paid research run is claimed. Starting the experiment requires your paper credentials, research model configuration and a dedicated account. See [acceptance coverage](docs/acceptance.md) and [operations](docs/operations.md).
+**Status: NO-GO for real money.** Offline tests, paid research evaluations and a broker-confirmed one-share paper fill have been recorded. Research acceptance, financial interpretation, recovery and live-release requirements remain incomplete; a paper fill does not establish investment quality. The deployed executor remains paused. See the current [readiness evidence ledger](docs/live-readiness.md), [acceptance coverage](docs/acceptance.md) and [operations](docs/operations.md).
 
 ## Start
 
-Requires Python 3.12+ and `uv` on macOS/Linux. All processes for an account must use one host, OS user, database and control directory.
+Requires Python 3.12+ and `uv` on macOS/Linux. All active processes for an account must share one authorized host, OS user, database and control directory. Cloud deployment also uses an explicit executor-owner guard; a replacement host requires fenced transfer and broker reconciliation, not simultaneous execution.
 
 ```sh
 uv sync --locked
@@ -61,7 +61,7 @@ uv run python deploy/setup-observability.py
 
 The image contains code/dependencies only. Compose mounts `.env` as a runtime secret, `config.toml` read-only, and the existing ledger/control directories at their original absolute paths. It preserves the initialized experiment; do not run `init` again. Only this container should operate the account—stop any host scheduler/listener first. The current mount layout expects the default `state/ledger.sqlite` and `~/.local/state/paper-growth-agent` paths; custom locations require matching volume mounts.
 
-`restart: unless-stopped` restarts an exited container while Docker is running. Health checks verify recent monitoring and reconciliation; Docker does not automatically restart an unhealthy-but-running container. Health is visible in `ps`, but no push alerts are configured. Start Docker after a Mac reboot; this setup does not change macOS sleep or Docker login preferences.
+`restart: unless-stopped` restarts an exited container while Docker is running. Health checks verify recent monitoring and reconciliation; Docker does not automatically restart an unhealthy-but-running container. Health is visible in `ps`; this local Compose setup alone does not configure independent push alerts. The deployed cloud monitor and Telegram fill-notification procedures are documented in [operations](docs/operations.md). Start Docker after a Mac reboot; this setup does not change macOS sleep or Docker login preferences.
 
 Set `research_daily_cost_usd` in local `config.toml`: `0` means monitoring/reporting only; `5` is an example daily pilot ceiling. Model spending uses New York dates and durable per-run reservations. Unknown/crashed runs retain their reserved allowance; an investigation cannot start additional model calls after the New York date changes. Reconciliation, cancellations and reporting continue at the cap; new model research pauses. These are estimates using configured token rates, not a provider-enforced billing guarantee.
 
@@ -90,7 +90,7 @@ Use the supplied [systemd timer](deploy/paper-agent.timer), [finite-run service]
 * * * * * cd /absolute/path/to/trader && /absolute/path/to/trader/.venv/bin/paper-agent --config /absolute/path/to/trader/config.toml tick >> /absolute/path/to/paper-agent.log 2>&1
 ```
 
-Supply environment variables securely to the scheduler. No scheduler is installed or activated by this repository. The broker calendar controls sessions, holidays, daylight saving and early closes; the machine's cron timezone does not define market hours.
+Supply environment variables securely to the scheduler. Installing the Python package does not activate a scheduler. The deployed cloud environment uses systemd; do not start a second listener or timer for its account. The broker calendar controls sessions, holidays, daylight saving and early closes; the machine's cron timezone does not define market hours.
 
 Default cadence: reconcile every minute; research before open; check triggers every 15 minutes during the session; targeted checks on new news; daily report at least 16 minutes after close; deeper research and behavior review Friday after close. Streams only provide wake-up hints. Accounting always comes from REST reconciliation. Reconnects trigger reconciliation; downtime is recorded without fictitious backfilled monitoring.
 
@@ -119,7 +119,7 @@ These are initial experiment controls, **not optimized investment parameters**:
 
 US-listed common stocks only, long only, whole-share orders, limit orders of at least $1, regular sessions only. No leverage, shorts, options, crypto, fractional orders or extended-hours execution. The configured universe is an operator-reviewed allowlist; Alpaca's broad `us_equity` asset class alone does not identify common stocks.
 
-Pending buys count toward cash, symbol, sector, position-count and turnover limits. Pending sells do not free cash or concentration capacity until filled. Internal cash availability uses **broker cash minus pending-buy reservations**, never margin buying power; broker buying power is not subtracted again. Appreciation beyond an entry limit blocks additions and triggers reassessment, not forced liquidation. Cooldown/turnover rules also apply to exits; operator risk-rule changes must be explicit.
+Pending buys count toward cash, symbol, sector, position-count and turnover limits. Pending sells do not free cash or concentration capacity until filled. Internal cash availability uses **broker cash minus pending-buy reservations**, never margin buying power; broker buying power is not subtracted again. Appreciation beyond an entry limit blocks additions and triggers reassessment, not forced liquidation. Discretionary exits retain cooldown/turnover limits. Protective exits for risk, invalidated thesis or failed catalysts bypass those two limits only; pause, ownership, reconciliation, halt, freshness and execution limits still apply.
 
 Review deadlines cause reassessment. Every decision records business/price/timing rationales, catalysts, thesis development time, holding period, review date, add/reduce/exit conditions, evidence, assumptions and expected outcome. Exits can cite thesis failure, valuation, failed catalysts, better opportunities or risk. Cash and HOLD/WATCH are valid outcomes.
 

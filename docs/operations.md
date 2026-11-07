@@ -164,3 +164,26 @@ original pause, broker ledger and positions. If interrupted, inspect the actual
 systemd timer/service and incident states before doing anything else; do not
 restart the drill from a remembered status. A whole-host/zone outage still needs
 separate evidence.
+
+
+### Verified whole-host alert/restart drill
+
+On November 7, 2026 UTC, a controlled stop of the paused paper executor proved
+independent missing-heartbeat detection and same-host recovery. Preflight required
+fresh reconciliation, no working orders and the existing pause. A separate local
+watchdog bounded restart to twelve minutes; the normal observation loop restarted
+the VM when the incident opened. Do not rely on a timer on the stopped host.
+
+Observed timings: last heartbeat00:29:14, VM TERMINATED00:30:31, alert00:36:27,
+VM RUNNING00:36:53, recovered healthy metric00:40:08, automatic closure00:44:01.
+Both opening and recovery emails matched the cloud incident and passed Gmail
+DKIM/SPF/DMARC checks. The three-minute monitor boot delay contributes to recovery
+notification latency. These timings are measurements, not delivery guarantees.
+
+After restart, check the original VM identity, deployed artifact, active executor
+and monitor timer, external pause, fresh broker reconciliation, working orders and
+unchanged ledger/history. Temporary `/tmp` scripts may be removed by boot; restore
+only the diagnostic script, never an old operational ledger. External ephemeral
+IP addresses can change; use IAP/instance identity rather than a remembered IP.
+This drill retained the existing one-share paper position. It does not prove
+replacement-host failover, an in-flight broker request, disk loss or zone recovery.

@@ -21,7 +21,7 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 | 10 | Single executor and recovery | Actual two-VM owner transfer/restart and storage IAM-loss drill passed. Saved cloud ledger reconciled against paper broker; off-host generation/hash restored. Deployed owner admission guard enabled. Full restored-service failover, in-flight requests and network partition remain open. |
 | 11 | Provider/evidence/stream failure matrix | Future evidence, bounded retrieval, stream failure/backoff and duplicate-hint tests pass. Broader reconnect/backfill, schema drift, throttling, hostile-content and combined-failure matrix remains open. |
 | 12 | Complete authenticated traces | Deployed and verified on production: 557 unique events across six pages, full-event authentication, logout, malformed cursor rejection and mobile rendering. Real Postgres equal-timestamp fixture passes. Broader outage/load scenarios remain open under 11/14. |
-| 13 | Notifications/independent alerts | Deployed bounded Telegram retries, audited uncertain-delivery resolution and correction notices. Actual health/spend emails previously verified against cloud incidents. Actual metric-publisher outage opened a missing-heartbeat incident and delivered an authenticated email; publishing recovered. Automatic incident closure and matching recovery email verified. Whole-host failure remains separate. |
+| 13 | Notifications/independent alerts | Deployed bounded Telegram retries, audited uncertain-delivery resolution and correction notices. Actual health/spend emails previously verified against cloud incidents. Actual metric-publisher outage opened a missing-heartbeat incident and delivered an authenticated email; publishing recovered. Automatic incident closure and matching recovery email verified. Whole-host stop/restart and independent alert delivery are now verified below; replacement-host in-flight recovery remains separate. |
 | 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; 548 offline tests pass with three opt-in skips. Ten safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
 | 15 | Accounting/performance | Independent lifecycle balances cover distributions, withholding, fees, flows, splits, sales and audited return of capital. Unknown actions fail closed. Full broker cost-basis/correction cases, comparable total-return benchmarks and all operating costs remain open. |
 | 16 | Investment effectiveness | Not achieved. Predeclared unseen cohorts and forward paper observations after costs, independent review and uncertainty reporting remain required. No demonstrated investment edge. |
@@ -876,3 +876,28 @@ operator attestation, not independent API verification of delivery.
 - Full offline suite: **562 passed, 3 skipped**; Ruff and whitespace checks pass.
   No external provider/model requests or trading-state changes. Deployment and
   the broader adversarial/combined-failure matrix remain open.
+
+
+- Whole-host monitoring drill: with fresh reconciliation, pause present and no
+  working orders, stopped the original VM. Google Cloud confirmed TERMINATED at
+  2026-11-07T00:30:31Z. An independent local watchdog bounded restart to twelve
+  minutes; the drill observed the unchanged cloud absence policy and restarted
+  earlier when a new incident opened. No policy thresholds were shortened.
+- Last pre-stop metric was 00:29:14Z. Incident `0.oeq3kfcp7xvb` opened at
+  00:36:27Z (about 7m13 after the last sample), and authenticated alert email
+  `1a1b36f73c095b62` arrived with that exact incident link. Gmail was read-only.
+  Original VM ID 3629391648980512917 returned RUNNING at 00:36:53Z; no replacement
+  executor, ledger restore or new order was created. The transient watchdog exited.
+- Initial IAP SSH attempt preceded SSH startup; a later connection succeeded.
+  Boot cleared the temporary audit script, which was recopied. Both executor and
+  health timer became active; health and fresh broker reconciliation passed.
+  Pause, one-share AAPL position and counts (acceptance8/activity2/intent2/order1)
+  were unchanged. The expected `5e9dac86...` artifact remained deployed.
+- Automatic metric publishing recovered (healthy1 at00:40:08Z), respecting the
+  configured three-minute monitor boot delay. Incident closed automatically at00:44:01Z; matching authenticated recovery email
+  `1a1b376611626b4e` was received. No manual incident closure occurred.
+  This demonstrates same-host restart and independent detection, not a zone outage,
+  destructive disk failure or replacement-host takeover with an in-flight order.
+  Private evidence is retained under `state/host-outage-drill/`.
+- Updated stale README claims about prior paper acceptance, cloud monitoring,
+  scheduling and protective exits to match current behavior and link the evidence.
