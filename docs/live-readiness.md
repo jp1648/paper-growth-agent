@@ -839,3 +839,25 @@ operator attestation, not independent API verification of delivery.
   Postgres; all four browser checks passed, including new cost-result assertions,
   legacy snapshots and mobile layout. Disposable test database removed afterward.
   Complete cost allocation and deployment remain open; no trading state changed.
+
+- Cost reporting deployed from `09c8f78` after CI run `42317767744` passed all
+  backend, dashboard and secret checks. Allowlisted source builds excluded runtime
+  state and credentials. Agent build `dd98c0c7-765f-46f0-88ad-f83398115469` produced
+  digest `5e9dac8663d95ac00a1f64bc3bb37b6cf6a0c307124983b932a04e24638cca73`;
+  all 26 installed Python source hashes verified in a network-isolated container.
+  Dashboard build `fe386607-0f24-4f1a-b481-09ac5f683a35` produced digest
+  `f8f614407f4853950fad5cd6c6ee5d5ad97c6651637e26f60c494fd9802e6dfc`.
+- Executor rollout preserved config hash, pause, original experiment and ledger.
+  Private rollback files retained; no ledger restore occurred. Post-rollout health
+  and reconciliation passed; counts stayed at eight acceptance records, two
+  activities, two intents and one order. No model or order test was launched.
+- Dashboard revision `trader-dashboard-00008-vib` passed staged authenticated
+  acceptance before receiving 100% production traffic. The first check encountered
+  an older snapshot without the new field; a subsequent fresh maintenance export
+  passed, with no export errors. Production verification confirmed the rendered
+  partial-cost panel, arithmetic, mobile width, anonymous denial and logout.
+  Snapshot showed $39.000661 recorded operating costs, 13 unpriced requests and
+  four unresolved research runs. These are experiment totals, not this rollout's
+  costs or a full billing reconciliation. Evidence: `state/cost-release-09c8f78/`.
+  Trading remains paused; full cost attribution and the remaining release gates
+  are still open.
