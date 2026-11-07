@@ -20,7 +20,7 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 | 9 | Process-level crash consistency | Five real SIGKILL subprocess drills pass against loopback broker: prepared intent, accepted POST, saved order, accepted cancel, persisted fill. No duplicate orders; unresolved intent retains reservation. Cloud/process concurrency and disk failure drills pending. |
 | 10 | Single executor and disaster recovery | Saved cloud ledger reconciled twice against the paper broker; exact off-host generation/hash restored and integrity verified. Actual two-VM admission/transfer/restart and storage-permission-loss drill passed. Full restored-executor service failover, in-flight broker reconciliation across transfer, network partition and production enablement remain pending. |
 | 11 | Evidence/stream/provider failure matrix | Future-dated evidence cache and specialist-report reuse blocked with regressions. Clean stream closures now back off; disconnect/auth/subscription/malformed-message tests preserve maintenance, duplicate hints cannot create fills. Broader amendments, reconnect/backfill, throttling and injection matrix pending. |
-| 12 | Complete authenticated traces | Implemented timestamp/UUID pagination and authenticated run-scoped full-event retrieval; real Postgres 205-event equal-timestamp test and browser pagination/auth tests pass locally. Cloud deployment pending. |
+| 12 | Complete authenticated traces | Timestamp/UUID pagination and authenticated run-scoped full-event retrieval deployed. Isolated Postgres equal-timestamp tests pass; production browser/API checks loaded and rendered 557 unique events across six pages, verified full-event authentication, logout, invalid cursors and mobile layout. Broader outage/load/security scenarios remain part of requirements 11/14. |
 | 13 | Notification recovery | Local bounded 429 retries, strict response validation, audited no-resend operator resolution and reconciled correction notices tested. Actual independent health/spend email delivery verified against Cloud Monitoring incident IDs and authenticated Gmail. New code deployment and complete missing-heartbeat outage drill remain pending. |
 | 14 | CI/security/infrastructure gates | Browser/Postgres CI, pinned Python vulnerability audit, npm audit, redacted full-history secret scan and 80% combined coverage regression floor added. Local scans passed; six disabled safety guards detected by mutation tests. Broader mutations/permissions, CI remote execution and infrastructure failure drills pending. |
 | 15 | Financial accounting/performance matrix | Independent lifecycle balances pass for dividend/withholding/fees, capital flows, split/reverse split, partial/final sale and reviewed return of capital; unknown corporate actions fail closed. Broader broker cost-basis/total-return and correction matrix pending. |
@@ -772,3 +772,21 @@ operator attestation, not independent API verification of delivery.
   submission was used to test it in production. Full service failover, live
   account constraints and independent investment-quality/forward evidence remain
   open. Keep the release paused; overall status remains NO-GO for live money.
+
+- Dashboard release: pinned both Node build/runtime base images to a resolved
+  multiarch digest. Cloud Build 5e8028c0-ae78-4ff8-a7ed-c39f917e38e6 built
+  reviewed commit 279ba41 from an allowlisted tracked-source archive without
+  local environment, dependencies or runtime state. Build image digest:
+  sha256:ad9a19e6eae40f84aaed0ffa95139a2c3f7d8950012472b303f56f7b54645dab.
+  CI run 42315434755 passed backend, dashboard and secrets checks.
+- Staged Cloud Run revision trader-dashboard-00006-vix at zero traffic, preserved
+  existing secret references and configuration, then verified actual browser login,
+  anonymous API denial, six pages/557 unique events, authenticated full-event access,
+  no-store responses, malformed cursor rejection and logout denial. Only then
+  promoted it to 100% production traffic; previous revision remains available.
+- Repeated checks on the normal production URL passed. Additional rendered-UI
+  verification loaded all 557 events through the pagination button and found no
+  horizontal overflow at 390px. Checked at 2026-11-07T00:02:57Z. Credentials were
+  retrieved into process memory for login, never printed or embedded in the image.
+  Private receipts live in ignored state/dashboard-release. No trading settings,
+  broker orders or model investigations changed in this dashboard rollout.
