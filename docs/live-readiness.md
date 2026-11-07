@@ -1116,3 +1116,24 @@ operator attestation, not independent API verification of delivery.
   deployment or trading state. Arithmetic agreement does not validate forecasts,
   discount assumptions, normalization, economic fair value or investment edge;
   those independent-review and forward-observation gates remain open.
+
+- Executor safety batch deployed from `9af7871` after CI `42323942912` passed
+  backend/Postgres/coverage, sixteen safety mutations, dashboard/browser and secret
+  checks. Cloud Build `5f829816-ba93-4eab-8867-1dba22371811` used 30 allowlisted
+  tracked files and produced digest
+  `e2f21026d1a52ac95d47d7732cc52d70fb2ef7b6791efe0d6a19e4bf5ac2ad91`.
+  All 26 installed Python files matched source hashes in a network-disabled check.
+- Fresh paused/no-working-order preflight passed before switching the image.
+  Original experiment, ledger, control state and config hash
+  `d255b4f99146aeb11df5092a0c73168fed600334e28ea8f792e83235d9fec76a`
+  were preserved; private rollback backup retained without restoring an old ledger.
+  Post-rollout service active, health passed, reconciliation at
+  `2026-11-07T01:28:56Z` succeeded. Counts remain acceptance8/activity2/intent2/order1;
+  AAPL remains one share, with zero working orders and pause present.
+- This deploys accession validation, structured normalization enforcement, broker
+  history preflight/persistent discrepancy pause and activity-pagination validation.
+  Dashboard image remains unchanged; its normalization panel/session parser update
+  still needs separate deployment. No new model investigation or order was launched.
+  Private receipts: `state/safety-release-9af7871/`. Full normalization semantics,
+  broker bust recovery, independent investment review and other open gates remain
+  NO-GO for real money.
