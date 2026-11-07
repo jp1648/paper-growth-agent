@@ -815,3 +815,18 @@ operator attestation, not independent API verification of delivery.
   received and passed Gmail DKIM/SPF/DMARC checks. No manual incident closure or
   synthetic recovery metric was used. Publisher-outage detection, notification
   delivery, sample recovery and automatic resolution are verified for this drill.
+
+- Operating-cost reporting (local, not deployed): portfolio reports and dashboard
+  snapshots now include broker P/L, recorded operating-cost estimates, and P/L
+  after those recorded costs. The shared spend breakdown counts model, X, legacy
+  Flovia and manual data entries consistently. Broker fees remain included once
+  through broker P/L; reservations are not expenses. Unresolved research runs are
+  counted across dates for the current experiment, excluding other experiments.
+- This is explicitly partial, never an all-in return: unrecorded infrastructure,
+  subscriptions and separately logged evaluation costs remain excluded. Manual
+  entries must not overlap request charges. Empty cost history does not certify
+  zero economic cost. No existing NAV, daily-return history or ledger is rewritten.
+- Two new regressions failed before implementation and pass afterward, covering
+  fee double-counting, missing costs, reservation scope and empty history. Full
+  offline suite: **550 passed, 3 skipped**; Ruff and whitespace checks pass.
+  Dashboard rendering, complete cost attribution and deployment remain open.

@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 from .accounting import recent_turnover
 from .models import ZERO, dec, now
 from .observability import traced
-from .spending import spending_status
+from .spending import spend_breakdown, spending_status
 
 
 @traced("report.portfolio", inputs=lambda service: {})
@@ -30,6 +30,29 @@ def _portfolio_report(service):
         sector_values[sector] = sector_values.get(sector, ZERO) + dec(p["market_value"])
     costs = store.events("model_cost")
     data_costs = store.events("data_cost")
+    expenses = spend_breakdown(store, [x["body"] for x in costs])
+    known_expenses = sum((row["known_usd"] or ZERO for row in expenses), ZERO)
+    unresolved = store.db.execute(
+        "SELECT count(*) FROM documents WHERE scope='global' AND kind='research_spend' "
+        "AND json_extract(body, '$.experiment_id')=? "
+        "AND json_extract(body, '$.status')!='settled'",
+        (store.scope,),
+    ).fetchone()[0]
+    economic_result = {
+        "broker_pnl_usd": pnl,
+        "recorded_operating_cost_usd_estimate": known_expenses,
+        "pnl_after_recorded_costs_usd_estimate": pnl - known_expenses,
+        "unknown_cost_requests": sum(row["unknown_requests"] for row in expenses),
+        "unresolved_research_runs": unresolved,
+        "complete": False,
+        "scope": "Current experiment journal only; not provider invoices or all platform spending.",
+        "limitations": [
+            "Partial estimate: unrecorded infrastructure, subscriptions and separately logged evaluations are excluded.",
+            "Unknown charges and reservations are not zero costs or settled expenses.",
+            "Broker fees are already in broker P/L and are not subtracted again.",
+            "Manual cost entries must be incremental expenses, not totals overlapping recorded requests.",
+        ],
+    }
     fills = [a for a in store.activities() if a["activity_type"] == "FILL"]
     intents = {i.get("broker_order_id"): i for i in store.items("intent") if i.get("broker_order_id")}
     slippage = []
@@ -92,6 +115,7 @@ def _portfolio_report(service):
         "positions": positions,
         "unrealized_pnl": unrealized,
         "total_pnl": pnl,
+        "economic_result": economic_result,
         "realized_and_other_pnl": pnl - unrealized,
         "realized_pnl_average_cost_audit": audit["realized_average_cost"],
         "fees": audit["fees"],
