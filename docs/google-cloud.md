@@ -51,3 +51,23 @@ failed logout does not claim successful revocation. Password rotation invalidate
 all signatures. Do not roll back to the stateless-session application as a security
 recovery: it does not enforce the session allowlist. Rate limiting and broader
 login-abuse controls remain separate release gates.
+
+### Shared login-attempt limit
+
+The session migration also creates a single `dashboard_login_limit` row. The
+known dashboard roles have SELECT/INSERT/UPDATE permission on this table only;
+telemetry remains SELECT-only. Reapply the migration before deploying login-limit
+code to an existing installation. It is additive and idempotent.
+
+Before checking a password, each login reserves one of twenty attempts in a
+one-minute window using an atomic Postgres upsert. All instances share the same
+allowance; no client IP headers or per-process state are trusted. Successful and
+failed attempts both count. Existing sessions and logout are unaffected. No
+passwords, IP addresses or submitted values are stored in the rate-limit table.
+If the database fails, login fails closed. Saturation gives a one-minute retry
+message; a later attempt resets an expired window automatically.
+
+This is a bound on password checks, not denial-of-service protection. Someone can
+consume the workspace-wide allowance and temporarily deny new logins; fixed windows
+also permit a boundary burst. Trusted edge throttling/identity-aware access and
+sustained hostile-load testing remain required for stronger availability guarantees.

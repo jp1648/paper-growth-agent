@@ -2,9 +2,14 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { matches } from "../../lib/session.mjs";
-import { createSession, revokeSession } from "../../lib/session-store.mjs";
+import {
+  createSession,
+  revokeSession,
+  allowLogin,
+} from "../../lib/session-store.mjs";
 import { pool } from "../../lib/db";
 export async function login(form: FormData) {
+  if (!(await allowLogin(pool()))) redirect("/login?error=limited");
   const secret = process.env.DASHBOARD_PASSWORD || "";
   if (!matches(String(form.get("password") || ""), secret))
     redirect("/login?error=1");

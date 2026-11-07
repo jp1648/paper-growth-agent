@@ -50,3 +50,28 @@ export async function revokeSession(db, token) {
     client.release();
   }
 }
+
+// shortcut: workspace-wide allowance can deny new logins under attack; add trusted edge controls for hostile load.
+export async function allowLogin(db) {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN READ WRITE");
+    const result = await client.query(`
+      INSERT INTO public.dashboard_login_limit AS budget (id, window_started, attempts)
+      VALUES (true, now(), 1)
+      ON CONFLICT (id) DO UPDATE SET
+        attempts = CASE WHEN budget.window_started <= now() - interval '1 minute'
+          THEN 1 ELSE budget.attempts + 1 END,
+        window_started = CASE WHEN budget.window_started <= now() - interval '1 minute'
+          THEN now() ELSE budget.window_started END
+      WHERE budget.window_started <= now() - interval '1 minute' OR budget.attempts < 20
+      RETURNING attempts`);
+    await client.query("COMMIT");
+    return result.rowCount === 1;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}

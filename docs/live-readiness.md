@@ -1217,3 +1217,22 @@ operator attestation, not independent API verification of delivery.
   Private evidence: `state/dashboard-sessions-ad3fd1f/`. Login abuse, broader
   security/load checks and investment/recovery gates remain open. No model calls
   or broker orders were made; live readiness remains NO-GO.
+
+- Added shared login-attempt admission before password verification: one atomic
+  Postgres counter admits twenty attempts per one-minute window across instances.
+  Both successful/failed attempts count. Current sessions and logout are unaffected;
+  unavailable storage cannot fall back to unrestricted login. Grants are limited
+  to SELECT/INSERT/UPDATE on the separate counter table; no credentials/IPs stored.
+- Browser regression against the prior build showed twenty incorrect attempts did
+  not prevent the subsequent login. Initial test locator also matched Next's route
+  announcer; narrowed it to the actual error alert before obtaining this failure.
+  After the fix, the browser observes throttling and denial, then restored access
+  after the database window expires. For each supported role, sixty concurrent
+  attempts across two pools admit exactly twenty, retain existing session access,
+  and restart at one after expiry. Database-error propagation is asserted.
+- Seven Node tests with actual Postgres and all eleven browser/integration tests
+  pass; typecheck and production build pass. Migration is idempotent and used by
+  both setup paths. No production rollout/migration in this batch. A global
+  allowance can be exhausted to deny new logins and permits fixed-window boundary
+  bursts; it is not edge/DDoS protection. Those availability/load gates remain open.
+  No broker orders, paid research or trading-state changes. Live readiness NO-GO.
