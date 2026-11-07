@@ -50,10 +50,10 @@ def test_sec_payload_must_match_configured_company(env, monkeypatch, field, valu
 def test_legacy_unverified_cache_is_refetched(env, monkeypatch):
     source = provider(env, monkeypatch)
     legacy = source.fetch("ACME")
-    legacy["sec_schema"] = 2
+    legacy["sec_schema"] = 3
     source.store.put("ACME", legacy, "evidence_cache")
     bundle = source.get("ACME")
-    assert bundle["sec_schema"] == 3
+    assert bundle["sec_schema"] == 4
     assert bundle["sources"][0]["content"]["cik"] == "0000000001"
 
 
@@ -301,4 +301,38 @@ def test_fetch_keeps_verified_same_day_filing_but_excludes_date_only_facts(env, 
     assert [s["published_at"] for s in bundle["sources"] if s["id"].startswith("news-")] == [
         (AT - timedelta(seconds=1)).isoformat()
     ]
-    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 3
+    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 4
+
+
+@pytest.mark.parametrize("offset,expected", [(-1, 1), (1, 0)])
+def test_news_revision_timestamp_controls_snapshot_eligibility(env, monkeypatch, offset, expected):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    monkeypatch.setattr("trader.evidence.now", lambda: AT)
+    source = provider(env, monkeypatch)
+    source.data.news_items = [
+        {
+            "id": "revised",
+            "created_at": (AT - timedelta(days=8)).isoformat(),
+            "updated_at": (AT + timedelta(seconds=offset)).isoformat(),
+            "headline": "Revised claim",
+        }
+    ]
+    bundle = source.fetch("ACME")
+    news = [s for s in bundle["sources"] if s["id"].startswith("news-")]
+    assert len(news) == expected
+    if news:
+        assert news[0]["updated_at"] == source.data.news_items[0]["updated_at"]
+
+
+@pytest.mark.parametrize("updated", ["2020-01-01T00:00:00Z", "2026-01-01T00:00:00", "invalid"])
+def test_news_invalid_revision_cannot_be_cached(env, monkeypatch, updated):
+    from conftest import AT
+
+    source = provider(env, monkeypatch)
+    source.data.news_items = [{"id": "invalid", "created_at": AT.isoformat(), "updated_at": updated}]
+    with pytest.raises(ValueError):
+        source.get("ACME", fresh=True)
+    assert source.store.get("ACME", "evidence_cache") is None

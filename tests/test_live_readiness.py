@@ -326,3 +326,25 @@ def test_execution_rechecks_filings_and_retains_check(env, decision, monkeypatch
     if change == "unchanged":
         service.execute(decision, "filings")
         assert len(checks) == 1  # Existing intents reconcile without new freshness gates.
+
+
+@pytest.mark.parametrize("revised", [False, True])
+def test_news_changed_after_evidence_collection_blocks_cached_execution(env, decision, revised):
+    service, broker, data = env
+    build_graph(service, FixtureTeam(decision)).invoke(
+        {"symbol": "ACME", "run_key": "cached-news", "research_only": True}
+    )
+    cached = service.store.get("cached-news", "research_result")
+    cached["evidence"]["fetched_at"] = (AT - timedelta(minutes=5)).isoformat()
+    service.store.put("cached-news", cached, "research_result")
+    changed = (AT - timedelta(minutes=1)).isoformat()
+    data.news_items = [
+        {
+            "created_at": (AT - timedelta(days=1)).isoformat() if revised else changed,
+            "updated_at": changed,
+        }
+    ]
+    result = service.execute(decision, "cached-news")
+    assert result["status"] == "rejected"
+    assert "New news requires research review" in result["reasons"]
+    assert broker.submits == 0

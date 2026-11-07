@@ -916,3 +916,22 @@ operator attestation, not independent API verification of delivery.
   lint and formatting pass. No provider/model calls, orders or deployment changes.
   This does not establish a historical point-in-time database or prove that later
   vendor edits to old articles are unavailable; that broader provenance gate remains.
+
+- News revision boundary (local, not deployed): two regressions showed execution
+  could submit on news published or revised after evidence collection but before
+  research completion. Execution now compares returned news against evidence
+  collection time. A shared timestamp validator uses updated_at when supplied,
+  rejects updates predating publication, and is used by ingestion, scheduler and
+  deferred-decision checks. Source records retain original publication and update
+  timestamps; post-cutoff revisions cannot enter a research snapshot. Schema4
+  invalidates older evidence caches. Original journal history remains unchanged.
+- Seven added cases cover publication/revision during research, pre/post-cutoff
+  revisions and malformed/naive/reversed timestamps. Full offline suite passed
+  **576 tests, 3 skipped**; affected suites passed again after the cache bump.
+  No external model/data calls or orders. Alpaca's
+  [news reference](https://docs.alpaca.markets/us/reference/news-3) documents sorting
+  by update date. These tests prove treatment of returned revisions, not complete
+  retrieval: start-filter semantics for old revisions and the current 50-item
+  unpaginated query still need verification/remediation before claiming complete
+  news freshness coverage. Missing updated_at retains publication-time behavior;
+  upstream omission cannot prove that an article was never revised.

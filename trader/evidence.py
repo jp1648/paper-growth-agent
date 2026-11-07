@@ -10,7 +10,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from .models import dec, dt, dumps, now
+from .models import dec, dt, dumps, news_time, now
 from .observability import traced
 
 
@@ -102,7 +102,7 @@ class EvidenceProvider:
         cached = self.store.get(symbol, "evidence_cache")
         if (
             cached
-            and cached.get("sec_schema") == 3
+            and cached.get("sec_schema") == 4
             and not fresh
             and timedelta(0)
             <= now() - dt(cached["fetched_at"])
@@ -195,7 +195,7 @@ class EvidenceProvider:
             )
         news = self.data.news(symbol, (started_at - timedelta(days=7)).isoformat())
         for article in news:
-            if not started_at - timedelta(days=7) <= dt(article["created_at"]) <= started_at:
+            if not started_at - timedelta(days=7) <= news_time(article) <= started_at:
                 continue
             sources.append(
                 {
@@ -206,12 +206,13 @@ class EvidenceProvider:
                     "source": article.get("source", "Alpaca news"),
                     "url": article.get("url"),
                     "published_at": article.get("created_at"),
+                    "updated_at": article.get("updated_at", article["created_at"]),
                     "retrieved_at": now(),
                     "content": {k: article.get(k) for k in ("headline", "summary", "content")},
                 }
             )
         bundle = {
-            "sec_schema": 3,
+            "sec_schema": 4,
             "symbol": symbol,
             "fetched_at": started_at.isoformat(),
             "sources": sources,

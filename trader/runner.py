@@ -6,7 +6,7 @@ from decimal import InvalidOperation
 from zoneinfo import ZoneInfo
 
 from .alpaca import safe_error
-from .models import dec, dt, now
+from .models import dec, dt, news_time, now
 from .observability import traced
 from .reports import daily_report, portfolio_report
 from .spending import spending_status
@@ -36,7 +36,7 @@ class Runner:
             return True, "review deadline"
         news = self.service.data.news(symbol, reviewed.isoformat())
         # New external evidence can warrant research; price by itself only checks saved thresholds.
-        if any(reviewed < dt(a["created_at"]) <= now() for a in news):
+        if any(reviewed < news_time(a) <= now() for a in news):
             return True, "new news evidence"
         quote = self.service.data.quote(symbol)
         if (
@@ -203,7 +203,7 @@ class Runner:
                     and now() - dt(thesis["reviewed_at"]) < timedelta(hours=self.cfg.research_cache_hours)
                     and dt(thesis["decision"]["next_review"]) > now()
                     and not any(
-                        dt(a["created_at"]) > dt(thesis["reviewed_at"])
+                        news_time(a) > dt(thesis["reviewed_at"])
                         for a in self.service.data.news(symbol, thesis["reviewed_at"])
                     )
                 )

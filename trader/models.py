@@ -31,6 +31,14 @@ def dt(value: str | datetime) -> datetime:
     return value
 
 
+def news_time(article):
+    created = dt(article["created_at"])
+    updated = dt(article.get("updated_at", article["created_at"]))
+    if updated < created:
+        raise ValueError("News update predates publication")
+    return updated
+
+
 def dec(value) -> Decimal:
     result = D(str(value))
     if not result.is_finite():

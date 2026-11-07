@@ -10,7 +10,7 @@ from .accounting import LedgerError, replay, reserved
 from .alpaca import safe_error
 from .evidence import EvidenceProvider
 from .executor_owner import ExecutionFenceError
-from .models import TERMINAL, ZERO, Decision, SubmissionPreflightError, dec, dt, dumps, now
+from .models import TERMINAL, ZERO, Decision, SubmissionPreflightError, dec, dt, dumps, news_time, now
 from .observability import traced
 from .risk import check, daily_loss
 
@@ -370,8 +370,8 @@ class Service:
                 if not timedelta(0) <= now() - completed < timedelta(hours=self.cfg.research_cache_hours):
                     research_reasons.append("Research is stale or future-dated")
                 elif any(
-                    dt(item["created_at"]) > completed
-                    for item in self.data.news(decision.symbol, completed.isoformat())
+                    news_time(item) > dt(research["evidence"]["fetched_at"])
+                    for item in self.data.news(decision.symbol, research["evidence"]["fetched_at"])
                 ):
                     research_reasons.append("New news requires research review")
                 if not research_reasons:
