@@ -16,7 +16,7 @@ export function validSession(token, secret, now = Date.now()) {
   if (!secret || secret.length < 24 || !token) return false;
   const [expiry, signature, extra] = token.split(".");
   if (
-    extra ||
+    extra !== undefined ||
     !/^\d+$/.test(expiry) ||
     !signature ||
     Number(expiry) <= now ||

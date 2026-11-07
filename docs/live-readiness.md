@@ -978,3 +978,19 @@ operator attestation, not independent API verification of delivery.
 - Syntactic accession validation does not verify filing existence or establish
   economic normalization. Debt, dilution/SBC, nonrecurring adjustments and separate
   semantic review remain required; no fair-value certification is inferred.
+
+- Dashboard authentication matrix (local, not deployed): a regression reproduced
+  acceptance of correctly signed session tokens with trailing empty separators.
+  Parser now requires exactly two token components. This was permissive parsing,
+  not evidence that an attacker could forge a session without the secret.
+- Production build/typecheck and two session unit tests passed. A new HTTP test
+  against the actual standalone server verifies eight invalid/expired/future/
+  wrong-secret/tampered token cases across overview, trace pagination, full event
+  and homepage paths (32 API denials plus eight redirects). A valid signed token
+  successfully reaches the homepage as a positive control. Tests used fixture
+  credentials and an intentionally unavailable localhost database; no production
+  database or account credentials were used. The new test is included in CI.
+- Logout currently deletes the client cookie; it does not revoke a copied token
+  on the server. Password rotation invalidates all signatures, but per-session
+  revocation and online authentication abuse/load handling remain open security
+  requirements. This matrix does not constitute a penetration test.
