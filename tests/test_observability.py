@@ -156,6 +156,63 @@ def test_postgres_delivery_and_duplicate_replay(sink):
         )
 
 
+@pytest.mark.skipif(
+    not os.environ.get("TEST_OBSERVABILITY_DATABASE_URL"), reason="Opt-in local Postgres test"
+)
+@pytest.mark.parametrize("stage", ["before_commit", "after_commit"])
+def test_export_process_death_preserves_batch_and_replays_once(sink, stage):
+    import signal
+    import subprocess
+    import sys
+
+    sink.dsn = os.environ["TEST_OBSERVABILITY_DATABASE_URL"]
+    with psycopg.connect(sink.dsn) as pg:
+        pg.execute(obs.SCHEMA)
+    for index in range(201):
+        obs.emit("crash.fixture", {"index": index})
+    originals = events(sink)
+    ids = [row["event_id"] for row in originals]
+    child = r"""
+import os, signal, sys
+from contextlib import contextmanager
+from trader import observability as obs
+connect = obs.psycopg.connect
+@contextmanager
+def interrupted(*args, **kwargs):
+    with connect(*args, **kwargs) as pg:
+        yield pg
+        if sys.argv[2] == 'before_commit':
+            os.kill(os.getpid(), signal.SIGKILL)
+    os.kill(os.getpid(), signal.SIGKILL)
+obs.psycopg.connect = interrupted
+obs.Sink(sys.argv[1], os.environ['TEST_OBSERVABILITY_DATABASE_URL'], start=False).flush()
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", child, str(sink.path), stage],
+        env={**os.environ, "OBSERVABILITY_DATABASE_URL": ""},
+        capture_output=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == -signal.SIGKILL
+    assert events(sink) == originals
+    with psycopg.connect(sink.dsn) as pg:
+        assert pg.execute(
+            "SELECT count(*) FROM telemetry_events WHERE event_id::text = ANY(%s)", (ids,)
+        ).fetchone()[0] == (200 if stage == "after_commit" else 0)
+    restarted = obs.Sink(sink.path, sink.dsn, start=False)
+    assert restarted.flush() == 200
+    assert restarted.flush() == 1
+    assert restarted.flush() == 0
+    assert events(sink) == []
+    with psycopg.connect(sink.dsn) as pg:
+        rows = pg.execute(
+            "SELECT event_id::text, payload FROM telemetry_events WHERE event_id::text = ANY(%s)", (ids,)
+        ).fetchall()
+    assert len(rows) == 201
+    assert dict(rows) == {row["event_id"]: row["payload"] for row in originals}
+
+
 def test_real_rejected_report_is_available(sink):
     from test_research_team import test_decimal_valuation_and_fabricated_calculation_rejected
 

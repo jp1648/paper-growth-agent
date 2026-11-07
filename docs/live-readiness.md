@@ -1062,3 +1062,16 @@ operator attestation, not independent API verification of delivery.
   whitespace checks pass. Mock transports only: no provider/model requests,
   orders or deployment changes. This does not prove provider snapshot atomicity
   or full trade-bust semantics; both remain separate readiness requirements.
+
+- Telemetry commit-boundary drills: two new opt-in tests use real disposable
+  Postgres and SIGKILL an actual exporter subprocess immediately before commit
+  and immediately after commit but before local acknowledgement. All 201 local
+  events survive either interruption. A new exporter drains batches of 200 and 1;
+  Postgres contains exactly the original 201 IDs and unchanged payloads. Before-
+  commit writes roll back; after-commit replay is deduplicated. No production
+  implementation change was needed for these tested boundaries.
+- Full suite with isolated Postgres: 617 passed, one explicit paper-order test
+  skipped. Ruff and whitespace checks pass. Temporary tmpfs Postgres container
+  removed; existing containers untouched. No production database, model or broker
+  requests. This proves the two export transaction boundaries, not prolonged
+  outage capacity, disk exhaustion, retention or full observability availability.
