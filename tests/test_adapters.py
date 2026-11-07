@@ -39,6 +39,58 @@ def test_no_redirect_to_live(keys):
         broker.account()
 
 
+@pytest.mark.parametrize(
+    "page", [{}, {"error": "unavailable"}, None, "", [None], [{}], [{"id": ""}], [{"id": 1}]]
+)
+def test_invalid_activity_page_never_becomes_empty_history(keys, page):
+    def handler(req):
+        if req.url.path.endswith("activities"):
+            return httpx.Response(200, text="null") if page is None else httpx.Response(200, json=page)
+        pytest.fail("Invalid history must stop snapshot collection")
+
+    broker = AlpacaBroker(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(ValueError, match="activity page"):
+        broker.snapshot(AT.isoformat(), [])
+
+
+def test_activity_pagination_cycle_stops_at_first_repeated_cursor(keys):
+    calls = []
+
+    def handler(req):
+        calls.append(req)
+        assert len(calls) <= 3, "Cycle must not consume the 1000-page allowance"
+        tail = "a" if len(calls) % 2 else "b"
+        return httpx.Response(200, json=[{"id": f"{tail}-{i}"} for i in range(100)])
+
+    broker = AlpacaBroker(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(RuntimeError, match="pagination"):
+        broker.snapshot(AT.isoformat(), [])
+    assert len(calls) == 3
+
+
+def test_activity_history_bound_rejects_instead_of_returning_partial_snapshot(keys):
+    calls = 0
+
+    def handler(req):
+        nonlocal calls
+        assert req.url.path.endswith("activities")
+        calls += 1
+        return httpx.Response(200, json=[{"id": f"{calls}-{i}"} for i in range(100)])
+
+    broker = AlpacaBroker(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(RuntimeError, match="bound exceeded"):
+        broker.snapshot(AT.isoformat(), [])
+    assert calls == 1000
+
+
+def test_valid_empty_activity_history_is_supported(keys):
+    def handler(req):
+        return httpx.Response(200, json={"id": "fixture"} if req.url.path.endswith("account") else [])
+
+    broker = AlpacaBroker(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    assert broker.snapshot(AT.isoformat(), []).activities == []
+
+
 def test_activity_pagination_and_lookup404(keys):
     requests = []
 

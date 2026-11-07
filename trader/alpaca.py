@@ -73,17 +73,26 @@ class AlpacaBroker:
     def snapshot(self, after, tracked_ids):
         # Read all activities since baseline, with overlap; activity IDs make replay idempotent.
         activities, token = [], None
+        cursors = set()
         for _ in range(1000):
             params = {"after": after, "direction": "asc", "page_size": 100}
             if token:
                 params["page_token"] = token
             page = self.request("GET", "/v2/account/activities", params=params)
+            if not isinstance(page, list) or any(
+                not isinstance(activity, dict)
+                or not isinstance(activity.get("id"), str)
+                or not activity["id"].strip()
+                for activity in page
+            ):
+                raise ValueError("Malformed broker activity page")
             activities.extend(page)
             if len(page) < 100:
                 break
-            if token == page[-1]["id"]:
-                raise RuntimeError("Activity pagination stalled")
             token = page[-1]["id"]
+            if token in cursors:
+                raise RuntimeError("Activity pagination stalled")
+            cursors.add(token)
         else:
             raise RuntimeError("Activity pagination bound exceeded")
         orders = self.open_orders()

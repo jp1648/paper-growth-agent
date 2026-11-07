@@ -1049,3 +1049,16 @@ operator attestation, not independent API verification of delivery.
   partial-import regression then passed with all 30 execution tests. Ruff and
   whitespace checks pass. No paid calls, broker requests, deployment or new orders.
   Full trade-bust/reopened-order provider semantics remain unsupported and blocked.
+
+- Broker activity pagination validation (local, not deployed): reproduced malformed
+  page handling, including an empty object accepted as empty history, and cyclic
+  cursors only reaching the broad page bound. The snapshot adapter now requires
+  a list of objects with nonblank string IDs and detects every repeated cursor.
+  It retains the existing 1000-page hard bound and never returns a partial snapshot
+  at that bound. Reconciliation still owns activity-content/correction validation.
+- Eleven added cases cover malformed pages/IDs, a two-cursor cycle, the full page
+  bound, and valid empty history. Existing multi-page and 404 lookup positive tests
+  pass. Full offline suite: 613 passed, three opt-in skips; Ruff lint/format and
+  whitespace checks pass. Mock transports only: no provider/model requests,
+  orders or deployment changes. This does not prove provider snapshot atomicity
+  or full trade-bust semantics; both remain separate readiness requirements.
