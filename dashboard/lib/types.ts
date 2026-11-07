@@ -40,6 +40,16 @@ export interface Snapshot {
     reconciliation: { ok: boolean } | null;
     equity: Amount;
     total_pnl: Amount;
+    economic_result?: {
+      broker_pnl_usd: Amount;
+      recorded_operating_cost_usd_estimate: Amount;
+      pnl_after_recorded_costs_usd_estimate: Amount;
+      unknown_cost_requests: number;
+      unresolved_research_runs: number;
+      complete: boolean;
+      scope: string;
+      limitations: string[];
+    };
     cash: Amount;
     model_cost_usd_estimate: Amount;
     market_data: { coverage: string };

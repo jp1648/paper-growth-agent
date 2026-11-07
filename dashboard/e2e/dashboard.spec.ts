@@ -25,6 +25,9 @@ test("private dashboard, research filtering, traces and responsive layout", asyn
   await expect(
     page.getByText(/Missing billing data does not mean zero cost/),
   ).toBeVisible();
+  await expect(
+    page.getByText(/Cost-adjusted P.L is unavailable in this snapshot/),
+  ).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.screenshot({
     path: "../state/dashboard-desktop.png",
@@ -68,6 +71,19 @@ test("accepted investigation is readable and trace filters work", async ({
   await page.getByRole("button", { name: "Enter observatory" }).click();
   await expect(page.getByRole("button", { name: /Refresh/ })).toBeVisible();
   const original = await (await page.request.get("/api/data")).json();
+  original.snapshot.portfolio.economic_result = {
+    broker_pnl_usd: "-2",
+    recorded_operating_cost_usd_estimate: "4.25",
+    pnl_after_recorded_costs_usd_estimate: "-6.25",
+    unknown_cost_requests: 2,
+    unresolved_research_runs: 1,
+    complete: false,
+    scope: "Current experiment journal only.",
+    limitations: [
+      "Broker fees are already in broker P/L.",
+      "Infrastructure costs are not fully recorded.",
+    ],
+  };
   original.snapshot.x_credits = {
     status: "available",
     checked_at: "2026-11-06T04:00:00Z",
@@ -123,6 +139,17 @@ test("accepted investigation is readable and trace filters work", async ({
     }),
   );
   await page.getByRole("button", { name: /Refresh/ }).click();
+  const economic = page.getByRole("region", { name: "Economic result" });
+  await expect(economic.getByText("-$6.2500", { exact: true })).toBeVisible();
+  await expect(
+    economic.getByText(/2 unpriced requests · 1 unresolved research runs/),
+  ).toBeVisible();
+  await expect(
+    economic.getByText(/not an all-in investment return/),
+  ).toBeVisible();
+  await expect(
+    economic.getByText(/Infrastructure costs are not fully recorded/),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "X API credits" }),
   ).toBeVisible();

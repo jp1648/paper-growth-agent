@@ -45,6 +45,52 @@ export default function Overview({
           </section>
         ))}
       </div>
+      <section className="panel" aria-label="Economic result">
+        <div className="panel-title">
+          <div>
+            <h2>P/L after recorded operating costs</h2>
+            <p>Partial estimate · not an all-in investment return</p>
+          </div>
+        </div>
+        {p.economic_result ? (
+          <>
+            <div className="metrics">
+              {[
+                ["Broker P/L", p.economic_result.broker_pnl_usd],
+                [
+                  "Recorded operating costs",
+                  p.economic_result.recorded_operating_cost_usd_estimate,
+                ],
+                [
+                  "P/L after recorded costs",
+                  p.economic_result.pnl_after_recorded_costs_usd_estimate,
+                ],
+              ].map(([title, value]) => (
+                <div className="metric" key={String(title)}>
+                  <span>{title}</span>
+                  <strong>{money(value, 4)}</strong>
+                </div>
+              ))}
+            </div>
+            <p className="notice">
+              {p.economic_result.unknown_cost_requests} unpriced requests ·{" "}
+              {p.economic_result.unresolved_research_runs} unresolved research
+              runs. These are excluded from recorded costs, not treated as free.
+            </p>
+            <p className="muted">{p.economic_result.scope}</p>
+            <ul className="muted">
+              {p.economic_result.limitations.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="muted">
+            Cost-adjusted P/L is unavailable in this snapshot. Missing costs do
+            not mean zero cost.
+          </p>
+        )}
+      </section>
       <section className="panel x-credits">
         <div className="panel-title">
           <div>

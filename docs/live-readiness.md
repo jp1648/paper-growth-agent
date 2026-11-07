@@ -830,3 +830,12 @@ operator attestation, not independent API verification of delivery.
   fee double-counting, missing costs, reservation scope and empty history. Full
   offline suite: **550 passed, 3 skipped**; Ruff and whitespace checks pass.
   Dashboard rendering, complete cost attribution and deployment remain open.
+
+- Cost-result dashboard (local, not deployed): overview now renders broker P/L,
+  recorded operating costs and P/L after those costs in one explicitly partial
+  panel. Unpriced requests, unresolved runs and missing infrastructure costs stay
+  visible. Older snapshots show unavailable rather than inventing a zero result.
+  Production build/typecheck passed; all five dashboard tests passed with isolated
+  Postgres; all four browser checks passed, including new cost-result assertions,
+  legacy snapshots and mobile layout. Disposable test database removed afterward.
+  Complete cost allocation and deployment remain open; no trading state changed.
