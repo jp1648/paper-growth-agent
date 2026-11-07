@@ -7,24 +7,27 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 
 ## Requirement-to-evidence ledger
 
-| # | Requirement | Implementation / verification state |
+| # | Requirement | Current evidence and remaining gate |
 |---|---|---|
-| 1 | Shared freshness gate for cached decisions | Local regression fix: age, future timestamps, newer news, immutable decision; filing invalidation and complete boundary matrix pending. |
-| 2 | Append-only, broker-verified corrections/busts | Local exact-before/after approval command handles fees and reduced positive fill quantities, preserving originals. Account/pause/broker checks and replay/idempotency tested. Full bust and revision-chain matrix pending. |
-| 3 | Protective exits independent of churn controls | Local regression fix for risk/thesis-invalid/catalyst-failed exits; halt/ownership and discretionary-exit negative tests. Full matrix pending. |
-| 4 | Budget-independent held-position safety | Local maintenance checks overdue/missing/future/invalid held-position reviews independent of budget; reports and health signal issues, entries blocked, protective exits retained. External alert delivery/adverse-news policy pending. |
-| 5 | Financial input provenance | Local source-bound annual CFO-minus-capex/diluted-share proxy implemented: exact original fact records, accession, units, period and transformation preserved; report must cite input source. Negative/restatement tests pass. Normalization, debt/SBC adjustments, document extraction and independent semantic review remain open. |
-| 6 | Passing independently reviewed research cohort | Pending. Historical sufficient-evidence passes 0/3 development, 0/1 holdout. No new paid runs authorized beyond existing limits. |
-| 7 | Live execution economics/account restrictions | Local spread/midpoint, executable-side displayed-size participation and per-order equity caps implemented with entry/exit and provider-unit tests. Account settlement/eligibility, adverse execution and live pilot evidence pending. |
-| 8 | Explicit isolated live release boundary | Draft release contract in live-pilot-release.md specifies account/artifact/capital approval, isolated state and credentials, settlement evidence, fencing, loss limits and supervised launch. 28 negative adapter tests pass for runtime endpoint changes, all redirect statuses and generic credential fallback. Actual live adapter/release and independent approval remain pending; runtime stays paper-only. |
-| 9 | Process-level crash consistency | Five real SIGKILL subprocess drills pass against loopback broker: prepared intent, accepted POST, saved order, accepted cancel, persisted fill. No duplicate orders; unresolved intent retains reservation. Cloud/process concurrency and disk failure drills pending. |
-| 10 | Single executor and disaster recovery | Saved cloud ledger reconciled twice against the paper broker; exact off-host generation/hash restored and integrity verified. Actual two-VM admission/transfer/restart and storage-permission-loss drill passed. Full restored-executor service failover, in-flight broker reconciliation across transfer, network partition and production enablement remain pending. |
-| 11 | Evidence/stream/provider failure matrix | Future-dated evidence cache and specialist-report reuse blocked with regressions. Clean stream closures now back off; disconnect/auth/subscription/malformed-message tests preserve maintenance, duplicate hints cannot create fills. Broader amendments, reconnect/backfill, throttling and injection matrix pending. |
-| 12 | Complete authenticated traces | Timestamp/UUID pagination and authenticated run-scoped full-event retrieval deployed. Isolated Postgres equal-timestamp tests pass; production browser/API checks loaded and rendered 557 unique events across six pages, verified full-event authentication, logout, invalid cursors and mobile layout. Broader outage/load/security scenarios remain part of requirements 11/14. |
-| 13 | Notification recovery | Local bounded 429 retries, strict response validation, audited no-resend operator resolution and reconciled correction notices tested. Actual independent health/spend email delivery verified against Cloud Monitoring incident IDs and authenticated Gmail. New code deployment and complete missing-heartbeat outage drill remain pending. |
-| 14 | CI/security/infrastructure gates | Browser/Postgres CI, pinned Python vulnerability audit, npm audit, redacted full-history secret scan and 80% combined coverage regression floor added. Local scans passed; six disabled safety guards detected by mutation tests. Broader mutations/permissions, CI remote execution and infrastructure failure drills pending. |
-| 15 | Financial accounting/performance matrix | Independent lifecycle balances pass for dividend/withholding/fees, capital flows, split/reverse split, partial/final sale and reviewed return of capital; unknown corporate actions fail closed. Broader broker cost-basis/total-return and correction matrix pending. |
-| 16 | Investment effectiveness evidence | Pending frozen unseen cohorts and forward paper observations after costs; independent review required. |
+| 1 | Shared decision freshness | Deployed: age/future checks, news/filing invalidation and final pre-send risk callback. Regressions cover stale evidence and ownership-I/O delays. Broader combined provider/time faults remain open. |
+| 2 | Broker corrections/busts | Deployed append-only exact-before/after corrections, positive quantity revisions and revision-chain tests. Full zero-quantity bust/reopened-order broker contract remains unsupported and blocked. |
+| 3 | Protective exits | Deployed exemptions from discretionary cooldown/turnover; ownership, halt, freshness and execution limits remain enforced. Broader combined-failure and actual broker behavior evidence remains open. |
+| 4 | Budget-independent position safety | Deployed overdue/missing/invalid review detection and daily/cumulative loss controls, including working-buy cancellation and fill races. Actual post-rollout health is good. Material-news policy and complete independent outage evidence remain open. |
+| 5 | Financial provenance/interpretation | Deployed source-bound annual proxy with matching periods/units and coherent filing basis. Restatement regressions and frozen financial inputs pass. Partial-amendment bridges, debt/SBC normalization and independent economic review remain open. |
+| 6 | Independently reviewed research cohort | Not achieved. Deterministic fixture validity is not accepted model research; sufficient-evidence completion and separate semantic reviews still need proof. Preserve holdouts and spending limits. |
+| 7 | Execution economics/account restrictions | Deployed spread/depth/participation/notional controls and non-marginable balance checks. Actual settlement/account eligibility, early-close baseline semantics and adverse execution evidence remain open. |
+| 8 | Isolated live release boundary | Paper-only enforcement and negative endpoint/credential tests pass. Draft live contract exists; no live adapter, account-specific release or user approval exists. |
+| 9 | Crash consistency | Seven subprocess SIGKILL boundaries, atomic adjustments, disk/flush faults and checkpoint-restore regressions pass. Deployed mandatory pre-POST local checkpoint and configured verified off-host replication. Full service/infrastructure combined-failure proof remains open. |
+| 10 | Single executor and recovery | Actual two-VM owner transfer/restart and storage IAM-loss drill passed. Saved cloud ledger reconciled against paper broker; off-host generation/hash restored. Deployed owner admission guard enabled. Full restored-service failover, in-flight requests and network partition remain open. |
+| 11 | Provider/evidence/stream failure matrix | Future evidence, bounded retrieval, stream failure/backoff and duplicate-hint tests pass. Broader reconnect/backfill, schema drift, throttling, hostile-content and combined-failure matrix remains open. |
+| 12 | Complete authenticated traces | Deployed and verified on production: 557 unique events across six pages, full-event authentication, logout, malformed cursor rejection and mobile rendering. Real Postgres equal-timestamp fixture passes. Broader outage/load scenarios remain open under 11/14. |
+| 13 | Notifications/independent alerts | Deployed bounded Telegram retries, audited uncertain-delivery resolution and correction notices. Actual health/spend emails previously verified against cloud incidents. Actual metric-publisher outage opened a missing-heartbeat incident and delivered an authenticated email; publishing recovered. Automatic incident closure and matching recovery email verified. Whole-host failure remains separate. |
+| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; 548 offline tests pass with three opt-in skips. Ten safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
+| 15 | Accounting/performance | Independent lifecycle balances cover distributions, withholding, fees, flows, splits, sales and audited return of capital. Unknown actions fail closed. Full broker cost-basis/correction cases, comparable total-return benchmarks and all operating costs remain open. |
+| 16 | Investment effectiveness | Not achieved. Predeclared unseen cohorts and forward paper observations after costs, independent review and uncertainty reporting remain required. No demonstrated investment edge. |
+
+This table summarizes the latest evidence; the chronological log below preserves
+older states and findings. Both services are deployed, but trading remains paused.
 
 ## Release gates
 
@@ -790,3 +793,25 @@ operator attestation, not independent API verification of delivery.
   retrieved into process memory for login, never printed or embedded in the image.
   Private receipts live in ignored state/dashboard-release. No trading settings,
   broker orders or model investigations changed in this dashboard rollout.
+
+- Independent missing-heartbeat drill stopped only the metric publisher at
+  2026-11-07T00:04:20Z while the paused executor continued reconciling. A separately
+  verified transient twelve-minute restoration timer protected against interrupted
+  observation. Existing five-minute absence policy and notification channel were
+  unchanged. Cloud metrics confirmed the last healthy sample at 00:03:19Z.
+- Missing-heartbeat incident opened at 00:10:31Z, about 7m12s after the last sample.
+  The actual received email linked to that exact Cloud Monitoring incident and
+  passed Gmail DKIM/SPF/DMARC checks. Only relevant alert/recovery emails were read; no
+  manual email send, modification or mark-read operation was performed. Detection was slower
+  than the configured window, consistent with additional evaluation latency; do
+  not promise five-minute delivery from this configuration.
+- Publishing was restored with a successful service invocation and a fresh healthy
+  cloud sample at 00:10:49Z. Both executor and health timer are active, pause remains
+  present, and the transient restoration timer was stopped after recovery. Private
+  receipts live under ignored state/heartbeat-drill. This is publisher-outage
+  evidence, not proof of whole-host/zone failure or every notification channel.
+- The missing-heartbeat incident closed automatically at 00:13:51Z, about three
+  minutes after the first restored sample. A matching RESOLVED email was actually
+  received and passed Gmail DKIM/SPF/DMARC checks. No manual incident closure or
+  synthetic recovery metric was used. Publisher-outage detection, notification
+  delivery, sample recovery and automatic resolution are verified for this drill.

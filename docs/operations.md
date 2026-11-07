@@ -136,3 +136,31 @@ failure leaves `rejected`. Neither is automatically resent because Telegram's
 troubleshooting missed alerts. Repeated reconciliation never resends a recorded
 fill. Telegram credentials are redacted from telemetry; raw request URLs and
 provider error bodies are never journaled.
+
+## Missing-monitor heartbeat drill
+
+Run only while trading is paused and the executor itself is healthy. Confirm
+that the existing missing-heartbeat policy is enabled and that its notification
+channel is the intended operator. Preserve the policy threshold; do not lower it
+to manufacture a passing result. Record the last actual metric timestamp and
+existing incidents before starting.
+
+Before stopping `always-on-health.timer` and its oneshot service, install and
+verify a separate transient systemd restoration timer (for example, twelve
+minutes) that starts `always-on-health.timer`. If the restoration timer cannot
+be confirmed active, do not stop publishing. Keep the executor and its internal
+maintenance running; this isolates metric-publisher failure, not whole-host loss.
+
+Observe Cloud Monitoring until its normal absence duration plus evaluation
+latency elapses. Match a newly opened missing-heartbeat incident to an actually
+received notification, recording timestamps and identity privately. A configured
+channel, an empty incident query, or a successful metric POST is not proof of
+notification delivery. Check the returned API field names when filtering.
+
+Restore the health timer and run its service once, even when the drill fails.
+Verify a fresh cloud metric and subsequent incident resolution. Remove the
+transient restoration timer only after publishing has recovered. Preserve the
+original pause, broker ledger and positions. If interrupted, inspect the actual
+systemd timer/service and incident states before doing anything else; do not
+restart the drill from a remembered status. A whole-host/zone outage still needs
+separate evidence.
