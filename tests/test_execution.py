@@ -438,3 +438,16 @@ def test_revision_preflight_does_not_partially_import_new_activities(env, decisi
     assert service.kill_path.exists()
     assert service.reservation_summary() > 0
     assert broker.submits == 1
+
+
+@pytest.mark.parametrize("quantity", ["10", "999"])
+def test_duplicate_position_rows_cannot_be_collapsed(env, decision, quantity):
+    service, broker, _ = env
+    result = service.execute(decision, "duplicate-position")
+    broker.fixture_fill(result["client_order_id"])
+    broker.positions.insert(0, {**broker.positions[0], "qty": quantity})
+    with pytest.raises(LedgerError, match="Duplicate broker position"):
+        service.reconcile()
+    assert not service.store.activities()
+    assert service.store.get("reconciliation")["ok"] is False
+    assert broker.submits == 1

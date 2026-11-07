@@ -91,6 +91,58 @@ def test_valid_empty_activity_history_is_supported(keys):
     assert broker.snapshot(AT.isoformat(), []).activities == []
 
 
+@pytest.mark.parametrize(
+    "orders",
+    [
+        {},
+        None,
+        [None],
+        [{}],
+        [{"id": "a", "client_order_id": ""}],
+        [{"id": "a", "client_order_id": "same"}, {"id": "b", "client_order_id": "same"}],
+        [{"id": "same", "client_order_id": "a"}, {"id": "same", "client_order_id": "b"}],
+    ],
+)
+def test_open_order_identity_is_not_silently_collapsed(keys, orders):
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda req: (
+                httpx.Response(200, text="null") if orders is None else httpx.Response(200, json=orders)
+            )
+        )
+    )
+    with pytest.raises(ValueError, match="order"):
+        AlpacaBroker(Settings(), client).open_orders()
+
+
+@pytest.mark.parametrize("change", ["id", "client", "status"])
+def test_tracked_lookup_cannot_replace_a_different_open_order(keys, change):
+    def handler(req):
+        if req.url.path.endswith("activities"):
+            return httpx.Response(200, json=[])
+        if req.url.path.endswith("by_client_order_id"):
+            return httpx.Response(
+                200,
+                json={
+                    "id": "other" if change == "id" else "original",
+                    "client_order_id": "other" if change == "client" else "tracked",
+                    "status": "filled",
+                },
+            )
+        if req.url.path.endswith("orders"):
+            return httpx.Response(200, json=[{"id": "original", "client_order_id": "tracked"}])
+        if change != "status":
+            pytest.fail("Conflicting identity must stop snapshot collection")
+        return httpx.Response(200, json={"id": "fixture"} if req.url.path.endswith("account") else [])
+
+    broker = AlpacaBroker(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    if change == "status":
+        assert broker.snapshot(AT.isoformat(), ["tracked"]).orders[0]["status"] == "filled"
+    else:
+        with pytest.raises(ValueError, match="order identity"):
+            broker.snapshot(AT.isoformat(), ["tracked"])
+
+
 def test_activity_pagination_and_lookup404(keys):
     requests = []
 

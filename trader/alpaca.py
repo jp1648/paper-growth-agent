@@ -41,7 +41,18 @@ class AlpacaBroker:
 
     def open_orders(self):
         orders = self.request("GET", "/v2/orders", params={"status": "open", "limit": 500})
-        if len(orders) == 500:
+        if not isinstance(orders, list) or any(
+            not isinstance(order, dict)
+            or any(
+                not isinstance(order.get(key), str) or not order[key].strip()
+                for key in ("id", "client_order_id")
+            )
+            for order in orders
+        ):
+            raise ValueError("Malformed broker open order list")
+        if any(len({order[key] for order in orders}) != len(orders) for key in ("id", "client_order_id")):
+            raise ValueError("Duplicate broker open order identity")
+        if len(orders) >= 500:
             raise RuntimeError("Open order list may be truncated")
         return orders
 
@@ -100,6 +111,10 @@ class AlpacaBroker:
         for cid in tracked_ids:
             order = self.lookup(cid)
             if order:
+                if order.get("client_order_id") != cid or (
+                    cid in by_client and by_client[cid]["id"] != order.get("id")
+                ):
+                    raise ValueError("Tracked broker order identity changed")
                 by_client[cid] = order
         positions = self.request("GET", "/v2/positions")
         return Snapshot(

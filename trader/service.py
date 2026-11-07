@@ -121,6 +121,8 @@ class Service:
                 snap = self.broker.snapshot(self.store.experiment["started_at"], sorted(set(tracked)))
                 if snap.account["id"] != self.account_id:
                     raise LedgerError("Broker account identity does not match experiment")
+                if len({p["symbol"] for p in snap.positions}) != len(snap.positions):
+                    raise LedgerError("Duplicate broker position rows require a consistent snapshot")
                 incoming = {}
                 for activity in snap.activities:
                     identifier = activity["id"]

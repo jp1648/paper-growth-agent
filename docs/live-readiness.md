@@ -22,7 +22,7 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 | 11 | Provider/evidence/stream failure matrix | Future evidence, bounded retrieval, stream failure/backoff and duplicate-hint tests pass. Broader reconnect/backfill, schema drift, throttling, hostile-content and combined-failure matrix remains open. |
 | 12 | Complete authenticated traces | Deployed and verified on production: 557 unique events across six pages, full-event authentication, logout, malformed cursor rejection and mobile rendering. Real Postgres equal-timestamp fixture passes. Broader outage/load scenarios remain open under 11/14. |
 | 13 | Notifications/independent alerts | Deployed bounded Telegram retries, audited uncertain-delivery resolution and correction notices. Actual health/spend emails previously verified against cloud incidents. Actual metric-publisher outage opened a missing-heartbeat incident and delivered an authenticated email; publishing recovered. Automatic incident closure and matching recovery email verified. Whole-host stop/restart and independent alert delivery are now verified below; replacement-host in-flight recovery remains separate. |
-| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; 548 offline tests pass with three opt-in skips. Ten safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
+| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; latest local suite has 643 passes with six opt-in skips. Sixteen safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
 | 15 | Accounting/performance | Independent lifecycle balances cover distributions, withholding, fees, flows, splits, sales and audited return of capital. Unknown actions fail closed. Full broker cost-basis/correction cases, comparable total-return benchmarks and all operating costs remain open. |
 | 16 | Investment effectiveness | Not achieved. Predeclared unseen cohorts and forward paper observations after costs, independent review and uncertainty reporting remain required. No demonstrated investment edge. |
 
@@ -1156,3 +1156,16 @@ operator attestation, not independent API verification of delivery.
   `state/dashboard-safety-9af7871/`. Normalization UI and canonical session parsing
   are now deployed; copied-token revocation, abuse controls and independent
   investment-quality/remaining readiness gates remain open.
+
+- Snapshot identity regressions reproduced silent dictionary collapse of duplicate
+  positions and conflicting open-order identities. Broker adapter now rejects
+  malformed/duplicate open-order identities and tracked lookups that substitute a
+  different broker/client identity. Reconciliation rejects duplicate position
+  symbols before importing activities. A later status for the same identity is
+  still accepted; transient snapshot rejection does not erase history or orders.
+- Twelve new cases cover malformed lists, conflicting and duplicate identities,
+  duplicate equal/different position quantities, and the valid status-update path.
+  Full offline suite: 643 passed, six opt-in skips; Ruff passed. These changes are
+  local source validation, not deployed broker evidence. No provider/model calls,
+  new orders, pause changes or ledger modifications. Production remains on the
+  previously verified safety release; live readiness remains NO-GO.
