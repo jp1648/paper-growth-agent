@@ -642,6 +642,17 @@ class ResearchDesk:
                     return {"found": False, "note": "Query absent; not proof the underlying risk is absent"}
                 start = max(0, start - 500) + offset
                 passage = text[start : start + 12000]
+                if not passage.strip():
+                    gap = {
+                        "document_id": document_id,
+                        "available": False,
+                        "reason": "empty_passage",
+                        "offset": start,
+                        "note": "No text exists at this offset; this result supplies no citable evidence.",
+                    }
+                    with self.budget.lock:
+                        self.budget.events.append(("research_evidence_gap", copy.deepcopy(gap)))
+                    return gap
                 identifier = (
                     "passage-"
                     + hashlib.sha256((metadata["url"] + str(start) + passage).encode()).hexdigest()[:20]
@@ -730,6 +741,24 @@ class ResearchDesk:
     def validate(self, schema, output):
         result = schema.model_validate(output).model_dump(mode="json")
         unknown = sorted(set(result["evidence_ids"]) - self.sources.keys())
+        empty = sorted(
+            identifier
+            for identifier in set(result["evidence_ids"]) & self.sources.keys()
+            if self.sources[identifier].get("source") == "SEC EDGAR filing passage"
+            and (
+                not isinstance(self.sources[identifier].get("content"), str)
+                or not self.sources[identifier]["content"].strip()
+            )
+        )
+        if empty:
+            with self.budget.lock:
+                self.budget.events.append(
+                    (
+                        "research_rejected_report",
+                        {"schema": schema.__name__, "empty_passage_ids": empty, "report": result},
+                    )
+                )
+            raise ValueError("Research/decision cited an empty SEC passage")
         if unknown:
             with self.budget.lock:
                 self.budget.events.append(

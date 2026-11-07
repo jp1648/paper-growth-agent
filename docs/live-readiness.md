@@ -861,3 +861,18 @@ operator attestation, not independent API verification of delivery.
   costs or a full billing reconciliation. Evidence: `state/cost-release-09c8f78/`.
   Trading remains paused; full cost attribution and the remaining release gates
   are still open.
+
+- Evidence-boundary regressions (local, not deployed): found and reproduced four
+  cases where an empty/whitespace filing or offset beyond its end generated a
+  registered citation ID. The passage tool now records an explicit evidence gap
+  without registering a source. Three further regressions proved already-saved
+  empty passages could pass report validation; shared validation now rejects and
+  retains those rejected reports without changing the original source history.
+- Five hostile-reference cases verify that instructions embedded in source text
+  cannot turn read_source/read_document into arbitrary file, metadata-service or
+  network fetches. Even an undiscovered SEC URL remains unavailable. Original
+  hostile text is retained as evidence. These tests exercise tool boundaries,
+  not real-model resistance to misleading claims or independent semantic review.
+- Full offline suite: **562 passed, 3 skipped**; Ruff and whitespace checks pass.
+  No external provider/model requests or trading-state changes. Deployment and
+  the broader adversarial/combined-failure matrix remain open.
