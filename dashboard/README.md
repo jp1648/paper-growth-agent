@@ -107,3 +107,7 @@ requests by provider, across all recorded attempts (not only the latest 30 runs)
 Known estimates exclude unpriced requests and budget reservations. X/Flovia costs
 remain unknown when the provider response does not report a charge. Cloud hosting,
 market-data subscriptions, SEC access and Telegram billing are not integrated.
+
+Database-backed sessions require `deploy/dashboard-sessions.sql` before deploying
+updated application code. Telemetry stays read-only; the dashboard role can create
+and delete its hashed session records. See the [migration procedure](../docs/google-cloud.md#dashboard-session-migration).

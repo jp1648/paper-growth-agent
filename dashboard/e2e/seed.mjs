@@ -1,5 +1,6 @@
 // Only the disposable browser-test database may receive these synthetic records.
 import { Client } from "pg";
+import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 const url = new URL(process.env.TEST_OBSERVABILITY_DATABASE_URL || "");
 if (
@@ -13,6 +14,18 @@ await db.connect();
 try {
   await db.query(
     "CREATE TABLE IF NOT EXISTS telemetry_events(event_id uuid primary key,at timestamptz,run_key text,name text,phase text,span_id text,parent_span_id text,payload jsonb)",
+  );
+  await db.query(
+    "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='trader_dashboard') THEN CREATE ROLE trader_dashboard NOLOGIN; END IF; IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='dashboard_reader') THEN CREATE ROLE dashboard_reader NOLOGIN; END IF; END $$",
+  );
+  await db.query(
+    "GRANT USAGE ON SCHEMA public TO trader_dashboard, dashboard_reader; GRANT SELECT ON public.telemetry_events TO trader_dashboard, dashboard_reader",
+  );
+  await db.query(
+    await readFile(
+      new URL("../../deploy/dashboard-sessions.sql", import.meta.url),
+      "utf8",
+    ),
   );
   const snapshot = {
     generated_at: new Date().toISOString(),

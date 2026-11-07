@@ -1169,3 +1169,27 @@ operator attestation, not independent API verification of delivery.
   local source validation, not deployed broker evidence. No provider/model calls,
   new orders, pause changes or ledger modifications. Production remains on the
   previously verified safety release; live readiness remains NO-GO.
+
+- Dashboard logout revocation: browser regression against the prior built app
+  reproduced a copied cookie returning HTTP 200 after logout (expected 401).
+  Implemented randomized signed identities plus a Postgres session allowlist;
+  only token hashes and expiries are stored. Logout deletes the record before
+  success, and every authenticated request rechecks it across instances. Expired
+  records are removed on login; password rotation still invalidates signatures.
+- Separate session-table grants preserve telemetry SELECT-only access. Both local
+  and Cloud SQL setup paths include the migration; existing deployments need the
+  documented owner-applied migration before application rollout. No fallback to
+  stateless validation on database failure. Previously authorized in-flight reads
+  are not recalled. Login-abuse controls remain open.
+- Verification: seven Node tests passed with actual Postgres (no skips), eight
+  browser/integration tests passed, production build and typecheck passed, Python
+  deploy-script lint/format and whitespace passed. Tests cover copied-token denial,
+  independent simultaneous logins, cross-connection revocation, expiry/cleanup,
+  unregistered signed-token denial, rotated secrets, database-error propagation,
+  and telemetry write denial for both deployment roles in read-write transactions.
+- Initial browser setup used a wrong logout locator; corrected it before obtaining
+  the meaningful 200-versus-401 regression. One later full suite exposed duplicate
+  test seeding, not application trace loss; recreated only disposable test tables
+  and reran all eight successfully. Disposable Postgres container removed afterward.
+  No production migration/deployment, broker calls or paid investigations in this
+  batch. Production remains on the previous dashboard until staged verification.

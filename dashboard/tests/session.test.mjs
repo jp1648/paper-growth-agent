@@ -32,3 +32,11 @@ test("sessions require canonical signed tokens", () => {
     assert.equal(validSession(malformed, secret, issued + 1), false, malformed);
   }
 });
+
+test("simultaneous logins have independent session identities", () => {
+  const first = signSession(secret, 1000);
+  const second = signSession(secret, 1000);
+  assert.notEqual(first, second);
+  assert.equal(validSession(first, secret, 1001), true);
+  assert.equal(validSession(second, secret, 1001), true);
+});

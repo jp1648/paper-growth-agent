@@ -15,7 +15,7 @@ function xCredits() {
   return creditCheck.result;
 }
 const globalDB = globalThis as unknown as { dashboardPool?: Pool };
-function pool() {
+export function pool() {
   if (!process.env.DATABASE_URL) throw new Error("Database not configured");
   return (globalDB.dashboardPool ??= new Pool({
     connectionString: process.env.DATABASE_URL,
