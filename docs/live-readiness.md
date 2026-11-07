@@ -1137,3 +1137,22 @@ operator attestation, not independent API verification of delivery.
   Private receipts: `state/safety-release-9af7871/`. Full normalization semantics,
   broker bust recovery, independent investment review and other open gates remain
   NO-GO for real money.
+
+- Dashboard safety release deployed from CI-verified `9af7871`. Cloud Build
+  `8de8cf81-6882-4e67-9a97-6f7f5fb60b05` used 29 allowlisted tracked files,
+  excluding local secrets/state, and produced image digest
+  `f5f35b82358555e2015967782ddbb362e6926267158dc142cf5b995f3483701f`.
+  Cloud Run revision `trader-dashboard-00010-way` was staged at zero traffic;
+  environment hash and service account were unchanged.
+- Actual browser checks passed on staged then production URL: anonymous denial,
+  password login, no-store data, malformed correctly-signed token suffix denial,
+  logout denial, partial-cost arithmetic, selected investigation accounting-review
+  disclosure and no horizontal mobile overflow. Rendered mobile screenshot was
+  inspected. An initial verifier timeout came from not selecting an investigation;
+  fixed verifier navigation, reran successfully before promotion.
+- Revision promoted to 100% production traffic; prior revision retained. Final
+  verification `2026-11-07T01:32:50Z` shows paused trading and successful broker
+  reconciliation. No trading configuration/history changed. Private receipts:
+  `state/dashboard-safety-9af7871/`. Normalization UI and canonical session parsing
+  are now deployed; copied-token revocation, abuse controls and independent
+  investment-quality/remaining readiness gates remain open.
