@@ -23,7 +23,7 @@ from pydantic import Field
 
 from .alpaca import safe_error
 from .evidence import EvidenceTooLarge
-from .financials import annual_cash_flow
+from .financials import annual_cash_flow, normalization_supported
 from .models import Decision, Model, dec, dt, dumps, now
 from .observability import emit, traced
 from .spending import DailyReservation
@@ -42,7 +42,17 @@ class Research(Model):
     missing_information: list[str]
 
 
+class NormalizationReview(Model):
+    cash_flow_basis: str = Field(min_length=1)
+    debt_and_cash: str = Field(min_length=1)
+    dilution_and_sbc: str = Field(min_length=1)
+    nonrecurring_items: str = Field(min_length=1)
+    unresolved_material_gaps: bool
+    evidence_ids: list[str] = Field(min_length=1)
+
+
 class Valuation(Model):
+    normalization_review: NormalizationReview | None = None
     calculation_id: str | None
     bear_value: str | None
     base_value: str | None
@@ -119,7 +129,7 @@ ROLES = {
             "structured facts: matched annual USD operating cash flow, USD capex and diluted weighted-average shares "
             "from one coherent filing accession/date/form. Do not mix amended and older facts. "
             "cash_flow_per_share must equal (CFO-capex)/shares rounded to six decimals. The historical proxy "
-            "does not establish normalized earnings; discuss debt, dilution, SBC and nonrecurring items. Return its calculation_id and exact bear/base/bull values. "
+            "does not establish normalized earnings. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Flag unresolved_material_gaps if material adjustments are unavailable; never invent adjustments or treat the historical proxy as normalized cash. A missing or unresolved normalization review blocks BUY/ADD. Return its calculation_id and exact bear/base/bull values. "
             "Explain sensitivity and expectations embedded in today's price. If this simplified "
             "cash-flow model is inappropriate or inputs are insufficient, return null for calculation_id "
             "and all three values and explain the limitation in method. Never manufacture value."
@@ -773,6 +783,9 @@ class ResearchDesk:
                 )
             raise UnknownEvidence("Research/decision cited unknown evidence")
         if schema is Valuation:
+            review = result.get("normalization_review")
+            if review and not set(review["evidence_ids"]).issubset(result["evidence_ids"]):
+                raise ValueError("Normalization review must cite valuation evidence")
             if result["calculation_id"] is None:
                 if any(result[k] is not None for k in ("bear_value", "base_value", "bull_value")):
                     raise ValueError("Unsupported valuation must leave all values unknown")
@@ -1040,13 +1053,14 @@ class ResearchDesk:
         gap = (
             self.reports["adversarial"]["unresolved_material_gaps"]
             or self.reports["valuation"]["calculation_id"] is None
+            or not normalization_supported(self.reports["valuation"])
         )
         if gap and decision["action"] in {"BUY", "ADD"}:
             self.budget.events.append(
                 (
                     "research_veto",
                     {
-                        "reason": "Material evidence gap or no supported calculated valuation",
+                        "reason": "Material evidence gap, missing normalization review or no supported calculated valuation",
                         "action": decision["action"],
                     },
                 )

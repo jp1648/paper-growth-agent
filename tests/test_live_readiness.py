@@ -376,3 +376,26 @@ def test_later_news_page_failure_blocks_execution(env, decision, monkeypatch):
     assert len(pages) == 2
     assert broker.submits == 0
     assert service.store.get(service.client_order_id("news-outage"), "intent") is None
+
+
+@pytest.mark.parametrize("fault", ["missing", "gap", "blank", "uncited"])
+def test_cached_buy_requires_normalization_review(env, decision, fault):
+    service, broker, _ = env
+    build_graph(service, FixtureTeam(decision)).invoke(
+        {"symbol": "ACME", "run_key": "normalization", "research_only": True}
+    )
+    saved = service.store.get("normalization", "research_result")
+    review = saved["valuation"]["normalization_review"]
+    if fault == "missing":
+        saved["valuation"].pop("normalization_review")
+    elif fault == "gap":
+        review["unresolved_material_gaps"] = True
+    elif fault == "blank":
+        review["debt_and_cash"] = " "
+    else:
+        review["evidence_ids"] = ["unknown"]
+    service.store.put("normalization", saved, "research_result")
+    result = service.execute(decision, "normalization")
+    assert result["status"] == "rejected"
+    assert "Valuation normalization review is missing or unresolved" in result["reasons"]
+    assert broker.submits == 0

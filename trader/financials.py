@@ -64,3 +64,20 @@ def annual_cash_flow(source, period_end, cutoff):
             "Debt changes, dilution, stock compensation and nonrecurring items require independent review.",
         ],
     }
+
+
+def normalization_supported(valuation):
+    review = valuation.get("normalization_review")
+    if not isinstance(review, dict) or review.get("unresolved_material_gaps") is not False:
+        return False
+    if any(
+        not isinstance(review.get(key), str) or not review[key].strip()
+        for key in ("cash_flow_basis", "debt_and_cash", "dilution_and_sbc", "nonrecurring_items")
+    ):
+        return False
+    refs = review.get("evidence_ids")
+    return (
+        isinstance(refs, list)
+        and bool(refs)
+        and all(isinstance(ref, str) and ref in valuation.get("evidence_ids", []) for ref in refs)
+    )

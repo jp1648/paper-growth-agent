@@ -10,6 +10,7 @@ from .accounting import LedgerError, replay, reserved
 from .alpaca import safe_error
 from .evidence import EvidenceProvider
 from .executor_owner import ExecutionFenceError
+from .financials import normalization_supported
 from .models import TERMINAL, ZERO, Decision, SubmissionPreflightError, dec, dt, dumps, news_time, now
 from .observability import traced
 from .risk import check, daily_loss
@@ -364,6 +365,10 @@ class Service:
             filing_check = None
             research = self.store.get(intent_key, "research_result")
             if research:
+                if decision.action in {"BUY", "ADD"} and not normalization_supported(
+                    research.get("valuation", {})
+                ):
+                    research_reasons.append("Valuation normalization review is missing or unresolved")
                 if research["decision"] != decision.model_dump(mode="json"):
                     research_reasons.append("Decision does not match immutable research")
                 completed = dt(research["research_completed_at"])

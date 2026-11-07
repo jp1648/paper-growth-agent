@@ -61,7 +61,7 @@ to pass the cohort; separately test bounded document access or honest abstention
 
 ## Separate semantic reviews
 
-The current scoring contract is `financial-provenance-v3`. A candidate's embedded
+The current scoring contract is `financial-provenance-v5`. A candidate's embedded
 `human_review` is rejected; a model output cannot approve itself. A reviewer must
 supply a separate JSON file to `paper-agent evaluate --reviews reviews.json`
 alongside the existing `--suite`, `--responses`, `--output` and `--run-id` options.

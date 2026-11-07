@@ -224,6 +224,14 @@ class TeamModel(BaseChatModel):
                             "assumptions": ["Fixture inputs"],
                             "sensitivity": "Growth",
                             "margin_of_safety": "Conditional",
+                            "normalization_review": {
+                                "cash_flow_basis": "Synthetic fixture proxy; not real company evidence",
+                                "debt_and_cash": "Fixture assumes no debt or excess cash",
+                                "dilution_and_sbc": "Fixture assumes stable diluted shares and no SBC",
+                                "nonrecurring_items": "Fixture assumes none",
+                                "unresolved_material_gaps": False,
+                                "evidence_ids": refs[:1],
+                            },
                             "evidence_ids": refs[:1],
                         }
                     )
@@ -1372,5 +1380,25 @@ def test_saved_empty_passage_cannot_support_a_report(content):
     kind, rejected = desk.budget.events[-1]
     assert kind == "research_rejected_report"
     assert rejected["empty_passage_ids"] == ["empty-saved"]
-    assert rejected["report"] == report
+    assert rejected["report"] == Valuation.model_validate(report).model_dump(mode="json")
     assert desk.sources["empty-saved"]["content"] == content
+
+
+@pytest.mark.parametrize("missing", [True, False])
+def test_final_lead_cannot_override_normalization_gap(env, decision, monkeypatch, missing):
+    original = ResearchDesk.result
+
+    def result(desk, output):
+        if missing:
+            desk.reports["valuation"].pop("normalization_review", None)
+        else:
+            desk.reports["valuation"]["normalization_review"]["unresolved_material_gaps"] = True
+        return original(desk, output)
+
+    monkeypatch.setattr(ResearchDesk, "result", result)
+    service, broker, _ = env
+    worker, _ = team(env, decision)
+    result = build_graph(service, worker).invoke({"symbol": "ACME", "run_key": "normalization-veto"})
+    assert result["decision"]["action"] == "WATCH"
+    assert result["execution"]["status"] == "no_order"
+    assert broker.submits == 0

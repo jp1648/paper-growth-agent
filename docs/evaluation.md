@@ -263,3 +263,25 @@ predecessor record and require a newly declared candidate window. Safety inciden
 stop the study and remain reported; they are not excluded as warm-up. A completed
 observation window is only input to independent review and the separate live
 pilot contract; it never automatically activates real-money trading.
+
+### Financial normalization review gate (scoring contract v5)
+
+Valuation reports now carry an explicit optional `normalization_review`: cash-flow
+basis and discount consistency, debt/cash treatment, dilution/SBC, nonrecurring
+items, original evidence IDs and an unresolved-material-gap flag. Missing legacy
+reviews remain missing; history is not backfilled with invented approvals.
+
+BUY/ADD require a present review with nonblank explanations, no declared material
+gaps and references included in the valuation's original evidence citations.
+The gate applies to final synthesis, frozen evaluation scoring and cached research
+execution. HOLD/WATCH remain possible without a supported valuation. A deterministic
+CFO-minus-capex calculation alone no longer satisfies this gate. Models must leave
+material adjustments unresolved when the underlying evidence is unavailable.
+
+This is a structured model judgment, not independent acceptance or a new normalized
+cash-flow formula. The independent reviewer must verify the specific accounting
+claims and method choice against cited passages; a model setting the gap flag to
+false is not proof of economic correctness. Synthetic test reports explicitly
+state their assumptions and cannot serve as real-company normalization evidence.
+Original frozen recordings remain unchanged. New results use
+`financial-provenance-v5`; comparisons against older scoring contracts are rejected.

@@ -1004,3 +1004,19 @@ operator attestation, not independent API verification of delivery.
   paid research performed, orders submitted, portfolio reset or pause cleared.
   Total-return/cost and numerical analysis implementation, independent review and
   prospective observations remain open; no investment edge is claimed.
+
+- Normalization gate (local, not deployed): final acceptance previously required
+  calculated valuation plus critic approval but no explicit accounting review.
+  Added source-cited structured review of cash-flow basis, debt/cash, dilution/SBC
+  and nonrecurring items. Missing, blank, uncited or declared unresolved reviews
+  block BUY/ADD in final synthesis and cached execution. Evaluator applies the same
+  predicate under financial-provenance-v5; old recordings/history are unchanged.
+- Regression evidence covers cached legacy/missing reviews, material gaps, blank
+  treatment, unknown citations, a lead attempting to override missing/gapped
+  review, and evaluator parity with original recordings preserved. Synthetic
+  positive controls provide explicit fixture assumptions. Independent semantic
+  review and source-bound normalized adjustments remain open: this is not a model
+  self-certification of fair value. No paid runs, orders or deployment changes.
+- Full offline verification for normalization gate: **597 passed, 3 skipped**;
+  lint, format and whitespace checks pass. The three opt-ins remain external
+  database/paper-order integrations, not silently claimed as exercised here.

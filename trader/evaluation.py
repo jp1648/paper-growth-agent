@@ -10,12 +10,12 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .financials import annual_cash_flow
+from .financials import annual_cash_flow, normalization_supported
 from .models import Decision
 from .research_team import Catalysts, Critique, Research, Valuation
 
 SCHEMAS = {"business": Research, "catalysts": Catalysts, "valuation": Valuation, "adversarial": Critique}
-SCORING_CONTRACT = "financial-provenance-v4"
+SCORING_CONTRACT = "financial-provenance-v5"
 
 
 def fingerprint(value):
@@ -181,8 +181,13 @@ def score(case, candidate, review=None):
                     failures.append("unverified_financial_provenance")
             except (KeyError, TypeError, ValueError, ArithmeticError):
                 failures.append("unverified_financial_provenance")
+        normalization = valuation.get("normalization_review")
+        if normalization and not set(normalization["evidence_ids"]).issubset(valuation["evidence_ids"]):
+            failures.append("unverified_normalization_evidence")
         if decision["action"] in {"BUY", "ADD"} and (
-            reports["adversarial"]["unresolved_material_gaps"] or valuation["calculation_id"] is None
+            reports["adversarial"]["unresolved_material_gaps"]
+            or valuation["calculation_id"] is None
+            or not normalization_supported(valuation)
         ):
             failures.append("unsupported_buy")
     expected = case["expected"]

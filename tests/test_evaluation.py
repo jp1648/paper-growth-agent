@@ -550,3 +550,26 @@ def test_separate_review_replay_binds_all_evidence(tmp_path, change):
         assert row["acceptance"] == "passed"
         assert result["reviews_hash"] == fingerprint(reviews)
         assert result["summary"]["pending_semantic_reviews"] == len(suite["cases"]) - 1
+
+
+def test_evaluation_requires_normalization_for_buy_without_rewriting_old_recording():
+    suite, recording = inputs()
+    case = suite["cases"][0]
+    candidate = copy.deepcopy(recording["cases"][case["id"]])
+    candidate["decision"].update(action="BUY", quantity="1", limit_price="40")
+    candidate["reports"]["adversarial"]["unresolved_material_gaps"] = False
+    valuation = candidate["reports"]["valuation"]
+    assert "unsupported_buy" in score(case, candidate)["failures"]
+    valuation["normalization_review"] = {
+        "cash_flow_basis": "Synthetic fixture proxy only",
+        "debt_and_cash": "Fixture assumes none",
+        "dilution_and_sbc": "Fixture assumes none",
+        "nonrecurring_items": "Fixture assumes none",
+        "unresolved_material_gaps": False,
+        "evidence_ids": valuation["evidence_ids"],
+    }
+    assert "unsupported_buy" not in score(case, candidate)["failures"]
+    valuation["normalization_review"]["evidence_ids"] = ["unknown"]
+    failures = score(case, candidate)["failures"]
+    assert "unsupported_buy" in failures and "unverified_normalization_evidence" in failures
+    assert "normalization_review" not in recording["cases"][case["id"]]["reports"]["valuation"]

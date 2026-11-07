@@ -30,7 +30,20 @@ class FixtureTeam:
         ref = {"evidence_ids": ["fixture-sec-1"]}
         reports = {
             "business": {**ref, "business_quality": "Fixture quality"},
-            "valuation": {**ref, "bear_value": "70", "base_value": "140", "bull_value": "170"},
+            "valuation": {
+                **ref,
+                "bear_value": "70",
+                "base_value": "140",
+                "bull_value": "170",
+                "normalization_review": {
+                    "cash_flow_basis": "Synthetic fixture proxy",
+                    "debt_and_cash": "Fixture assumes none",
+                    "dilution_and_sbc": "Fixture assumes none",
+                    "nonrecurring_items": "Fixture assumes none",
+                    "unresolved_material_gaps": False,
+                    "evidence_ids": ref["evidence_ids"],
+                },
+            },
             "catalysts": {**ref, "why_now": "Fixture catalyst"},
             "adversarial": {**ref, "unresolved_material_gaps": self.gaps},
         }
