@@ -22,7 +22,7 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 | 11 | Provider/evidence/stream failure matrix | Future evidence, bounded retrieval, stream failure/backoff and duplicate-hint tests pass. Broader reconnect/backfill, schema drift, throttling, hostile-content and combined-failure matrix remains open. |
 | 12 | Complete authenticated traces | Deployed and verified on production: 557 unique events across six pages, full-event authentication, logout, malformed cursor rejection and mobile rendering. Real Postgres equal-timestamp fixture passes. Broader outage/load scenarios remain open under 11/14. |
 | 13 | Notifications/independent alerts | Deployed bounded Telegram retries, audited uncertain-delivery resolution and correction notices. Actual health/spend emails previously verified against cloud incidents. Actual metric-publisher outage opened a missing-heartbeat incident and delivered an authenticated email; publishing recovered. Automatic incident closure and matching recovery email verified. Whole-host stop/restart and independent alert delivery are now verified below; replacement-host in-flight recovery remains separate. |
-| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; latest local suite has 643 passes with six opt-in skips. Sixteen safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
+| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; latest local suite has 646 passes with six opt-in skips. Sixteen safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
 | 15 | Accounting/performance | Independent lifecycle balances cover distributions, withholding, fees, flows, splits, sales and audited return of capital. Unknown actions fail closed. Full broker cost-basis/correction cases, comparable total-return benchmarks and all operating costs remain open. |
 | 16 | Investment effectiveness | Not achieved. Predeclared unseen cohorts and forward paper observations after costs, independent review and uncertainty reporting remain required. No demonstrated investment edge. |
 
@@ -1265,3 +1265,28 @@ operator attestation, not independent API verification of delivery.
   Workspace-wide denial-of-login and sustained hostile-load/edge protection limits
   remain explicit; no claim of comprehensive DoS resistance. No model calls or
   broker orders. Remaining sixteen-item gates keep real-money readiness NO-GO.
+
+- November 7 research preflight: authoritative executor paused/reconciled, no new
+  day model records, configured daily/per-run caps $6/$5, expected Sol/Astra/Terra
+  standard rates match current official pricing. Frozen Apple annual proxy
+  independently recomputed to 6.582405 per diluted share; incomplete variant
+  correctly rejects missing capex. Microsoft holdouts were not run or tuned on.
+- Planned `annual-dev-20261107-1` with a $4.50 cohort cap was NOT started. A deeper
+  check found November 5 unrestricted usage remains unknown, alongside a capped
+  unknown evaluation. The $55.540397 recorded/reserved since the grant is therefore
+  not an upper bound or a proven remaining balance. No new reservation or model
+  call was made. Read-only billing navigation requires user login; requested that
+  access without changing billing, purchasing credits or editing old records.
+- This exposed a rollover defect: spending_status counted uncapped unknown runs
+  only on the current day. New regressions failed for both pending and finished-
+  unknown prior-day runs, and for the runner's skip path. The guard now counts
+  unresolved unrestricted runs across the shared ledger, surviving day changes,
+  restart and experiment changes. Normal reservations fail with an explicit
+  provider-charge reconciliation reason; runner maintenance/reconciliation still
+  proceeds and skips fresh research. Existing capped-reservation rollover behavior
+  is unchanged; real settlement restores normal admission in the regression.
+- Full offline suite 646 passed, six opt-in skips; Ruff/format and whitespace pass.
+  This fix is committed source work, not yet deployed. Production history,
+  reservations, paper position and pause were preserved. Private preflight plan is
+  marked not_started_credit_uncertain to prevent treating its arithmetic as credit
+  confirmation. Live readiness remains NO-GO; offline work can continue.

@@ -209,12 +209,14 @@ class Runner:
                 )
                 run_key = thesis["run_key"] if pending else key
                 cached = self.store.get(run_key, "research_result")
-                if (
-                    not cached
-                    and spending_status(self.store, self.cfg.research_daily_cost_usd)["remaining_usd"] <= 0
-                ):
-                    outcomes.append({"symbol": symbol, "status": "daily model budget exhausted"})
-                    continue
+                if not cached:
+                    spending = spending_status(self.store, self.cfg.research_daily_cost_usd)
+                    if spending["unbounded_unknown_runs"]:
+                        outcomes.append({"symbol": symbol, "status": "unbounded model usage unresolved"})
+                        continue
+                    if spending["remaining_usd"] <= 0:
+                        outcomes.append({"symbol": symbol, "status": "daily model budget exhausted"})
+                        continue
                 if (
                     job
                     and job["status"] == "failed"

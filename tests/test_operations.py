@@ -162,3 +162,43 @@ def test_process_timeout_terminates_child(env, monkeypatch):
         assert service.store.events("error")
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("finish_unknown", [False, True])
+def test_uncapped_unknown_cost_survives_day_rollover_and_restart(env, monkeypatch, finish_unknown):
+    service, _, _ = env
+    reservation = DailyReservation(service.store, service.cfg, "uncapped", unrestricted_research=True)
+    if finish_unknown:
+        reservation.finish(dec("1.25"), unknown=True)
+    monkeypatch.setattr("trader.spending.now", lambda: AT + timedelta(days=2))
+    reopened = Store(service.cfg.database)
+    try:
+        reopened.experiment = {"id": "different-experiment"}
+        status = spending_status(reopened, dec(6))
+        assert status["charged_or_reserved_usd"] == 0
+        assert status["unbounded_unknown_runs"] == 1
+        with pytest.raises(DailyBudgetExceeded):
+            DailyReservation(reopened, service.cfg, "cannot-hide-liability")
+        # Simulate receiving final provider usage, not deleting the original reservation.
+        reservation.finish(dec("1.50"), unknown=False)
+        assert spending_status(reopened, dec(6))["unbounded_unknown_runs"] == 0
+        assert DailyReservation(reopened, service.cfg, "after-settlement").allowance == 5
+        assert reopened.get(reservation.key, "research_spend", scope="global")["usd"] == "1.50"
+    finally:
+        reopened.db.close()
+
+
+def test_uncapped_liability_blocks_new_research_but_not_reconciliation(env, decision, monkeypatch):
+    service, broker, _ = env
+    cid = service.execute(decision, "entry")["client_order_id"]
+    broker.fixture_fill(cid)
+    monkeypatch.setattr("trader.spending.now", lambda: AT - timedelta(days=1))
+    pending = DailyReservation(service.store, service.cfg, "unknown-old", unrestricted_research=True)
+    pending.finish(dec(".1"), unknown=True)
+    original = service.store.get(pending.key, "research_spend", scope="global")
+    monkeypatch.setattr("trader.spending.now", lambda: AT)
+    result = Runner(service, None).tick()
+    assert service.store.get("snapshot")["positions"][0]["qty"] == "10"
+    assert all(item["status"] == "unbounded model usage unresolved" for item in result["outcomes"])
+    assert result["outcomes"]
+    assert service.store.get(pending.key, "research_spend", scope="global") == original

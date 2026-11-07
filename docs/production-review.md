@@ -1,5 +1,9 @@
 # Code review and release checks
 
+This file preserves the original review baseline. Current release evidence and
+remaining gates are maintained in [live-readiness.md](live-readiness.md); the
+counts below are historical, not the current suite or deployment status.
+
 Review scope: Python research/execution/accounting, provider adapters, durable
 telemetry, Next.js dashboard, deployment scripts and public release hygiene.
 Private operational journals are intentionally excluded from the public repository.
@@ -33,9 +37,11 @@ no known Python or npm vulnerabilities at review time.
 
 ## Remaining limits
 
-This review does not certify every possible bug absent. Real research acceptance
-and a confirmed broker paper fill remain separate external gates. Telemetry can
+This review does not certify every possible bug absent. Independent investment-quality acceptance and broader broker failure/recovery
+checks remain separate gates. The recorded one-share paper fill establishes only
+that bounded smoke test, not live readiness. Telemetry can
 contain sensitive source/account data despite credential redaction: keep databases
 and dashboards private. The single-workspace dashboard password is not multi-user
-IAM; stronger access control and login rate limiting belong at the hosting edge
-before wider use. See [always-on requirements](always-on.md).
+IAM; database session revocation and shared login throttling are now deployed, while
+stronger identity-aware access and edge abuse protection remain necessary before
+wider use. See [always-on requirements](always-on.md).
