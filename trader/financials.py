@@ -1,5 +1,6 @@
 """A narrow, source-bound annual cash-flow proxy; not an assertion of fair value."""
 
+import re
 from datetime import date
 
 from .models import dec, dt
@@ -31,7 +32,9 @@ def annual_cash_flow(source, period_end, cutoff):
                 continue
             duration = (end - date.fromisoformat(record["start"])).days
             if 350 <= duration <= 380 and record.get("form") in {"10-K", "10-K/A", "20-F", "20-F/A"}:
-                if not record.get("accn"):
+                if not isinstance(record.get("accn"), str) or not re.fullmatch(
+                    r"[0-9]{10}-[0-9]{2}-[0-9]{6}", record["accn"]
+                ):
                     raise ValueError("Financial fact lacks original accession")
                 eligible.append(record)
         if not eligible:

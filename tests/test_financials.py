@@ -76,13 +76,13 @@ def test_latest_restated_fact_selected_without_summing_duplicate_periods():
                 **records[0],
                 "val": 700 if tag == CFO else records[0]["val"],
                 "filed": "2026-06-01",
-                "accn": "amended",
+                "accn": "0000000001-26-000002",
                 "form": "10-K/A",
             }
         )
     result = annual_cash_flow(source, "2025-12-31", CUTOFF)
     assert result["cash_flow_per_share"] == "6.000000"
-    assert result["facts"][CFO]["accn"] == "amended"
+    assert result["facts"][CFO]["accn"] == "0000000001-26-000002"
 
 
 def test_model_cannot_override_evidenced_cash_flow():
@@ -168,10 +168,10 @@ def test_mixed_filing_basis_requires_review(fault):
     record = source["content"]["facts"][CFO]["USD"][0]
     if fault == "partial_restatement":
         source["content"]["facts"][CFO]["USD"].append(
-            {**record, "val": 700, "filed": "2026-06-01", "accn": "amended", "form": "10-K/A"}
+            {**record, "val": 700, "filed": "2026-06-01", "accn": "0000000001-26-000002", "form": "10-K/A"}
         )
     elif fault == "different_accession":
-        record["accn"] = "different"
+        record["accn"] = "0000000001-26-000003"
     else:
         record["filed"] = "2026-01-02"
     with pytest.raises(ValueError, match="filing basis"):
@@ -190,7 +190,9 @@ def test_partial_restatement_cannot_create_calculation():
         evaluation_at=CUTOFF.isoformat(),
     )
     records = desk.sources["fixture-sec"]["content"]["facts"][CFO]["USD"]
-    records.append({**records[0], "val": 700, "filed": "2026-06-01", "accn": "amended", "form": "10-K/A"})
+    records.append(
+        {**records[0], "val": 700, "filed": "2026-06-01", "accn": "0000000001-26-000002", "form": "10-K/A"}
+    )
     tool = next(t for t in desk.tools() if t.name == "value_scenarios")
     with pytest.raises(ValueError, match="filing basis"):
         tool.invoke(
@@ -205,3 +207,14 @@ def test_partial_restatement_cannot_create_calculation():
             }
         )
     assert not desk.calculations
+
+
+@pytest.mark.parametrize(
+    "accession", ["amended", "0000000001-26-000001-extra", " 0000000001-26-000001", 123, True]
+)
+def test_all_matching_facts_still_require_valid_accession(accession):
+    source = {"id": "original", "content": {"facts": financial_facts()}}
+    for units in source["content"]["facts"].values():
+        next(iter(units.values()))[0]["accn"] = accession
+    with pytest.raises(ValueError, match="accession"):
+        annual_cash_flow(source, "2025-12-31", CUTOFF)

@@ -966,3 +966,15 @@ operator attestation, not independent API verification of delivery.
   it does not close the outstanding vendor-coverage, independent semantic-review,
   replacement-host in-flight recovery or real-money approval gates. No research
   investigation or order test was launched during the rollout. Trading is paused.
+
+- Financial accession validation (local, not deployed): five negative tests
+  demonstrated that arbitrary strings, integers and booleans could be treated as
+  an original filing accession when all selected facts matched. Shared annual
+  derivation now requires the exact ASCII-digit accession format before selecting
+  a fact. Both research calculations and evaluation replay use this validation.
+  Amendment tests now use well-formed distinct accessions while preserving their
+  partial/mixed-basis rejection checks. Full offline suite: **590 passed, 3 skipped**;
+  lint and whitespace pass. No model/provider requests or trading changes.
+- Syntactic accession validation does not verify filing existence or establish
+  economic normalization. Debt, dilution/SBC, nonrecurring adjustments and separate
+  semantic review remain required; no fair-value certification is inferred.
