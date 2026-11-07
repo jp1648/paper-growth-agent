@@ -216,7 +216,7 @@ class EvidenceProvider:
             "symbol": symbol,
             "fetched_at": started_at.isoformat(),
             "sources": sources,
-            "news_coverage": "Up to 50 recent vendor articles; absence is not proof of no material news",
+            "news_coverage": "Paginated vendor news within the requested window; absence is not proof of no material news",
         }
         return bundle
 

@@ -181,10 +181,32 @@ class AlpacaData:
         )
 
     def news(self, symbol, since):
-        return self.get(
-            "/v1beta1/news",
-            {"symbols": symbol, "start": since, "limit": 50, "sort": "desc", "include_content": "true"},
-        ).get("news", [])
+        result, seen = [], set()
+        params = {
+            "symbols": symbol,
+            "start": since,
+            "end": now().isoformat(),
+            "limit": 50,
+            "sort": "desc",
+            "include_content": "true",
+        }
+        for _ in range(100):
+            page = self.get("/v1beta1/news", params)
+            if not isinstance(page, dict) or not isinstance(page.get("news"), list):
+                raise TypeError("Malformed news page")
+            if any(not isinstance(article, dict) for article in page["news"]):
+                raise ValueError("Malformed news article")
+            result.extend(page["news"])
+            token = page.get("next_page_token")
+            if token is None or token == "":
+                return result
+            if not isinstance(token, str):
+                raise TypeError("Malformed news pagination token")
+            if token in seen:
+                raise RuntimeError("News pagination token repeated")
+            seen.add(token)
+            params["page_token"] = token
+        raise RuntimeError("News pagination bound exceeded")
 
     def bars(self, symbol, start, end):
         result, token = [], None

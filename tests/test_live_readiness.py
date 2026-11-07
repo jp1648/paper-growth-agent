@@ -348,3 +348,31 @@ def test_news_changed_after_evidence_collection_blocks_cached_execution(env, dec
     assert result["status"] == "rejected"
     assert "New news requires research review" in result["reasons"]
     assert broker.submits == 0
+
+
+def test_later_news_page_failure_blocks_execution(env, decision, monkeypatch):
+    import httpx
+
+    from trader.alpaca import AlpacaData
+
+    service, broker, data = env
+    build_graph(service, FixtureTeam(decision)).invoke(
+        {"symbol": "ACME", "run_key": "news-outage", "research_only": True}
+    )
+    pages = []
+
+    def handler(req):
+        pages.append(req)
+        if len(pages) == 1:
+            return httpx.Response(200, json={"news": [], "next_page_token": "next"})
+        return httpx.Response(503)
+
+    monkeypatch.setenv("ALPACA_PAPER_API_KEY", "fixture-key")
+    monkeypatch.setenv("ALPACA_PAPER_SECRET_KEY", "fixture-secret")
+    adapter = AlpacaData(service.cfg, httpx.Client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(data, "news", adapter.news)
+    with pytest.raises(httpx.HTTPStatusError):
+        service.execute(decision, "news-outage")
+    assert len(pages) == 2
+    assert broker.submits == 0
+    assert service.store.get(service.client_order_id("news-outage"), "intent") is None

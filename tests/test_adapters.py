@@ -153,3 +153,48 @@ def test_quote_sizes_use_shares_without_round_lot_multiplication(keys, monkeypat
     quote = data.quote("ACME")
     assert quote.bid_size == expected
     assert quote.ask_size == (D(456) if expected is not None else None)
+
+
+def test_news_paginates_with_fixed_window(keys, monkeypatch):
+    monkeypatch.setattr("trader.alpaca.now", lambda: AT)
+    requests = []
+
+    def handler(req):
+        requests.append(req)
+        if len(requests) == 1:
+            return httpx.Response(200, json={"news": [{"id": 1}], "next_page_token": "second"})
+        assert req.url.params["page_token"] == "second"
+        return httpx.Response(200, json={"news": [{"id": 2}], "next_page_token": None})
+
+    data = AlpacaData(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    assert data.news("ACME", (AT - timedelta(hours=1)).isoformat()) == [{"id": 1}, {"id": 2}]
+    assert len(requests) == 2
+    assert requests[0].url.params["end"] == requests[1].url.params["end"] == AT.isoformat()
+
+
+@pytest.mark.parametrize(
+    "page", [{}, {"news": None}, {"news": {}}, {"news": [None]}, {"news": [], "next_page_token": 1}]
+)
+def test_news_malformed_page_is_not_empty_coverage(keys, page):
+    data = AlpacaData(
+        Settings(), httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=page)))
+    )
+    with pytest.raises((ValueError, TypeError), match="news"):
+        data.news("ACME", AT.isoformat())
+
+
+@pytest.mark.parametrize("cycle", [True, False])
+def test_news_incomplete_pagination_never_returns_partial_results(keys, cycle):
+    calls = []
+
+    def handler(req):
+        calls.append(req)
+        return httpx.Response(
+            200,
+            json={"news": [{"id": len(calls)}], "next_page_token": "repeat" if cycle else str(len(calls))},
+        )
+
+    data = AlpacaData(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(RuntimeError, match="News pagination"):
+        data.news("ACME", AT.isoformat())
+    assert len(calls) == (2 if cycle else 100)

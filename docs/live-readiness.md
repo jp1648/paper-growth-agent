@@ -935,3 +935,17 @@ operator attestation, not independent API verification of delivery.
   unpaginated query still need verification/remediation before claiming complete
   news freshness coverage. Missing updated_at retains publication-time behavior;
   upstream omission cannot prove that an article was never revised.
+
+- News pagination (local, not deployed): eight new regressions reproduced first-
+  page truncation, malformed page acceptance and unhandled continuation bounds.
+  Adapter now follows continuation tokens with a fixed end timestamp, validates
+  page/list/token shapes, rejects repeated tokens and fails after 100 pages
+  instead of returning partial coverage. Valid empty lists remain supported.
+  The source coverage note no longer describes a single 50-article page.
+- A service-level integration fixture also verifies second-page HTTP failure
+  aborts before any prepared intent or broker submission. Full offline suite:
+  **585 passed, 3 skipped**; lint, formatting and whitespace pass. Requests use
+  isolated mock HTTP transports and fixture credentials, not provider traffic.
+  This closes local pagination handling, not vendor completeness: update-window
+  semantics for old revisions and entitlement/delivery delays remain unverified.
+  The fixed-window pagination is not a provider-guaranteed atomic snapshot.
