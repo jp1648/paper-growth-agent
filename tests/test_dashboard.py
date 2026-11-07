@@ -66,3 +66,48 @@ def test_spend_breakdown_separates_models_unknowns_and_data_requests(env):
     assert rows["Flovia (legacy)"]["known_usd"] is None
     assert rows["Example data"]["known_usd"] == dec("0.03")
     assert sum(r["known_usd"] or dec(0) for r in rows.values()) == dec("0.33")
+
+
+def test_economic_result_keeps_broker_fees_and_unknown_costs_distinct(env):
+    from trader.models import dec
+
+    service, broker, _ = env
+    broker.activities.append({"id": "fee", "activity_type": "FEE", "net_amount": "-2", "date": "2026-10-21"})
+    broker.raw_account.update(cash="99998", equity="99998")
+    service.reconcile()
+    store = service.store
+    store.log("model_cost", {"estimated_usd": "3"})
+    store.log("model_cost", {"estimated_usd": None})
+    store.log("data_cost", {"usd": "1.25"})
+    store.log("x_attempt", {"operation_id": "unknown-x"})
+    for key, experiment, status in (
+        ("pending", store.scope, "reserved"),
+        ("old", "other-experiment", "unknown"),
+        ("finished", store.scope, "settled"),
+    ):
+        store.put(
+            key,
+            {"experiment_id": experiment, "status": status, "usd": "50"},
+            "research_spend",
+            scope="global",
+        )
+    result = publish_snapshot(service)["portfolio"]
+    economic = result["economic_result"]
+    assert result["equity"] == dec("99998")
+    assert result["total_pnl"] == economic["broker_pnl_usd"] == dec("-2")
+    assert economic["recorded_operating_cost_usd_estimate"] == dec("4.25")
+    assert economic["pnl_after_recorded_costs_usd_estimate"] == dec("-6.25")
+    assert economic["unknown_cost_requests"] == 2
+    assert economic["unresolved_research_runs"] == 1
+    assert economic["complete"] is False
+    assert broker.submits == 0
+
+
+def test_empty_cost_history_is_not_proof_of_cost_completeness(env):
+    service, _, _ = env
+    service.reconcile()
+    result = publish_snapshot(service)["portfolio"]["economic_result"]
+    assert result["recorded_operating_cost_usd_estimate"] == 0
+    assert result["pnl_after_recorded_costs_usd_estimate"] == 0
+    assert result["unknown_cost_requests"] == 0
+    assert result["complete"] is False

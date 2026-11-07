@@ -107,6 +107,8 @@ async def listen(settings, store, config_path):
                                     {"id": message.get("id"), "symbols": message.get("symbols")},
                                 )
                                 wake.set()
+                    # A normal socket close also needs backoff; otherwise this loop reconnects continuously.
+                    raise ConnectionError("Stream closed; reconcile before reconnecting")
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001 - failed cancellation/reconnect must remain observable

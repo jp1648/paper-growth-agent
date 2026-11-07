@@ -76,6 +76,8 @@ def replay(initial, activities, adjustments):
                 basis[symbol] += dec(change["basis_delta"])
                 if shares[symbol] < 0 or basis[symbol] < 0:
                     raise LedgerError("Invalid corporate-action adjustment")
+                if shares[symbol] == 0 and basis[symbol] != 0:
+                    raise LedgerError("Corporate action leaves cost basis without shares")
         else:
             raise LedgerError(
                 f"Unsupported corporate activity {kind}: {a['id']}; explicit audited adjustment required"

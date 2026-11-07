@@ -156,6 +156,63 @@ def test_postgres_delivery_and_duplicate_replay(sink):
         )
 
 
+@pytest.mark.skipif(
+    not os.environ.get("TEST_OBSERVABILITY_DATABASE_URL"), reason="Opt-in local Postgres test"
+)
+@pytest.mark.parametrize("stage", ["before_commit", "after_commit"])
+def test_export_process_death_preserves_batch_and_replays_once(sink, stage):
+    import signal
+    import subprocess
+    import sys
+
+    sink.dsn = os.environ["TEST_OBSERVABILITY_DATABASE_URL"]
+    with psycopg.connect(sink.dsn) as pg:
+        pg.execute(obs.SCHEMA)
+    for index in range(201):
+        obs.emit("crash.fixture", {"index": index})
+    originals = events(sink)
+    ids = [row["event_id"] for row in originals]
+    child = r"""
+import os, signal, sys
+from contextlib import contextmanager
+from trader import observability as obs
+connect = obs.psycopg.connect
+@contextmanager
+def interrupted(*args, **kwargs):
+    with connect(*args, **kwargs) as pg:
+        yield pg
+        if sys.argv[2] == 'before_commit':
+            os.kill(os.getpid(), signal.SIGKILL)
+    os.kill(os.getpid(), signal.SIGKILL)
+obs.psycopg.connect = interrupted
+obs.Sink(sys.argv[1], os.environ['TEST_OBSERVABILITY_DATABASE_URL'], start=False).flush()
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", child, str(sink.path), stage],
+        env={**os.environ, "OBSERVABILITY_DATABASE_URL": ""},
+        capture_output=True,
+        timeout=20,
+        check=False,
+    )
+    assert result.returncode == -signal.SIGKILL
+    assert events(sink) == originals
+    with psycopg.connect(sink.dsn) as pg:
+        assert pg.execute(
+            "SELECT count(*) FROM telemetry_events WHERE event_id::text = ANY(%s)", (ids,)
+        ).fetchone()[0] == (200 if stage == "after_commit" else 0)
+    restarted = obs.Sink(sink.path, sink.dsn, start=False)
+    assert restarted.flush() == 200
+    assert restarted.flush() == 1
+    assert restarted.flush() == 0
+    assert events(sink) == []
+    with psycopg.connect(sink.dsn) as pg:
+        rows = pg.execute(
+            "SELECT event_id::text, payload FROM telemetry_events WHERE event_id::text = ANY(%s)", (ids,)
+        ).fetchall()
+    assert len(rows) == 201
+    assert dict(rows) == {row["event_id"]: row["payload"] for row in originals}
+
+
 def test_real_rejected_report_is_available(sink):
     from test_research_team import test_decimal_valuation_and_fabricated_calculation_rejected
 
@@ -193,3 +250,63 @@ def test_redaction_refreshes_secrets_between_events(monkeypatch):
     assert obs.clean({"nested": ["first-private-token"]}) == {"nested": ["[REDACTED]"]}
     monkeypatch.setenv("X_BEARER_TOKEN", "second-private-token")
     assert obs.clean(["second-private-token"]) == ["[REDACTED]"]
+
+
+@pytest.mark.skipif(
+    not os.environ.get("TEST_OBSERVABILITY_DATABASE_URL"), reason="Opt-in local Postgres test"
+)
+def test_export_outage_backlog_recovers_with_concurrent_producers(sink, monkeypatch):
+    from contextlib import contextmanager
+    from threading import Event
+
+    sink.dsn = os.environ["TEST_OBSERVABILITY_DATABASE_URL"]
+    connect = psycopg.connect
+
+    def produce(index):
+        # Use the public emit path: its swallowed errors must not hide lost events.
+        obs.emit("backlog.fixture", {"index": index, "body": "x" * 4096})
+
+    def unavailable(*args, **kwargs):
+        raise psycopg.OperationalError("Injected exporter outage")
+
+    monkeypatch.setattr(psycopg, "connect", unavailable)
+    with ThreadPoolExecutor(4) as producers:
+        for batch in range(5):
+            list(producers.map(produce, range(batch * 200, (batch + 1) * 200)))
+            with pytest.raises(psycopg.OperationalError):
+                sink.flush()
+            assert len(events(sink)) == (batch + 1) * 200
+    originals = events(sink)
+    entered, release = Event(), Event()
+
+    @contextmanager
+    def slow_export(*args, **kwargs):
+        with connect(*args, **kwargs) as pg:
+            entered.set()
+            assert release.wait(10), "Concurrent producer did not finish"
+            yield pg
+
+    monkeypatch.setattr(psycopg, "connect", slow_export)
+    restarted = obs.Sink(sink.path, sink.dsn, start=False)
+    with ThreadPoolExecutor(1) as exporter:
+        exporting = exporter.submit(restarted.flush)
+        try:
+            assert entered.wait(10)
+            with ThreadPoolExecutor(4) as producers:
+                list(producers.map(produce, range(1000, 1100)))
+            pending = events(sink)
+            assert len(pending) == 1100
+            assert pending[:1000] == originals
+        finally:
+            release.set()
+        assert exporting.result(timeout=10) == 200
+    monkeypatch.setattr(psycopg, "connect", connect)
+    assert [restarted.flush() for _ in range(6)] == [200, 200, 200, 200, 100, 0]
+    assert events(sink) == []
+    ids = [row["event_id"] for row in pending]
+    with connect(sink.dsn) as pg:
+        rows = pg.execute(
+            "SELECT event_id::text, payload FROM telemetry_events WHERE event_id::text = ANY(%s)", (ids,)
+        ).fetchall()
+    assert len(rows) == 1100
+    assert dict(rows) == {row["event_id"]: row["payload"] for row in pending}

@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from .config import Settings, credentials
+from .executor_owner import verify_executor_owner
 from .models import PAPER_URL, Quote, Snapshot, dec, dt, now
 from .observability import traced
 
@@ -20,11 +21,15 @@ class AlpacaBroker:
         self.headers = {"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret}
 
     @traced("alpaca.request")
-    def request(self, method, path, **kwargs):
+    def request(self, method, path, *, before_send=None, **kwargs):
         # Check each call as well as startup; never accept redirects or arbitrary URLs.
         Settings.model_validate(self.settings.model_dump())
         if not path.startswith("/v2/"):
             raise ValueError("Invalid trading path")
+        if method.upper() != "GET" and self.settings.executor_fence:
+            verify_executor_owner(self.settings.checkpoint_bucket)
+        if before_send is not None:
+            before_send()
         response = self.client.request(
             method, PAPER_URL + path, headers=self.headers, follow_redirects=False, **kwargs
         )
@@ -36,7 +41,18 @@ class AlpacaBroker:
 
     def open_orders(self):
         orders = self.request("GET", "/v2/orders", params={"status": "open", "limit": 500})
-        if len(orders) == 500:
+        if not isinstance(orders, list) or any(
+            not isinstance(order, dict)
+            or any(
+                not isinstance(order.get(key), str) or not order[key].strip()
+                for key in ("id", "client_order_id")
+            )
+            for order in orders
+        ):
+            raise ValueError("Malformed broker open order list")
+        if any(len({order[key] for order in orders}) != len(orders) for key in ("id", "client_order_id")):
+            raise ValueError("Duplicate broker open order identity")
+        if len(orders) >= 500:
             raise RuntimeError("Open order list may be truncated")
         return orders
 
@@ -48,10 +64,10 @@ class AlpacaBroker:
                 return None
             raise
 
-    def submit(self, payload):
+    def submit(self, payload, *, before_send=None):
         if payload.get("type") != "limit" or payload.get("extended_hours") is not False:
             raise ValueError("Only regular-hours limit orders allowed")
-        return self.request("POST", "/v2/orders", json=payload)
+        return self.request("POST", "/v2/orders", json=payload, before_send=before_send)
 
     def cancel(self, order_id):
         self.request("DELETE", f"/v2/orders/{order_id}")
@@ -68,17 +84,26 @@ class AlpacaBroker:
     def snapshot(self, after, tracked_ids):
         # Read all activities since baseline, with overlap; activity IDs make replay idempotent.
         activities, token = [], None
+        cursors = set()
         for _ in range(1000):
             params = {"after": after, "direction": "asc", "page_size": 100}
             if token:
                 params["page_token"] = token
             page = self.request("GET", "/v2/account/activities", params=params)
+            if not isinstance(page, list) or any(
+                not isinstance(activity, dict)
+                or not isinstance(activity.get("id"), str)
+                or not activity["id"].strip()
+                for activity in page
+            ):
+                raise ValueError("Malformed broker activity page")
             activities.extend(page)
             if len(page) < 100:
                 break
-            if token == page[-1]["id"]:
-                raise RuntimeError("Activity pagination stalled")
             token = page[-1]["id"]
+            if token in cursors:
+                raise RuntimeError("Activity pagination stalled")
+            cursors.add(token)
         else:
             raise RuntimeError("Activity pagination bound exceeded")
         orders = self.open_orders()
@@ -86,6 +111,10 @@ class AlpacaBroker:
         for cid in tracked_ids:
             order = self.lookup(cid)
             if order:
+                if order.get("client_order_id") != cid or (
+                    cid in by_client and by_client[cid]["id"] != order.get("id")
+                ):
+                    raise ValueError("Tracked broker order identity changed")
                 by_client[cid] = order
         positions = self.request("GET", "/v2/positions")
         return Snapshot(
@@ -163,6 +192,9 @@ class AlpacaData:
             symbol=symbol,
             bid=raw["bp"],
             ask=raw["ap"],
+            # Provider sizes are shares since 2025-11-03; older round-lot quotes are not executable here.
+            bid_size=raw.get("bs") if dt(raw["t"]).date().isoformat() >= "2025-11-03" else None,
+            ask_size=raw.get("as") if dt(raw["t"]).date().isoformat() >= "2025-11-03" else None,
             timestamp=dt(raw["t"]),
             source="Alpaca",
             feed=feed,
@@ -173,10 +205,32 @@ class AlpacaData:
         )
 
     def news(self, symbol, since):
-        return self.get(
-            "/v1beta1/news",
-            {"symbols": symbol, "start": since, "limit": 50, "sort": "desc", "include_content": "true"},
-        ).get("news", [])
+        result, seen = [], set()
+        params = {
+            "symbols": symbol,
+            "start": since,
+            "end": now().isoformat(),
+            "limit": 50,
+            "sort": "desc",
+            "include_content": "true",
+        }
+        for _ in range(100):
+            page = self.get("/v1beta1/news", params)
+            if not isinstance(page, dict) or not isinstance(page.get("news"), list):
+                raise TypeError("Malformed news page")
+            if any(not isinstance(article, dict) for article in page["news"]):
+                raise ValueError("Malformed news article")
+            result.extend(page["news"])
+            token = page.get("next_page_token")
+            if token is None or token == "":
+                return result
+            if not isinstance(token, str):
+                raise TypeError("Malformed news pagination token")
+            if token in seen:
+                raise RuntimeError("News pagination token repeated")
+            seen.add(token)
+            params["page_token"] = token
+        raise RuntimeError("News pagination bound exceeded")
 
     def bars(self, symbol, start, end):
         result, token = [], None

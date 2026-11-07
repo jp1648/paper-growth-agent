@@ -36,6 +36,7 @@ def main(argv=None):
         help="Research now; reevaluate execution during a regular session",
     )
     research.add_argument("--run-key", required=True, help="Stable logical decision ID, reused on retry")
+    research.add_argument("--finalize-from", help="Explicit failed run with four fresh completed reports")
     execute = sub.add_parser("execute")
     execute.add_argument("decision_file")
     execute.add_argument("--intent-key", required=True)
@@ -43,10 +44,55 @@ def main(argv=None):
     kill.add_argument("--reason", required=True)
     adjust = sub.add_parser("acknowledge-adjustment")
     adjust.add_argument("file")
+    revision = sub.add_parser("acknowledge-revision")
+    revision.add_argument("file")
+    notification = sub.add_parser(
+        "resolve-notification", help="Record delivery evidence without sending a message"
+    )
+    notification.add_argument("file")
     costs = sub.add_parser("record-data-cost")
     costs.add_argument("usd")
     costs.add_argument("--reason", required=True)
+    evaluation = sub.add_parser("evaluate", help="Score frozen research records; never connects to a broker")
+    evaluation.add_argument("--suite", required=True)
+    evaluation.add_argument("--responses", required=True)
+    evaluation.add_argument("--output", required=True)
+    evaluation.add_argument("--run-id", required=True)
+    evaluation.add_argument("--reviews", help="Separate reviewer-supplied, hash-bound semantic reviews")
+    live_eval = sub.add_parser(
+        "evaluate-run", help="Explicitly budgeted model research on frozen evidence; no broker"
+    )
+    live_eval.add_argument("--suite", required=True)
+    live_eval.add_argument("--output-dir", required=True)
+    live_eval.add_argument("--run-id", required=True)
+    live_eval.add_argument("--max-cost", required=True)
+    live_eval.add_argument("--split", choices=["development", "holdout"], default="development")
+    live_eval.add_argument("--allow-paid", action="store_true", required=True)
+    comparison = sub.add_parser("evaluate-compare", help="Compare paired frozen research evaluations")
+    comparison.add_argument("--baseline", required=True)
+    comparison.add_argument("--candidate", required=True)
+    comparison.add_argument("--output", required=True)
     args = parser.parse_args(argv)
+    if args.command == "evaluate-compare":
+        from .evaluation import compare
+
+        result = compare(args.baseline, args.candidate, args.output)
+        print(json.dumps(result, indent=2))
+        return 0
+    if args.command == "evaluate-run":
+        from .evaluation import run_suite
+
+        result = run_suite(
+            Settings.load(args.config), args.suite, args.output_dir, args.run_id, args.max_cost, args.split
+        )
+        print(json.dumps(result["summary"], indent=2))
+        return 0
+    if args.command == "evaluate":
+        from .evaluation import replay
+
+        result = replay(args.suite, args.responses, args.output, args.run_id, reviews_path=args.reviews)
+        print(json.dumps(result["summary"], indent=2))
+        return 0
     try:
         configure(Settings.load(args.config).database)
     except Exception:  # noqa: BLE001, S110 - dispatch reports the configuration error
@@ -60,6 +106,12 @@ def dispatch(args):
     try:
         cfg = Settings.load(args.config)
         store = Store(cfg.database)
+        if args.command == "resolve-notification":
+            from .notifications import resolve_delivery
+
+            result = resolve_delivery(store, json.loads(Path(args.file).read_text()))
+            print(dumps(result))
+            return 0
         service = Service(cfg, store, AlpacaBroker(cfg), AlpacaData(cfg))
         if args.command == "init":
             result = service.initialize(args.new_experiment)
@@ -91,6 +143,8 @@ def dispatch(args):
                 )
             elif args.command == "acknowledge-adjustment":
                 result = service.acknowledge_adjustment(json.loads(Path(args.file).read_text()))
+            elif args.command == "acknowledge-revision":
+                result = service.acknowledge_revision(json.loads(Path(args.file).read_text()))
             elif args.command == "record-data-cost":
                 from .models import dec
 
@@ -124,6 +178,7 @@ def dispatch(args):
                             "run_key": args.run_key,
                             "fresh": True,
                             "research_only": args.defer_execution,
+                            "finalize_from": args.finalize_from,
                         }
                     )
                 else:
@@ -139,6 +194,9 @@ def dispatch(args):
             store.log("error", {"command": args.command, "error": message})
         print(message, file=sys.stderr)
         return 1
+    finally:
+        if store:
+            store.db.close()
     return 0
 
 

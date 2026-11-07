@@ -142,7 +142,9 @@ def test_zero_comparison_equity_does_not_break_reporting(env, monkeypatch):
     monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=1, hours=6))
     result = daily_report(service)
     assert result["experiment_price_return"] is None
+    assert result["experiment_total_return"] is None
     assert result["daily_equity"][-1]["return"] is None
+    assert result["daily_equity"][-1]["total_return"] is None
 
 
 @pytest.mark.parametrize(
@@ -173,8 +175,8 @@ def test_mismatched_submission_keeps_unknown_intent(env, decision):
     service, broker, _ = env
     original = broker.submit
 
-    def corrupt(payload):
-        order = original(payload)
+    def corrupt(payload, **kwargs):
+        order = original(payload, **kwargs)
         order["client_order_id"] = "unexpected"
         return order
 
@@ -339,3 +341,43 @@ def test_financial_previews_require_original_evidence_reads(env):
     reader = next(t for t in desk.tools() if t.name == "read_source")
     assert "100" in reader.invoke({"source_id": "facts"})["content"]
     assert desk.sources["facts"] == original
+
+
+def test_total_return_includes_net_distributions_but_excludes_external_cash_flow(env, monkeypatch):
+    service, broker, _ = env
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(hours=6))
+    first = daily_report(service)
+    assert first["experiment_total_return"] == 0
+    broker.activities = [
+        {"id": "div", "activity_type": "DIV", "date": "2026-10-22", "net_amount": "100"},
+        {"id": "tax", "activity_type": "DIVNRA", "date": "2026-10-22", "net_amount": "-30"},
+        {"id": "fee", "activity_type": "FEE", "date": "2026-10-22", "net_amount": "-10"},
+        {"id": "deposit", "activity_type": "CSD", "date": "2026-10-22", "net_amount": "500"},
+    ]
+    service.store.put(
+        "deposit", {"id": "deposit", "cash": "500", "reason": "verified capital flow"}, "adjustment"
+    )
+    broker.raw_account.update(cash="100560", equity="100560")
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=1, hours=6))
+    second = daily_report(service)
+    assert second["experiment_total_return"] == dec(".0006")
+    assert second["experiment_price_return"] == dec("-.0001")
+    assert second["daily_equity"][-1]["total_return"] == dec(".0006")
+    assert second["total_pnl"] == dec("60")
+    assert second["total_return_max_drawdown"] == 0
+    assert "price-only" in second["total_return_method"]
+    broker.activities += [
+        {"id": "fee-two", "activity_type": "FEE", "date": "2026-10-23", "net_amount": "-200"},
+        {"id": "withdraw", "activity_type": "CSW", "date": "2026-10-23", "net_amount": "-500"},
+    ]
+    service.store.put(
+        "withdraw", {"id": "withdraw", "cash": "-500", "reason": "verified withdrawal"}, "adjustment"
+    )
+    broker.raw_account.update(cash="99860", equity="99860")
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=2, hours=6))
+    third = daily_report(service)
+    expected_daily = dec("100360") / dec("100560") - 1
+    assert third["daily_equity"][-1]["total_return"] == expected_daily
+    assert third["experiment_total_return"] == dec("1.0006") * (1 + expected_daily) - 1
+    assert abs(third["total_return_max_drawdown"] + expected_daily) < dec("1e-24")
+    assert third["total_pnl"] == dec("-140")

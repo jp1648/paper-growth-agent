@@ -30,7 +30,20 @@ class FixtureTeam:
         ref = {"evidence_ids": ["fixture-sec-1"]}
         reports = {
             "business": {**ref, "business_quality": "Fixture quality"},
-            "valuation": {**ref, "bear_value": "70", "base_value": "140", "bull_value": "170"},
+            "valuation": {
+                **ref,
+                "bear_value": "70",
+                "base_value": "140",
+                "bull_value": "170",
+                "normalization_review": {
+                    "cash_flow_basis": "Synthetic fixture proxy",
+                    "debt_and_cash": "Fixture assumes none",
+                    "dilution_and_sbc": "Fixture assumes none",
+                    "nonrecurring_items": "Fixture assumes none",
+                    "unresolved_material_gaps": False,
+                    "evidence_ids": ref["evidence_ids"],
+                },
+            },
             "catalysts": {**ref, "why_now": "Fixture catalyst"},
             "adversarial": {**ref, "unresolved_material_gaps": self.gaps},
         }
@@ -186,3 +199,30 @@ def test_first_day_loss_counts_toward_experiment_drawdown(env, decision, monkeyp
     assert report["max_drawdown"] == D(".002")
     assert report["experiment_price_return"] == D("-.002")
     assert report["matching_period_return"] == 0
+
+
+@pytest.mark.parametrize("fault", ["future_review", "future_quote", "future_news"])
+def test_future_inputs_cannot_debounce_forever_or_trigger_price_research(env, decision, fault):
+    service, broker, data = env
+    reviewed = AT + timedelta(days=1) if fault == "future_review" else AT - timedelta(hours=1)
+    service.store.put(
+        "ACME",
+        {
+            "reviewed_at": reviewed.isoformat(),
+            "decision": decision.model_dump(mode="json"),
+            "reference_price": "100",
+            "valuation": {},
+        },
+        "thesis",
+    )
+    if fault == "future_quote":
+        data.at = AT + timedelta(minutes=1)
+        data.ask = D("110")
+    if fault == "future_news":
+        data.news_items = [{"created_at": (AT + timedelta(days=1)).isoformat()}]
+    result = Runner(service, None).due("ACME", "intraday")
+    if fault == "future_review":
+        assert result == (True, "future-dated thesis requires fresh review")
+    else:
+        assert result[0] is False
+    assert broker.submits == 0

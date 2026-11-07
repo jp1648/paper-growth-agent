@@ -25,6 +25,9 @@ test("private dashboard, research filtering, traces and responsive layout", asyn
   await expect(
     page.getByText(/Missing billing data does not mean zero cost/),
   ).toBeVisible();
+  await expect(
+    page.getByText(/Cost-adjusted P.L is unavailable in this snapshot/),
+  ).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.screenshot({
     path: "../state/dashboard-desktop.png",
@@ -68,6 +71,19 @@ test("accepted investigation is readable and trace filters work", async ({
   await page.getByRole("button", { name: "Enter observatory" }).click();
   await expect(page.getByRole("button", { name: /Refresh/ })).toBeVisible();
   const original = await (await page.request.get("/api/data")).json();
+  original.snapshot.portfolio.economic_result = {
+    broker_pnl_usd: "-2",
+    recorded_operating_cost_usd_estimate: "4.25",
+    pnl_after_recorded_costs_usd_estimate: "-6.25",
+    unknown_cost_requests: 2,
+    unresolved_research_runs: 1,
+    complete: false,
+    scope: "Current experiment journal only.",
+    limitations: [
+      "Broker fees are already in broker P/L.",
+      "Infrastructure costs are not fully recorded.",
+    ],
+  };
   original.snapshot.x_credits = {
     status: "available",
     checked_at: "2026-11-06T04:00:00Z",
@@ -93,6 +109,7 @@ test("accepted investigation is readable and trace filters work", async ({
         evidence_ids: ["source-1"],
       },
       reports: {
+        valuation: { normalization_review: {} as Record<string, unknown> },
         business: { conclusion: "Complete findings preserved." },
         adversarial: {
           unresolved_material_gaps: true,
@@ -123,6 +140,17 @@ test("accepted investigation is readable and trace filters work", async ({
     }),
   );
   await page.getByRole("button", { name: /Refresh/ }).click();
+  const economic = page.getByRole("region", { name: "Economic result" });
+  await expect(economic.getByText("-$6.2500", { exact: true })).toBeVisible();
+  await expect(
+    economic.getByText(/2 unpriced requests · 1 unresolved research runs/),
+  ).toBeVisible();
+  await expect(
+    economic.getByText(/not an all-in investment return/),
+  ).toBeVisible();
+  await expect(
+    economic.getByText(/Infrastructure costs are not fully recorded/),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "X API credits" }),
   ).toBeVisible();
@@ -149,6 +177,42 @@ test("accepted investigation is readable and trace filters work", async ({
     page.getByRole("heading", { name: "WATCH — no trade proposed" }),
   ).toBeVisible();
   await expect(page.getByText("Material evidence gaps remain")).toBeVisible();
+  const accounting = page.getByRole("region", {
+    name: "Accounting normalization review",
+  });
+  await expect(
+    accounting.getByText("No accounting normalization review saved."),
+  ).toBeVisible();
+  original.snapshot.runs[0].reports.valuation.normalization_review = {
+    cash_flow_basis:
+      "Historical cash-flow proxy; discount basis requires review.",
+    debt_and_cash: "Debt treatment is unresolved.",
+    dilution_and_sbc: "Dilution needs filing verification.",
+    nonrecurring_items: "No conclusion recorded.",
+    unresolved_material_gaps: true,
+    evidence_ids: ["source-1"],
+  };
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(
+    accounting.getByText("Agent reports unresolved accounting gaps."),
+  ).toBeVisible();
+  await accounting.locator("summary").click();
+  await expect(
+    accounting.getByText("Debt treatment is unresolved."),
+  ).toBeVisible();
+  await expect(
+    accounting.getByText(/not independent verification/),
+  ).toBeVisible();
+  await expect(accounting.getByText("source-1", { exact: true })).toBeVisible();
+  original.snapshot.runs[0].reports.valuation.normalization_review.unresolved_material_gaps = false;
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(
+    accounting.getByText("Agent reports no material accounting gaps."),
+  ).toBeVisible();
+  await expect(
+    accounting.getByText(/not independent verification/),
+  ).toBeVisible();
+
   const report = page.locator("details").filter({
     has: page.locator("summary", {
       hasText: "Business quality & financial health",
@@ -180,4 +244,43 @@ test("accepted investigation is readable and trace filters work", async ({
       page.getByRole("button", { name: filter, exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
   }
+});
+
+test("long trace loads every event and full details require authentication", async ({
+  page,
+  request,
+}) => {
+  test.skip(!password, "Requires isolated fixture dashboard");
+  await page.goto("/login");
+  await page.getByLabel("Workspace password").fill(password!);
+  await page.getByRole("button", { name: "Enter observatory" }).click();
+  await page.getByRole("button", { name: "Traces", exact: true }).click();
+  await page.locator(".run-choice").filter({ hasText: "long-fixture" }).click();
+  await expect(page.locator(".trace-row")).toHaveCount(100);
+  await page
+    .getByRole("button", { name: "Load older events", exact: true })
+    .click();
+  await expect(page.locator(".trace-row")).toHaveCount(200);
+  await page
+    .getByRole("button", { name: "Load older events", exact: true })
+    .click();
+  await expect(page.locator(".trace-row")).toHaveCount(205);
+  await expect(
+    page.getByRole("button", { name: "Load older events", exact: true }),
+  ).toHaveCount(0);
+  await page.locator(".trace-row").first().locator("summary").click();
+  const href = await page
+    .getByRole("link", { name: "Open complete event (new tab)" })
+    .first()
+    .getAttribute("href");
+  expect(href).toBeTruthy();
+  expect((await request.get(href!)).status()).toBe(401);
+  const full = await page.request.get(href!);
+  expect(full.headers()["cache-control"]).toContain("no-store");
+  expect((await full.json()).event.payload.end_marker).toBe("FULL_EVENT_END");
+  expect(
+    (
+      await page.request.get("/api/data?run=long-fixture&cursor=invalid")
+    ).status(),
+  ).toBe(400);
 });

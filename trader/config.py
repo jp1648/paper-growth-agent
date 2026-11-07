@@ -28,14 +28,21 @@ class Settings(Model):
     broker_url: str = PAPER_URL
     database: str = "state/ledger.sqlite"
     control_dir: str = "~/.local/state/paper-growth-agent"
+    checkpoint_bucket: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$")
+    executor_fence: bool = False
     initial_capital: Decimal = Field(default=Decimal(100000), gt=0)
     experiment_weeks: int = Field(default=12, ge=1)
     max_position: Decimal = Field(default=Decimal("0.10"), gt=0, le=1)
     max_sector: Decimal = Field(default=Decimal("0.40"), gt=0, le=1)
     max_positions: int = Field(default=10, ge=1)
+    max_cumulative_loss_fraction: Decimal = Field(default=Decimal("0.10"), gt=0, le=1)
+    max_daily_loss_fraction: Decimal = Field(default=Decimal("0.02"), gt=0, le=1)
     turnover_30d: Decimal = Field(default=Decimal("1.0"), gt=0)
     cooldown_hours: int = Field(default=24, ge=0)
     price_tolerance: Decimal = Field(default=Decimal("0.005"), ge=0, le=Decimal("0.05"))
+    max_spread_fraction: Decimal = Field(default=Decimal("0.005"), gt=0, le=Decimal("0.05"))
+    max_quote_participation: Decimal = Field(default=Decimal("0.10"), gt=0, le=1)
+    max_order_equity: Decimal = Field(default=Decimal("0.02"), gt=0, le=1)
     fee_buffer: Decimal = Field(default=Decimal(1), ge=0)
     quote_max_age_seconds: int = Field(default=60, ge=1, le=300)
     halt_max_age_seconds: int = Field(default=180, ge=1, le=600)
@@ -87,6 +94,8 @@ class Settings(Model):
 
     @model_validator(mode="after")
     def paper_only(self):
+        if self.executor_fence and not self.checkpoint_bucket:
+            raise ValueError("Executor fencing requires a private checkpoint_bucket")
         if self.broker_url != PAPER_URL:
             raise ValueError("Only https://paper-api.alpaca.markets is allowed")
         for name in ("APCA_API_BASE_URL", "ALPACA_BASE_URL", "ALPACA_TRADING_URL"):

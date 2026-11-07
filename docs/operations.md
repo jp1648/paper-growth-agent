@@ -101,9 +101,17 @@ Premarket/weekly runs save a deferred decision without submitting an order. Duri
 
 The pause flag also blocks direct CLI research, but daily reports and maintenance continue. A successful daily report is immutable. Mixing market-data feeds within a benchmark history requires explicit rebaselining; the app refuses to silently compare unlike feeds. Returns through nonpositive comparison equity are null. SQLite reports are read under the account lock. Quote-stream persistence is limited to one update per second per symbol; order hints remain immediate.
 
-Maintenance creates a SQLite-consistent backup once per UTC date under `state/backups/ledger-YYYY-MM-DD.sqlite`. `paper-agent backup` ensures that day's backup exists; it does not overwrite it or promise a current-minute snapshot. Backups include committed WAL data, use private file permissions and pass an integrity check before publication. They are local disaster-recovery copies, not protection against loss of the Mac. Copy backups and the account control directory to operator-managed protected storage. Keep them private: they contain portfolio and research history. No automatic retention/deletion is enabled.
+Maintenance creates a SQLite-consistent backup once per UTC date under `state/backups/ledger-YYYY-MM-DD.sqlite`. `paper-agent backup` ensures that day's backup exists; it does not overwrite it or promise a current-minute snapshot. Backups include committed WAL data, use private file permissions and pass integrity and experiment-identity checks before publication and on reuse. Symlinks, corrupt files and mismatched experiments fail without overwriting the evidence. Publication flushes the closed database before rename and the containing directory afterward; a flush error is a failure, even if the renamed file already exists. They are local disaster-recovery copies, not protection against loss of the host. Copy backups and the account control directory to operator-managed protected storage. Keep them private: they contain portfolio and research history. No automatic retention/deletion is enabled.
 
-To recover, stop the container and any other account process. Preserve the damaged database and its WAL/SHM files for investigation. Restore the verified backup to the **original absolute database path**, with the original control-directory account binding and pause flag, and do not run `init`. Start paused; reconcile with the broker before `resume`. A backup can predate an in-flight intent: an unknown external order/fill must pause the restored account. Never submit another trade to compensate for a missing record. Recover the newer journal or resolve with the broker; an old backup cannot prove that no order was submitted.
+Before each order POST, the executor also publishes a private `backups/intent-<hash>.sqlite` checkpoint containing the exact prepared intent and prior ledger history. Publication and verification must succeed before submission. Disk failure rejects the intent without a POST; a fresh risk check after disk work prevents submitting stale inputs. Checkpoints are immutable per experiment/intent and are not automatically deleted.
+
+For cloud execution, configure `checkpoint_bucket` to require off-host replication before every POST. The GCE service identity needs object create/get access to a private bucket with public access prevention and uniform bucket-level access. No static storage key is used. Uploads use `ifGenerationMatch=0`; existing or ambiguously uploaded objects must pass identity, size and exact-generation SHA-256 read-back verification. No second upload is attempted after a timeout. Storage failure rejects the order, including exits; an operator must address the failure, never bypass it. Without this setting, only the local checkpoint is required, which is insufficient for a live release. Full-ledger checkpoints consume storage/network per order; monitor growth and storage costs separately from model spend. Administrator access and disaster recovery of the cloud project remain separate risks.
+
+`executor_fence = true` additionally requires every broker mutation to match the GCE instance ID, project number and full metadata zone in `executor-owner.json` in the same bucket. Reads remain available when ownership cannot be verified. The object must have integer `version: 1` and string `instance_id`, `project_number`, and `zone` fields. Only the trusted operator may replace this record; the executor's create/read IAM cannot overwrite the existing object. There is no expiry or automatic takeover. Before a generation-conditional ownership transfer, stop the old VM and independently verify its exact instance ID is TERMINATED, restore/reconcile the new ledger while paused, then assign the new VM. A registry update alone does not fence an already-authorized in-flight request. Cross-host fault drills remain a pending deployment prerequisite. The submission callback reruns shared risk checks after ownership I/O, immediately before the broker POST; rejection or check failure produces a rejected intent without a broker request.
+
+Use `uv run python deploy/transfer-executor.py --bucket BUCKET --project PROJECT --zone ZONE --name TARGET_VM` to prepare a read-only ownership plan. The existing owner object must include `project_id` and `instance_name` in addition to its metadata identity. For a different target, the plan requires the exact pinned source VM to be TERMINATED and the target RUNNING. Applying requires both `--apply` and `--expected-generation GENERATION` from the reviewed plan. The command rechecks source shutdown before a conditional object write, retains the previous identity/generation in the new record and verifies read-back. A conflict, timeout or changed identity is a failure, never permission to retry blindly. It does not stop/start VMs, restore state, clear pause or certify target ledger readiness. Coordinate administrators so nobody restarts the old host during transfer; reconcile any in-flight broker calls before resuming.
+
+To recover, stop the container and any other account process. Preserve the damaged database and its WAL/SHM files for investigation. Restore the verified backup/checkpoint to the **original absolute database path**, with the original control-directory account binding and pause flag, and do not run `init`. Start paused; reconcile with the broker before `resume`. A daily backup can predate an in-flight intent: an unknown external order/fill must pause the restored account. Use the newest verified checkpoint/journal containing the approved intent; never submit another trade to compensate for a missing record. A checkpoint may have been written before a POST that never happened. If its prepared intent has no broker order, reconciliation deliberately stays blocked for investigation; the file alone is not permission to retry or release a reservation.
 
 The container has CPU, memory and process limits. The CLI prevents a second listener for the same account/control directory on the same OS. Health remains an operational reconciliation check, not a certificate that OpenAI, research quality, or all data feeds are ready. Unknown-cost API failures retain their reserved daily allowance; a budget reservation is not a confirmed provider charge.
 
@@ -128,3 +136,54 @@ failure leaves `rejected`. Neither is automatically resent because Telegram's
 troubleshooting missed alerts. Repeated reconciliation never resends a recorded
 fill. Telegram credentials are redacted from telemetry; raw request URLs and
 provider error bodies are never journaled.
+
+## Missing-monitor heartbeat drill
+
+Run only while trading is paused and the executor itself is healthy. Confirm
+that the existing missing-heartbeat policy is enabled and that its notification
+channel is the intended operator. Preserve the policy threshold; do not lower it
+to manufacture a passing result. Record the last actual metric timestamp and
+existing incidents before starting.
+
+Before stopping `always-on-health.timer` and its oneshot service, install and
+verify a separate transient systemd restoration timer (for example, twelve
+minutes) that starts `always-on-health.timer`. If the restoration timer cannot
+be confirmed active, do not stop publishing. Keep the executor and its internal
+maintenance running; this isolates metric-publisher failure, not whole-host loss.
+
+Observe Cloud Monitoring until its normal absence duration plus evaluation
+latency elapses. Match a newly opened missing-heartbeat incident to an actually
+received notification, recording timestamps and identity privately. A configured
+channel, an empty incident query, or a successful metric POST is not proof of
+notification delivery. Check the returned API field names when filtering.
+
+Restore the health timer and run its service once, even when the drill fails.
+Verify a fresh cloud metric and subsequent incident resolution. Remove the
+transient restoration timer only after publishing has recovered. Preserve the
+original pause, broker ledger and positions. If interrupted, inspect the actual
+systemd timer/service and incident states before doing anything else; do not
+restart the drill from a remembered status. A whole-host/zone outage still needs
+separate evidence.
+
+
+### Verified whole-host alert/restart drill
+
+On November 7, 2026 UTC, a controlled stop of the paused paper executor proved
+independent missing-heartbeat detection and same-host recovery. Preflight required
+fresh reconciliation, no working orders and the existing pause. A separate local
+watchdog bounded restart to twelve minutes; the normal observation loop restarted
+the VM when the incident opened. Do not rely on a timer on the stopped host.
+
+Observed timings: last heartbeat00:29:14, VM TERMINATED00:30:31, alert00:36:27,
+VM RUNNING00:36:53, recovered healthy metric00:40:08, automatic closure00:44:01.
+Both opening and recovery emails matched the cloud incident and passed Gmail
+DKIM/SPF/DMARC checks. The three-minute monitor boot delay contributes to recovery
+notification latency. These timings are measurements, not delivery guarantees.
+
+After restart, check the original VM identity, deployed artifact, active executor
+and monitor timer, external pause, fresh broker reconciliation, working orders and
+unchanged ledger/history. Temporary `/tmp` scripts may be removed by boot; restore
+only the diagnostic script, never an old operational ledger. External ephemeral
+IP addresses can change; use IAP/instance identity rather than a remembered IP.
+This drill retained the existing one-share paper position. It does not prove
+replacement-host failover, an in-flight broker request, disk loss or zone recovery.

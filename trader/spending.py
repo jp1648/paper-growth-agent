@@ -21,6 +21,12 @@ def spending_status(store, limit, at=None):
 
     records = [json.loads(row[0]) for row in rows]
     used = sum((dec(r["usd"]) for r in records), dec(0))
+    # Midnight resets the allowance, not an uncapped liability from an earlier run.
+    unbounded = store.db.execute(
+        "SELECT count(*) FROM documents WHERE scope='global' AND kind='research_spend' "
+        "AND json_extract(body, '$.unrestricted_research')=1 "
+        "AND coalesce(json_extract(body, '$.status'), 'unknown')!='settled'"
+    ).fetchone()[0]
     return {
         "day": day,
         "timezone": "America/New_York",
@@ -28,9 +34,7 @@ def spending_status(store, limit, at=None):
         "charged_or_reserved_usd": used,
         "remaining_usd": max(dec(0), limit - used),
         "unresolved_runs": sum(r["status"] != "settled" for r in records),
-        "unbounded_unknown_runs": sum(
-            r.get("unrestricted_research", False) and r["status"] != "settled" for r in records
-        ),
+        "unbounded_unknown_runs": unbounded,
     }
 
 
@@ -45,7 +49,11 @@ class DailyReservation:
             self.allowance = (
                 None if unrestricted_research else min(cfg.research_max_cost_usd, status["remaining_usd"])
             )
-            if not unrestricted_research and (self.allowance <= 0 or status["unbounded_unknown_runs"]):
+            if not unrestricted_research and status["unbounded_unknown_runs"]:
+                raise DailyBudgetExceeded(
+                    "Unbounded model usage remains unresolved; reconcile provider charges"
+                )
+            if not unrestricted_research and self.allowance <= 0:
                 raise DailyBudgetExceeded("Daily model budget exhausted; monitoring/reconciliation continue")
             self.record = {
                 "run_key": run_key,
@@ -72,3 +80,33 @@ class DailyReservation:
             finished_at=now(),
         )
         self.store.put(self.key, self.record, "research_spend", scope="global")
+
+
+def spend_breakdown(store, model_usage):
+    rows = {}
+
+    def record(source, amount):
+        row = rows.setdefault(
+            source, {"source": source, "known_usd": dec(0), "requests": 0, "unknown_requests": 0}
+        )
+        row["requests"] += 1
+        if amount is None:
+            row["unknown_requests"] += 1
+        else:
+            row["known_usd"] += dec(amount)
+
+    for event in model_usage:
+        record("OpenAI · " + event.get("model", "unspecified model"), event.get("estimated_usd"))
+    x_results = {e["body"]["operation_id"]: e["body"] for e in store.events("x_result")}
+    for event in store.events("x_attempt"):
+        result = x_results.get(event["body"]["operation_id"], {})
+        record("X API", result.get("cost_usd"))
+    for _ in store.events("flovia_x_attempt"):
+        record("Flovia (legacy)", None)
+    for event in store.events("data_cost"):
+        body = event["body"]
+        record(body.get("source") or body.get("provider") or "Other data", body.get("usd"))
+    for row in rows.values():
+        if row["unknown_requests"] == row["requests"]:
+            row["known_usd"] = None
+    return sorted(rows.values(), key=lambda row: (-(row["known_usd"] or dec(0)), row["source"]))

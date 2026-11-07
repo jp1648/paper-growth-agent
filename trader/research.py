@@ -14,6 +14,7 @@ class GraphState(TypedDict, total=False):
     fresh: bool
     trigger: str
     research_only: bool
+    finalize_from: str
     portfolio: dict
     evidence: dict
     quote: dict
@@ -59,7 +60,12 @@ def build_graph(service, team):
             commit_research(s, cached)
             return cached
         quote = service.data.quote(s["symbol"]).model_dump(mode="json")
-        result = team.run({**s, "quote": quote, "current_timestamp": now().isoformat()})
+        context = {**s, "quote": quote, "current_timestamp": now().isoformat()}
+        result = (
+            team.run(context, finalize_from=s["finalize_from"])
+            if s.get("finalize_from")
+            else team.run(context)
+        )
         result["quote"] = quote
         proposal = Decision.model_validate(result["decision"])
         if proposal.symbol != s["symbol"]:

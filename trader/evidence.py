@@ -10,7 +10,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 
-from .models import dec, dt, dumps, now
+from .models import dec, dt, dumps, news_time, now
 from .observability import traced
 
 
@@ -36,6 +36,28 @@ class FilingText(HTMLParser):
     def handle_data(self, data):
         if not self.hidden:
             self.parts.append(data)
+
+
+def _recent_filings(recent, cutoff):
+    forms = recent["form"]
+    if (
+        not isinstance(forms, list)
+        or (forms and not {"accessionNumber", "acceptanceDateTime"}.issubset(recent))
+        or any(not isinstance(v, list) or len(v) != len(forms) for v in recent.values())
+        or any(not isinstance(form, str) or not form.strip() for form in forms)
+    ):
+        raise ValueError("SEC recent submissions are malformed")
+    filings = []
+    for i, form in enumerate(forms):
+        if form.removesuffix("/A") not in {"10-K", "10-Q", "8-K", "20-F", "6-K"}:
+            continue
+        filing = {key: values[i] for key, values in recent.items()}
+        if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", filing["accessionNumber"]):
+            raise ValueError("SEC filing lacks valid accession")
+        if dt(filing["acceptanceDateTime"]) > cutoff:
+            raise ValueError("SEC filing acceptance is future-dated")
+        filings.append(filing)
+    return filings
 
 
 class EvidenceProvider:
@@ -80,8 +102,11 @@ class EvidenceProvider:
         cached = self.store.get(symbol, "evidence_cache")
         if (
             cached
+            and cached.get("sec_schema") == 4
             and not fresh
-            and now() - dt(cached["fetched_at"]) < timedelta(hours=self.cfg.research_cache_hours)
+            and timedelta(0)
+            <= now() - dt(cached["fetched_at"])
+            < timedelta(hours=self.cfg.research_cache_hours)
         ):
             return cached
         bundle = self.fetch(symbol)
@@ -89,6 +114,7 @@ class EvidenceProvider:
         return bundle
 
     def fetch(self, symbol):
+        started_at = now()
         if symbol not in self.cfg.universe:
             raise ValueError("Symbol outside configured research universe")
         if not self.cfg.sec_user_agent or "@" not in self.cfg.sec_user_agent:
@@ -99,6 +125,7 @@ class EvidenceProvider:
             "Revenues",
             "RevenueFromContractWithCustomerExcludingAssessedTax",
             "NetIncomeLoss",
+            "WeightedAverageNumberOfDilutedSharesOutstanding",
             "NetCashProvidedByUsedInOperatingActivities",
             "PaymentsToAcquirePropertyPlantAndEquipment",
             "CashAndCashEquivalentsAtCarryingValue",
@@ -117,14 +144,23 @@ class EvidenceProvider:
         ):
             response = self.request(url)
             raw = response.json(parse_float=dec)
+            if str(raw.get("cik", "")).zfill(10) != cik:
+                raise ValueError("SEC response company identity does not match configured CIK")
             if kind == "facts":
                 values = {}
-                for taxonomy in raw["facts"].values():
+                namespaces = {}
+                for namespace, taxonomy in raw["facts"].items():
                     for tag, entry in taxonomy.items():
-                        if tag in tags:
+                        expected = "dei" if tag == "EntityCommonStockSharesOutstanding" else "us-gaap"
+                        if tag in tags and namespace == expected:
+                            namespaces[tag] = namespace
                             values[tag] = {
                                 unit: sorted(
-                                    [v for v in records if v.get("filed", "") <= now().date().isoformat()],
+                                    [
+                                        v
+                                        for v in records
+                                        if v.get("filed", "") < started_at.date().isoformat()
+                                    ],
                                     key=lambda x: (x.get("filed", ""), x.get("end", "")),
                                     reverse=True,
                                 )[:12]
@@ -133,21 +169,19 @@ class EvidenceProvider:
                 if not values:
                     raise ValueError("SEC evidence lacks usable financial facts")
                 content = {
+                    "cik": cik,
                     "entity": raw["entityName"],
                     "facts": values,
-                    "caution": "Facts may repeat/restated; compare matching fiscal durations and units; do not sum overlapping YTD periods.",
+                    "fact_taxonomies": namespaces,
+                    "caution": "Date-only facts filed today are excluded because availability time is unknown. Facts may repeat/restated; compare matching fiscal durations and units; do not sum overlapping YTD periods.",
                 }
             else:
                 recent = raw["filings"]["recent"]
                 content = {
+                    "cik": cik,
                     "name": raw["name"],
                     "sic_description": raw.get("sicDescription"),
-                    "filings": [
-                        {k: v[i] for k, v in recent.items()}
-                        for i, form in enumerate(recent["form"])
-                        if form.removesuffix("/A") in {"10-K", "10-Q", "8-K", "20-F", "6-K"}
-                        and recent["filingDate"][i] <= now().date().isoformat()
-                    ][:40],
+                    "filings": _recent_filings(recent, started_at)[:40],
                 }
             identifier = "sec-" + hashlib.sha256(dumps(content).encode()).hexdigest()[:20]
             sources.append(
@@ -159,8 +193,10 @@ class EvidenceProvider:
                     "content": content,
                 }
             )
-        news = self.data.news(symbol, (now() - timedelta(days=7)).isoformat())
+        news = self.data.news(symbol, (started_at - timedelta(days=7)).isoformat())
         for article in news:
+            if not started_at - timedelta(days=7) <= news_time(article) <= started_at:
+                continue
             sources.append(
                 {
                     "id": "news-"
@@ -170,17 +206,35 @@ class EvidenceProvider:
                     "source": article.get("source", "Alpaca news"),
                     "url": article.get("url"),
                     "published_at": article.get("created_at"),
+                    "updated_at": article.get("updated_at", article["created_at"]),
                     "retrieved_at": now(),
                     "content": {k: article.get(k) for k in ("headline", "summary", "content")},
                 }
             )
         bundle = {
+            "sec_schema": 4,
             "symbol": symbol,
-            "fetched_at": now().isoformat(),
+            "fetched_at": started_at.isoformat(),
             "sources": sources,
-            "news_coverage": "Up to 50 recent vendor articles; absence is not proof of no material news",
+            "news_coverage": "Paginated vendor news within the requested window; absence is not proof of no material news",
         }
         return bundle
+
+    @traced("evidence.filings_since")
+    def filings_since(self, symbol, since):
+        since = dt(since)
+        cutoff = now()
+        if not timedelta(0) <= cutoff - since < timedelta(days=365):
+            raise ValueError("Filing freshness cutoff is outside recent submissions coverage")
+        cik = self.cfg.universe[symbol].cik.zfill(10)
+        raw = self.request(f"https://data.sec.gov/submissions/CIK{cik}.json").json()
+        if str(raw.get("cik", "")).zfill(10) != cik:
+            raise ValueError("SEC response company identity does not match configured CIK")
+        recent = raw["filings"]["recent"]
+        filings = _recent_filings(recent, cutoff)
+        if not recent["form"]:
+            raise ValueError("SEC recent submissions are empty")
+        return [filing for filing in filings if dt(filing["acceptanceDateTime"]) >= since]
 
     @traced("evidence.documents")
     def documents(self, symbol, filing):

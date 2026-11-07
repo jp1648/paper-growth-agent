@@ -6,7 +6,7 @@ from decimal import InvalidOperation
 from zoneinfo import ZoneInfo
 
 from .alpaca import safe_error
-from .models import dec, dt, now
+from .models import dec, dt, news_time, now
 from .observability import traced
 from .reports import daily_report, portfolio_report
 from .spending import spending_status
@@ -22,6 +22,8 @@ class Runner:
         if phase in {"preopen", "weekly"} or not thesis:
             return True, phase
         reviewed = dt(thesis["reviewed_at"])
+        if reviewed > now():
+            return True, "future-dated thesis requires fresh review"
         if now() - reviewed < timedelta(minutes=self.cfg.event_debounce_minutes):
             return False, "debounced"
         decision = thesis["decision"]
@@ -34,11 +36,14 @@ class Runner:
             return True, "review deadline"
         news = self.service.data.news(symbol, reviewed.isoformat())
         # New external evidence can warrant research; price by itself only checks saved thresholds.
-        if any(dt(a["created_at"]) > reviewed for a in news):
+        if any(reviewed < news_time(a) <= now() for a in news):
             return True, "new news evidence"
         quote = self.service.data.quote(symbol)
-        if quote.delayed or (now() - quote.timestamp).total_seconds() > self.cfg.quote_max_age_seconds:
-            return False, "stale quote"
+        if (
+            quote.delayed
+            or not -5 <= (now() - quote.timestamp).total_seconds() <= self.cfg.quote_max_age_seconds
+        ):
+            return False, "stale or future-dated quote"
         move = abs(quote.ask / dec(thesis["reference_price"]) - 1)
         if move >= self.cfg.price_trigger:
             return True, "configured price-move threshold crossed"
@@ -87,8 +92,21 @@ class Runner:
                 },
             )
         self.store.put("heartbeat", {"at": current})
+        previous_limit = self.store.get("loss_limit") or {}
+        already_blocked = previous_limit.get("latched") or not previous_limit.get("daily", {}).get(
+            "valid", True
+        )
         self.service.cancel_expired()
-        self.service.reconcile()
+        snapshot = self.service.reconcile()
+        limit = self.store.get("loss_limit") or {}
+        if not already_blocked and (limit.get("latched") or not limit.get("daily", {}).get("valid", True)):
+            self.service.cancel_expired()
+            snapshot = self.service.reconcile()
+        issues = self.service.position_review_issues(snapshot.positions, now())
+        previous_review = self.store.get("position_review")
+        if previous_review is None or previous_review.get("issues") != issues:
+            self.store.log("position_review_changed", {"issues": issues})
+        self.store.put("position_review", {"at": now(), "issues": issues})
         self.store.backup()
         try:
             from .notifications import notify_fills
@@ -185,18 +203,20 @@ class Runner:
                     and now() - dt(thesis["reviewed_at"]) < timedelta(hours=self.cfg.research_cache_hours)
                     and dt(thesis["decision"]["next_review"]) > now()
                     and not any(
-                        dt(a["created_at"]) > dt(thesis["reviewed_at"])
+                        news_time(a) > dt(thesis["reviewed_at"])
                         for a in self.service.data.news(symbol, thesis["reviewed_at"])
                     )
                 )
                 run_key = thesis["run_key"] if pending else key
                 cached = self.store.get(run_key, "research_result")
-                if (
-                    not cached
-                    and spending_status(self.store, self.cfg.research_daily_cost_usd)["remaining_usd"] <= 0
-                ):
-                    outcomes.append({"symbol": symbol, "status": "daily model budget exhausted"})
-                    continue
+                if not cached:
+                    spending = spending_status(self.store, self.cfg.research_daily_cost_usd)
+                    if spending["unbounded_unknown_runs"]:
+                        outcomes.append({"symbol": symbol, "status": "unbounded model usage unresolved"})
+                        continue
+                    if spending["remaining_usd"] <= 0:
+                        outcomes.append({"symbol": symbol, "status": "daily model budget exhausted"})
+                        continue
                 if (
                     job
                     and job["status"] == "failed"
