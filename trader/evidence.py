@@ -38,6 +38,28 @@ class FilingText(HTMLParser):
             self.parts.append(data)
 
 
+def _recent_filings(recent, cutoff):
+    forms = recent["form"]
+    if (
+        not isinstance(forms, list)
+        or (forms and not {"accessionNumber", "acceptanceDateTime"}.issubset(recent))
+        or any(not isinstance(v, list) or len(v) != len(forms) for v in recent.values())
+        or any(not isinstance(form, str) or not form.strip() for form in forms)
+    ):
+        raise ValueError("SEC recent submissions are malformed")
+    filings = []
+    for i, form in enumerate(forms):
+        if form.removesuffix("/A") not in {"10-K", "10-Q", "8-K", "20-F", "6-K"}:
+            continue
+        filing = {key: values[i] for key, values in recent.items()}
+        if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", filing["accessionNumber"]):
+            raise ValueError("SEC filing lacks valid accession")
+        if dt(filing["acceptanceDateTime"]) > cutoff:
+            raise ValueError("SEC filing acceptance is future-dated")
+        filings.append(filing)
+    return filings
+
+
 class EvidenceProvider:
     def __init__(self, settings, store, data, client=None):
         self.cfg, self.store, self.data = settings, store, data
@@ -80,7 +102,7 @@ class EvidenceProvider:
         cached = self.store.get(symbol, "evidence_cache")
         if (
             cached
-            and cached.get("sec_schema") == 2
+            and cached.get("sec_schema") == 3
             and not fresh
             and timedelta(0)
             <= now() - dt(cached["fetched_at"])
@@ -134,7 +156,11 @@ class EvidenceProvider:
                             namespaces[tag] = namespace
                             values[tag] = {
                                 unit: sorted(
-                                    [v for v in records if v.get("filed", "") <= now().date().isoformat()],
+                                    [
+                                        v
+                                        for v in records
+                                        if v.get("filed", "") < started_at.date().isoformat()
+                                    ],
                                     key=lambda x: (x.get("filed", ""), x.get("end", "")),
                                     reverse=True,
                                 )[:12]
@@ -147,7 +173,7 @@ class EvidenceProvider:
                     "entity": raw["entityName"],
                     "facts": values,
                     "fact_taxonomies": namespaces,
-                    "caution": "Facts may repeat/restated; compare matching fiscal durations and units; do not sum overlapping YTD periods.",
+                    "caution": "Date-only facts filed today are excluded because availability time is unknown. Facts may repeat/restated; compare matching fiscal durations and units; do not sum overlapping YTD periods.",
                 }
             else:
                 recent = raw["filings"]["recent"]
@@ -155,12 +181,7 @@ class EvidenceProvider:
                     "cik": cik,
                     "name": raw["name"],
                     "sic_description": raw.get("sicDescription"),
-                    "filings": [
-                        {k: v[i] for k, v in recent.items()}
-                        for i, form in enumerate(recent["form"])
-                        if form.removesuffix("/A") in {"10-K", "10-Q", "8-K", "20-F", "6-K"}
-                        and recent["filingDate"][i] <= now().date().isoformat()
-                    ][:40],
+                    "filings": _recent_filings(recent, started_at)[:40],
                 }
             identifier = "sec-" + hashlib.sha256(dumps(content).encode()).hexdigest()[:20]
             sources.append(
@@ -172,9 +193,9 @@ class EvidenceProvider:
                     "content": content,
                 }
             )
-        news = self.data.news(symbol, (now() - timedelta(days=7)).isoformat())
+        news = self.data.news(symbol, (started_at - timedelta(days=7)).isoformat())
         for article in news:
-            if not now() - timedelta(days=7) <= dt(article["created_at"]) <= now():
+            if not started_at - timedelta(days=7) <= dt(article["created_at"]) <= started_at:
                 continue
             sources.append(
                 {
@@ -190,7 +211,7 @@ class EvidenceProvider:
                 }
             )
         bundle = {
-            "sec_schema": 2,
+            "sec_schema": 3,
             "symbol": symbol,
             "fetched_at": started_at.isoformat(),
             "sources": sources,
@@ -201,35 +222,18 @@ class EvidenceProvider:
     @traced("evidence.filings_since")
     def filings_since(self, symbol, since):
         since = dt(since)
-        if not timedelta(0) <= now() - since < timedelta(days=365):
+        cutoff = now()
+        if not timedelta(0) <= cutoff - since < timedelta(days=365):
             raise ValueError("Filing freshness cutoff is outside recent submissions coverage")
         cik = self.cfg.universe[symbol].cik.zfill(10)
         raw = self.request(f"https://data.sec.gov/submissions/CIK{cik}.json").json()
         if str(raw.get("cik", "")).zfill(10) != cik:
             raise ValueError("SEC response company identity does not match configured CIK")
         recent = raw["filings"]["recent"]
-        forms = recent["form"]
-        if (
-            not isinstance(forms, list)
-            or not forms
-            or not {"accessionNumber", "acceptanceDateTime"}.issubset(recent)
-            or any(not isinstance(v, list) or len(v) != len(forms) for v in recent.values())
-            or any(not isinstance(form, str) or not form.strip() for form in forms)
-        ):
-            raise ValueError("SEC recent submissions are empty or malformed")
-        changed = []
-        for i, form in enumerate(forms):
-            if form.removesuffix("/A") not in {"10-K", "10-Q", "8-K", "20-F", "6-K"}:
-                continue
-            filing = {key: values[i] for key, values in recent.items()}
-            if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", filing["accessionNumber"]):
-                raise ValueError("SEC filing lacks valid accession")
-            accepted = dt(filing["acceptanceDateTime"])
-            if accepted > now():
-                raise ValueError("SEC filing acceptance is future-dated")
-            if accepted >= since:
-                changed.append(filing)
-        return changed
+        filings = _recent_filings(recent, cutoff)
+        if not recent["form"]:
+            raise ValueError("SEC recent submissions are empty")
+        return [filing for filing in filings if dt(filing["acceptanceDateTime"]) >= since]
 
     @traced("evidence.documents")
     def documents(self, symbol, filing):

@@ -901,3 +901,18 @@ operator attestation, not independent API verification of delivery.
   Private evidence is retained under `state/host-outage-drill/`.
 - Updated stale README claims about prior paper acceptance, cloud monitoring,
   scheduling and protective exits to match current behavior and link the evidence.
+
+- Research timestamp boundary (local, not deployed): ingestion previously filtered
+  filings by calendar date while execution freshness used acceptance timestamps.
+  Both now share validation of material filing accessions, aware acceptance times
+  and consistent submission arrays. Research pins the cutoff before requests;
+  delayed requests cannot admit later filings or news into that evidence snapshot.
+  Same-day date-only company facts are conservatively excluded and the limitation
+  is disclosed in the source. Cache schema3 forces older bundles to be refetched.
+- Six negative regressions reproduced invalid/future acceptance and moving-cutoff
+  failures. A positive regression preserves a verified same-day accepted filing,
+  older facts and pre-cutoff news while excluding same-day date-only facts and
+  news arriving during retrieval. Full offline suite: **569 passed, 3 skipped**;
+  lint and formatting pass. No provider/model calls, orders or deployment changes.
+  This does not establish a historical point-in-time database or prove that later
+  vendor edits to old articles are unavailable; that broader provenance gate remains.

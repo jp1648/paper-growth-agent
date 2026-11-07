@@ -50,10 +50,10 @@ def test_sec_payload_must_match_configured_company(env, monkeypatch, field, valu
 def test_legacy_unverified_cache_is_refetched(env, monkeypatch):
     source = provider(env, monkeypatch)
     legacy = source.fetch("ACME")
-    legacy.pop("sec_schema")
+    legacy["sec_schema"] = 2
     source.store.put("ACME", legacy, "evidence_cache")
     bundle = source.get("ACME")
-    assert bundle["sec_schema"] == 2
+    assert bundle["sec_schema"] == 3
     assert bundle["sources"][0]["content"]["cik"] == "0000000001"
 
 
@@ -177,3 +177,128 @@ def test_incomplete_filing_history_cannot_prove_absence(env, monkeypatch, fault)
     )
     with pytest.raises(ValueError):
         source.filings_since("ACME", since)
+
+
+@pytest.mark.parametrize("fault", ["future", "missing_time", "naive_time", "bad_accession", "unequal_arrays"])
+def test_research_ingestion_requires_verified_filing_acceptance(env, monkeypatch, fault):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    monkeypatch.setattr("trader.evidence.now", lambda: AT)
+    source = provider(env, monkeypatch)
+    original = source.request
+    recent = {
+        "form": ["10-K"],
+        "filingDate": [AT.date().isoformat()],
+        "accessionNumber": ["0000000001-26-000001"],
+        "acceptanceDateTime": [(AT - timedelta(minutes=1)).isoformat()],
+    }
+    if fault == "future":
+        recent["acceptanceDateTime"] = [(AT + timedelta(seconds=1)).isoformat()]
+    elif fault == "missing_time":
+        del recent["acceptanceDateTime"]
+    elif fault == "naive_time":
+        recent["acceptanceDateTime"] = [AT.replace(tzinfo=None).isoformat()]
+    elif fault == "bad_accession":
+        recent["accessionNumber"] = ["unverified"]
+    else:
+        recent["acceptanceDateTime"].append(AT.isoformat())
+    monkeypatch.setattr(
+        source,
+        "request",
+        lambda url: (
+            original(url)
+            if "companyfacts" in url
+            else httpx.Response(200, json={"cik": 1, "name": "ACME", "filings": {"recent": recent}})
+        ),
+    )
+    with pytest.raises(ValueError):
+        source.get("ACME", fresh=True)
+    assert source.store.get("ACME", "evidence_cache") is None
+
+
+def test_research_fetch_pins_cutoff_before_requests(env, monkeypatch):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    current = [AT]
+    monkeypatch.setattr("trader.evidence.now", lambda: current[0])
+    source = provider(env, monkeypatch)
+    original = source.request
+
+    def request(url):
+        current[0] = AT + timedelta(minutes=1)
+        if "companyfacts" in url:
+            return original(url)
+        return httpx.Response(
+            200,
+            json={
+                "cik": 1,
+                "name": "ACME",
+                "filings": {
+                    "recent": {
+                        "form": ["8-K"],
+                        "filingDate": [AT.date().isoformat()],
+                        "accessionNumber": ["0000000001-26-000001"],
+                        "acceptanceDateTime": [(AT + timedelta(seconds=1)).isoformat()],
+                    }
+                },
+            },
+        )
+
+    monkeypatch.setattr(source, "request", request)
+    with pytest.raises(ValueError, match="future-dated"):
+        source.get("ACME", fresh=True)
+    assert source.store.get("ACME", "evidence_cache") is None
+
+
+def test_fetch_keeps_verified_same_day_filing_but_excludes_date_only_facts(env, monkeypatch):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    current = [AT]
+    monkeypatch.setattr("trader.evidence.now", lambda: current[0])
+    source = provider(env, monkeypatch)
+    original = source.request
+    accepted = (AT - timedelta(seconds=1)).isoformat()
+
+    def request(url):
+        current[0] = AT + timedelta(minutes=1)
+        if "companyfacts" in url:
+            raw = original(url).json()
+            raw["facts"]["us-gaap"]["NetIncomeLoss"]["units"]["USD"].append(
+                {"val": 999, "filed": AT.date().isoformat()}
+            )
+        else:
+            raw = {
+                "cik": 1,
+                "name": "ACME",
+                "filings": {
+                    "recent": {
+                        "form": ["10-K"],
+                        "filingDate": [AT.date().isoformat()],
+                        "accessionNumber": ["0000000001-26-000001"],
+                        "acceptanceDateTime": [accepted],
+                    }
+                },
+            }
+        return httpx.Response(200, json=raw)
+
+    monkeypatch.setattr(source, "request", request)
+    source.data.news_items = [
+        {"id": str(offset), "created_at": (AT + timedelta(seconds=offset)).isoformat(), "headline": "Fixture"}
+        for offset in (-1, 1)
+    ]
+    bundle = source.get("ACME", fresh=True)
+    assert bundle["fetched_at"] == AT.isoformat()
+    assert bundle["sources"][0]["content"]["facts"]["NetIncomeLoss"]["USD"] == [
+        {"val": 10, "filed": "2026-01-01"}
+    ]
+    assert bundle["sources"][1]["content"]["filings"][0]["acceptanceDateTime"] == accepted
+    assert [s["published_at"] for s in bundle["sources"] if s["id"].startswith("news-")] == [
+        (AT - timedelta(seconds=1)).isoformat()
+    ]
+    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 3
