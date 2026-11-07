@@ -32,6 +32,28 @@ MUTATIONS = {
     ),
     "loss_cancel": ("trader/service.py", 'or (loss_blocked and o["side"] == "buy")', "or False"),
     "transport_preflight": ("trader/alpaca.py", "if before_send is not None:", "if False:"),
+    "missing_history": ("trader/service.py", "if missing:", "if False:"),
+    "conflicting_history": (
+        "trader/service.py",
+        "if identifier in incoming and incoming[identifier] != activity:",
+        "if False:",
+    ),
+    "history_pause": (
+        "trader/service.py",
+        "if isinstance(error, BrokerHistoryError) and not self.kill_path.exists():",
+        "if False:",
+    ),
+    "cached_normalization": (
+        "trader/service.py",
+        'research_reasons.append("Valuation normalization review is missing or unresolved")',
+        "pass",
+    ),
+    "lead_normalization": (
+        "trader/research_team.py",
+        'or not normalization_supported(self.reports["valuation"])',
+        "or False",
+    ),
+    "activity_pagination_cycle": ("trader/alpaca.py", "if token in cursors:", "if False:"),
 }
 
 
@@ -61,6 +83,8 @@ def main():
                         "tests/test_financials.py",
                         "tests/test_loss_limits.py",
                         "tests/test_executor_owner.py",
+                        "tests/test_adapters.py",
+                        "tests/test_research_team.py::test_final_lead_cannot_override_normalization_gap",
                         "--junitxml=mutation.xml",
                     ],
                     cwd=target,
@@ -83,6 +107,9 @@ def main():
                     result.returncode != 0 if mutation is None else result.returncode != 1 or not failures
                 ):
                     print(f"{name}: INVALID or SURVIVED; failures={failures}, errors={errors}")
+                    for case in report.findall(".//testcase"):
+                        if case.find("failure") is not None or case.find("error") is not None:
+                            print(f"  {case.get('classname')}::{case.get('name')}")
                     return 1
                 print(f"{name}: " + ("passed" if mutation is None else f"caught ({failures} failing tests)"))
             finally:

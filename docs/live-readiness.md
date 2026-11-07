@@ -1087,3 +1087,19 @@ operator attestation, not independent API verification of delivery.
   production database, broker or model calls. This accelerated scenario is not a
   multi-hour capacity/latency benchmark and does not close disk exhaustion or
   retention requirements. No production implementation changes were necessary.
+
+- Safety mutation coverage expanded from ten to sixteen selected guards. New
+  isolated mutations disable missing-history rejection, conflicting-activity
+  rejection, persistent history pause, cached normalization enforcement, lead
+  normalization veto and activity pagination-cycle detection. Unchanged baseline
+  passes; every mutation produces assertion failures (respectively 2, 1, 3, 4,
+  2 and 1). All original ten mutations remain detected. Collection/setup errors
+  are not accepted as successful detection, and invalid runs now name failed cases.
+- The initial expanded baseline exposed unrelated research tests needing a config
+  file not copied by the harness; narrowed selection to the exact lead-normalization
+  regression rather than treating those baseline failures as mutation evidence.
+  Final runner exits zero. Ruff/format/whitespace pass. CI already invokes this
+  runner, so these checks join the existing release gate. Production source was
+  never mutated: changes run in disposable copies. No broker/model requests.
+  This is targeted invariant evidence, not exhaustive mutation coverage or proof
+  of investment quality. Live readiness remains NO-GO.
