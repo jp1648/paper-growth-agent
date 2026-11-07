@@ -219,3 +219,47 @@ charge, within the temporary $30 validation ceiling. Further new research that
 day is budget-blocked; monitoring and reconciliation continue. Original cohort
 scores remain unchanged: the quality target is unmet and no profitable edge or
 independent human semantic approval is claimed.
+
+## Forward-paper protocol v1 — declared, not activated
+
+`evaluations/forward-paper-v1.json` is the predeclared observation protocol. Its
+SHA-256 is `2e5591df3f67e5765c02bf4dd23229fb961d122eef155206dddc4e43b3147245`.
+The declaration precedes collection of this study's outcomes; prior development
+runs and the existing AAPL smoke position are not a completed prospective study.
+The minimum sample thresholds are engineering pilot requirements, not a claim of
+statistical power or a guarantee of safe/profitable live trading.
+
+Activation requires critical safety/account gates, independently accepted research,
+complete cost reporting, comparable total-return data, and an operator-approved
+manifest binding the candidate, protocol hash, configuration, opening portfolio
+and start session. No start date is backfilled. Current status is **not started**;
+a protocol declaration does not authorize orders, paid research or clearing pause.
+
+Observe at least 60 regular sessions and 12 calendar weeks (whichever ends later).
+Require 30 independently reviewed completed investigations across five symbols and
+ten closed position episodes for an informative pilot assessment. These are
+measurement minimums, never trading quotas. Insufficient activity is INCONCLUSIVE;
+never force sales, replace abstentions with orders, silently extend the window or
+select a better-looking historical interval to pass. Report dependence and market
+regime limitations even when numerical minimums are met.
+
+The primary baseline is SPY total return, with QQQ and verified uninvested-cash
+returns as descriptive secondary baselines. Align windows, cash flows, dividend/
+withholding assumptions and valuation times; include execution assumptions and
+all allocated operating costs. Current price-only benchmark reports and partial
+cost totals cannot satisfy this requirement. Benchmark/cost implementation and
+independent verification remain outstanding.
+
+The protocol specifies drawdown, turnover, exposure, execution shortfall, complete
+research costs including failures, abstentions, operational incidents and paired
+excess-return uncertainty. Block resampling parameters are declared in the JSON;
+its implementation still needs an independently checked numerical fixture. Neither
+an interval spanning zero nor positive point returns alone substantiates an edge.
+Do not optimize block lengths, benchmarks or acceptance thresholds after outcomes.
+
+Existing holdings remain in the opening reconciled portfolio and total P/L,
+with their legacy origin disclosed. Material candidate changes preserve the
+predecessor record and require a newly declared candidate window. Safety incidents
+stop the study and remain reported; they are not excluded as warm-up. A completed
+observation window is only input to independent review and the separate live
+pilot contract; it never automatically activates real-money trading.

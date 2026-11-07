@@ -994,3 +994,13 @@ operator attestation, not independent API verification of delivery.
   on the server. Password rotation invalidates all signatures, but per-session
   revocation and online authentication abuse/load handling remain open security
   requirements. This matrix does not constitute a penetration test.
+
+- Forward-paper acceptance protocol declared in `evaluations/forward-paper-v1.json`
+  and explained in `docs/evaluation.md`. Fixes previously unspecified observation
+  window, information minimums, primary/secondary baselines, cost scope, uncertainty
+  method, change handling and inconclusive/stopped outcomes before study results
+  exist. Declaration status is not_started, not a passing evaluation. Current
+  price-only benchmarks/partial costs cannot satisfy it. No start session selected,
+  paid research performed, orders submitted, portfolio reset or pause cleared.
+  Total-return/cost and numerical analysis implementation, independent review and
+  prospective observations remain open; no investment edge is claimed.

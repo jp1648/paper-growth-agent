@@ -1,0 +1,89 @@
+{
+  "protocol_id": "forward-paper-v1",
+  "status": "predeclared_not_started",
+  "purpose": "Evidence for a separately approved supervised live pilot, not a profitability certification",
+  "source_commit_at_declaration": "6e4559db12d96e10355f1eae5c9668f7969a099d",
+  "activation_requires": [
+    "Critical safety and account-contract gates passed",
+    "Independent sufficient-evidence research acceptance",
+    "Complete cost and comparable total-return reporting",
+    "Explicit operator approval of a frozen paper observation manifest"
+  ],
+  "manifest_required": [
+    "protocol_sha256",
+    "start_session",
+    "candidate_source_commit",
+    "image_digest",
+    "prompt_hashes",
+    "requested_model_versions",
+    "config_sha256",
+    "universe_and_sectors",
+    "experiment_id",
+    "opening_cash_positions_and_reservations",
+    "broker_reconciliation",
+    "benchmark_data_method",
+    "cost_allocation_method",
+    "reviewer_identity"
+  ],
+  "window": {
+    "minimum_regular_sessions": 60,
+    "minimum_calendar_weeks": 12,
+    "start": "First full broker-calendar regular session after activation requirements pass; record before collecting outcomes",
+    "end": "Later of session 60 close and first session close at or after 12 calendar weeks",
+    "safety_stop": "Immediate pause on invariant breach; retain all outcomes and costs; stopped study cannot pass"
+  },
+  "minimum_information": {
+    "independently_reviewed_completed_investigations": 30,
+    "distinct_symbols_reviewed": 5,
+    "closed_position_episodes": 10,
+    "insufficient_sample": "INCONCLUSIVE; no forced trades, automatic extension or retrospective window selection"
+  },
+  "baselines": {
+    "primary": "SPY buy-and-hold total return",
+    "secondary": [
+      "QQQ buy-and-hold total return",
+      "Uninvested cash using actual broker cash interest, zero only if verified"
+    ],
+    "requirements": [
+      "Same observation window and external-flow schedule",
+      "Common currency and declared dividend/withholding treatment",
+      "Aligned regular-session close and dated source provenance",
+      "Include simulated execution fees/slippage for investable baselines",
+      "No comparison of portfolio total return with benchmark price return"
+    ]
+  },
+  "metrics": [
+    "Flow-adjusted total return before operating costs",
+    "Return after all allocated model/data/infrastructure costs",
+    "Primary and secondary benchmark excess return",
+    "Maximum drawdown and daily return series",
+    "Turnover and exposure/concentration",
+    "Decision completion and independently reviewed claim support",
+    "All attempts cost and latency including failures",
+    "Fill/reject/cancel rates and observed execution shortfall",
+    "Abstention counts and reasons",
+    "Operational incidents and time to detection/recovery"
+  ],
+  "acceptance": {
+    "safety": "Zero unexplained broker/ledger divergence, duplicate submissions, unauthorized exposure or guard bypasses; every incident reviewed",
+    "research": "At least 90 percent completion on predeclared sufficient-evidence cases; no materially unsupported BUY/ADD; independent review of every actionable decision",
+    "data": "No missing required sessions, unresolved charges or unmatched cost allocation; noncomparable baselines block acceptance",
+    "performance": "Positive after-cost excess return over the primary benchmark is necessary but insufficient; dependence-aware uncertainty and independent economic review required. Interval spanning zero cannot substantiate positive edge",
+    "decision": "GO requires all engineering/account gates, adequate sample and independent review; otherwise NO-GO or INCONCLUSIVE. No automatic live promotion"
+  },
+  "analysis": {
+    "uncertainty": "Report primary excess-return uncertainty using paired daily observations and 5-session block resampling, 10000 resamples, seed 1648; sensitivity at 10-session blocks. Treat small-sample/regime limits explicitly; do not infer independence from trade count",
+    "secondary_metrics": "Descriptive only; do not substitute a better-performing secondary benchmark for primary",
+    "exclusions": "None after activation: failures, downtime, abstentions and costs remain in denominators",
+    "existing_holdings": "Include existing paper holdings at opening broker marks and disclose legacy origin; separately describe new decisions without excluding legacy P/L from the portfolio",
+    "changes": "Retain predecessor study; a material code/prompt/model/config/universe change starts a new preregistered candidate window, not a relabeled continuation",
+    "budget": "Existing authorized daily/run caps apply; insufficient budget delays activation or yields inconclusive observations, not permission to spend more"
+  },
+  "non_authorizations": [
+    "No new orders",
+    "No autonomous trading resume",
+    "No paid model run",
+    "No live credentials/endpoints",
+    "No history reset or liquidation"
+  ]
+}
