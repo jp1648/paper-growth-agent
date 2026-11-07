@@ -949,3 +949,20 @@ operator attestation, not independent API verification of delivery.
   This closes local pagination handling, not vendor completeness: update-window
   semantics for old revisions and entitlement/delivery delays remain unverified.
   The fixed-window pagination is not a provider-guaranteed atomic snapshot.
+
+- Evidence batch deployed from `07b4d71` after CI `42320915120` passed backend,
+  database, mutation, dashboard/browser and secret checks. Cloud Build
+  `e90de396-cdb4-4657-ad29-f80a5db111eb` used 30 allowlisted tracked files,
+  excluding credentials/runtime state, producing agent digest
+  `811cadda599e766be764b2a23ba5e2e0c2bcce87ed4e7c5967f777a722ecac15`.
+  All 26 installed Python source hashes matched in a network-isolated container.
+- Rollout retained config hash `d255b4f99146aeb11df5092a0c73168fed600334e28ea8f792e83235d9fec76a`,
+  the pause, original experiment and ledger. Private rollback snapshot retained;
+  no ledger restore occurred. New-container health and reconciliation passed at
+  2026-11-07T00:58:41Z. Counts remained acceptance8/activity2/intent2/order1,
+  with no working orders and one AAPL share. Dashboard image was unchanged.
+  Receipts: ignored `state/evidence-release-07b4d71/`.
+- This deploys the empty-passage, fixed-cutoff, revised-news and pagination fixes;
+  it does not close the outstanding vendor-coverage, independent semantic-review,
+  replacement-host in-flight recovery or real-money approval gates. No research
+  investigation or order test was launched during the rollout. Trading is paused.
