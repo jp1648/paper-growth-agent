@@ -109,6 +109,7 @@ test("accepted investigation is readable and trace filters work", async ({
         evidence_ids: ["source-1"],
       },
       reports: {
+        valuation: { normalization_review: {} as Record<string, unknown> },
         business: { conclusion: "Complete findings preserved." },
         adversarial: {
           unresolved_material_gaps: true,
@@ -176,6 +177,42 @@ test("accepted investigation is readable and trace filters work", async ({
     page.getByRole("heading", { name: "WATCH — no trade proposed" }),
   ).toBeVisible();
   await expect(page.getByText("Material evidence gaps remain")).toBeVisible();
+  const accounting = page.getByRole("region", {
+    name: "Accounting normalization review",
+  });
+  await expect(
+    accounting.getByText("No accounting normalization review saved."),
+  ).toBeVisible();
+  original.snapshot.runs[0].reports.valuation.normalization_review = {
+    cash_flow_basis:
+      "Historical cash-flow proxy; discount basis requires review.",
+    debt_and_cash: "Debt treatment is unresolved.",
+    dilution_and_sbc: "Dilution needs filing verification.",
+    nonrecurring_items: "No conclusion recorded.",
+    unresolved_material_gaps: true,
+    evidence_ids: ["source-1"],
+  };
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(
+    accounting.getByText("Agent reports unresolved accounting gaps."),
+  ).toBeVisible();
+  await accounting.locator("summary").click();
+  await expect(
+    accounting.getByText("Debt treatment is unresolved."),
+  ).toBeVisible();
+  await expect(
+    accounting.getByText(/not independent verification/),
+  ).toBeVisible();
+  await expect(accounting.getByText("source-1", { exact: true })).toBeVisible();
+  original.snapshot.runs[0].reports.valuation.normalization_review.unresolved_material_gaps = false;
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(
+    accounting.getByText("Agent reports no material accounting gaps."),
+  ).toBeVisible();
+  await expect(
+    accounting.getByText(/not independent verification/),
+  ).toBeVisible();
+
   const report = page.locator("details").filter({
     has: page.locator("summary", {
       hasText: "Business quality & financial health",

@@ -1020,3 +1020,16 @@ operator attestation, not independent API verification of delivery.
 - Full offline verification for normalization gate: **597 passed, 3 skipped**;
   lint, format and whitespace checks pass. The three opt-ins remain external
   database/paper-order integrations, not silently claimed as exercised here.
+
+- Normalization review UI (local, not deployed): investigations now highlight
+  absent accounting reviews and agent-reported gap status, with expandable
+  cash-flow basis, debt/cash, dilution/SBC, nonrecurring treatment and citation IDs.
+  Missing fields show Not recorded. The panel explicitly says agent-written
+  analysis is not independent verification or proof of fair value. Renamed the
+  adversarial agent labels so they no longer imply an independent human reviewer.
+- Production build/typecheck passed; all six dashboard unit/database tests passed
+  with a disposable local Postgres, and all five browser tests passed. Extended
+  browser coverage exercises missing/gapped/no-gap states and visible citations;
+  mobile screenshot inspected, without horizontal overflow. Disposable database
+  removed in finally. No production data, credentials, deployment or trading state
+  changed. Actual independent accounting review remains outstanding.
