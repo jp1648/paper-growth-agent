@@ -1236,3 +1236,32 @@ operator attestation, not independent API verification of delivery.
   allowance can be exhausted to deny new logins and permits fixed-window boundary
   bursts; it is not edge/DDoS protection. Those availability/load gates remain open.
   No broker orders, paid research or trading-state changes. Live readiness NO-GO.
+
+- Login-limit release deployed from `ba45f24` after CI `42326160115` passed all
+  gates. An earlier docs-only run failed while downloading a Go dependency for
+  gitleaks (upstream stream error, not a secret finding); the release's secrets
+  gate passed. Cloud Build `aedadd50-7e99-4000-8cd5-60e6c9f6dd02` packaged thirty
+  allowlisted tracked files and produced image digest
+  `9f6573d40e3625fa9630e4f6502386995662018410b97c19a070ea06f0db88ae`.
+- Applied additive counter migration through authenticated Cloud SQL proxy.
+  Verified telemetry remains SELECT-only, sessions have SELECT/INSERT/DELETE,
+  and the counter has SELECT/INSERT/UPDATE but no DELETE/TRUNCATE. Telemetry count
+  remained 563428 during migration; no trading ledger/config changes.
+- Staged `trader-dashboard-00014-dos` at zero traffic with unchanged environment
+  and service account. Actual browser attempts exhausted the allowance, rejected
+  even a correct password while saturated, and preserved an existing session.
+  Waited sixty-two seconds without editing the counter; login recovered naturally
+  at `2026-11-07T01:57:05Z`. Production still used the non-counter version during
+  this drill, so it did not deny production logins.
+- The first private verifier stalled in Playwright response.finished despite a
+  completed Cloud Run POST and authenticated polling. Confirmed via request logs,
+  stopped that specific process, removed the unnecessary body-completion wait and
+  reran with bounded response/UI waits. No application change or counter reset.
+- Staged ordinary access/revocation/UI checks passed, then promoted to 100% and
+  repeated production checks at `2026-11-07T01:57:41Z`: paused/reconciled snapshot,
+  copied-token logout denial, independent sessions, private uncached data and
+  mobile/accounting disclosures. Removed previous sessions tag; all four older
+  tagged login URLs return 404. Evidence: `state/dashboard-login-ba45f24/`.
+  Workspace-wide denial-of-login and sustained hostile-load/edge protection limits
+  remain explicit; no claim of comprehensive DoS resistance. No model calls or
+  broker orders. Remaining sixteen-item gates keep real-money readiness NO-GO.
