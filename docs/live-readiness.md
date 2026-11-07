@@ -1193,3 +1193,27 @@ operator attestation, not independent API verification of delivery.
   and reran all eight successfully. Disposable Postgres container removed afterward.
   No production migration/deployment, broker calls or paid investigations in this
   batch. Production remains on the previous dashboard until staged verification.
+
+- Database-backed session release deployed from `ad3fd1f` after CI `42325485935`
+  passed all backend/Postgres/coverage/mutation, dashboard/browser and secrets gates.
+  Cloud Build `12d3cf30-27c2-4541-8cad-c09c32bb58e6` used 30 allowlisted tracked
+  dashboard files and produced image digest
+  `6e118740597a45d822a4c9be16e38393e9f77aeb92d78e6fb0150e0f29aa8896`.
+- Applied session-table migration through authenticated Cloud SQL proxy. Verified
+  telemetry SELECT-only permissions and session SELECT/INSERT/DELETE-only grants;
+  telemetry count advanced normally from 563090 to 563091 during the transaction.
+  No trading ledger/configuration changes. Migration checksum and permission
+  receipt saved privately; no credentials emitted.
+- Staged revision `trader-dashboard-00012-wuc` at zero traffic, preserving service
+  account and environment. Actual staged browser tests verified logout rejects a
+  copied token, another independent session remains usable, malformed tokens fail,
+  private data is uncached, and accounting/mobility/pause disclosures remain valid.
+  Promoted to 100%, repeated checks on the production URL using sandboxed Chrome;
+  passed at `2026-11-07T01:47:02Z` with paused/reconciled snapshot.
+- Removed old `readiness`, `costs`, and `safety` tags so older stateless-auth builds
+  cannot remain accessible as a bypass. Verified all three former login URLs
+  return 404 and only the current revision has traffic/routes. Prior images remain
+  retained, but reverting to stateless authentication is not a safe security rollback.
+  Private evidence: `state/dashboard-sessions-ad3fd1f/`. Login abuse, broader
+  security/load checks and investment/recovery gates remain open. No model calls
+  or broker orders were made; live readiness remains NO-GO.
