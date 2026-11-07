@@ -1075,3 +1075,15 @@ operator attestation, not independent API verification of delivery.
   removed; existing containers untouched. No production database, model or broker
   requests. This proves the two export transaction boundaries, not prolonged
   outage capacity, disk exhaustion, retention or full observability availability.
+
+- Accelerated telemetry backlog recovery: four concurrent producers queue 1000
+  events with 4KiB payload bodies across five injected Postgres connection failures.
+  A fresh exporter is then stalled while 100 further events are emitted through
+  the public instrumentation path. All 1100 events remain observable locally
+  before acknowledgement and reach real isolated Postgres exactly once with
+  unchanged payloads after recovery, across bounded 200-event batches.
+- Full isolated-Postgres suite: 618 passed, one explicit paper-order test skipped;
+  Ruff/format/whitespace checks pass. Temporary tmpfs database removed. No provider,
+  production database, broker or model calls. This accelerated scenario is not a
+  multi-hour capacity/latency benchmark and does not close disk exhaustion or
+  retention requirements. No production implementation changes were necessary.

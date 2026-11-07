@@ -250,3 +250,63 @@ def test_redaction_refreshes_secrets_between_events(monkeypatch):
     assert obs.clean({"nested": ["first-private-token"]}) == {"nested": ["[REDACTED]"]}
     monkeypatch.setenv("X_BEARER_TOKEN", "second-private-token")
     assert obs.clean(["second-private-token"]) == ["[REDACTED]"]
+
+
+@pytest.mark.skipif(
+    not os.environ.get("TEST_OBSERVABILITY_DATABASE_URL"), reason="Opt-in local Postgres test"
+)
+def test_export_outage_backlog_recovers_with_concurrent_producers(sink, monkeypatch):
+    from contextlib import contextmanager
+    from threading import Event
+
+    sink.dsn = os.environ["TEST_OBSERVABILITY_DATABASE_URL"]
+    connect = psycopg.connect
+
+    def produce(index):
+        # Use the public emit path: its swallowed errors must not hide lost events.
+        obs.emit("backlog.fixture", {"index": index, "body": "x" * 4096})
+
+    def unavailable(*args, **kwargs):
+        raise psycopg.OperationalError("Injected exporter outage")
+
+    monkeypatch.setattr(psycopg, "connect", unavailable)
+    with ThreadPoolExecutor(4) as producers:
+        for batch in range(5):
+            list(producers.map(produce, range(batch * 200, (batch + 1) * 200)))
+            with pytest.raises(psycopg.OperationalError):
+                sink.flush()
+            assert len(events(sink)) == (batch + 1) * 200
+    originals = events(sink)
+    entered, release = Event(), Event()
+
+    @contextmanager
+    def slow_export(*args, **kwargs):
+        with connect(*args, **kwargs) as pg:
+            entered.set()
+            assert release.wait(10), "Concurrent producer did not finish"
+            yield pg
+
+    monkeypatch.setattr(psycopg, "connect", slow_export)
+    restarted = obs.Sink(sink.path, sink.dsn, start=False)
+    with ThreadPoolExecutor(1) as exporter:
+        exporting = exporter.submit(restarted.flush)
+        try:
+            assert entered.wait(10)
+            with ThreadPoolExecutor(4) as producers:
+                list(producers.map(produce, range(1000, 1100)))
+            pending = events(sink)
+            assert len(pending) == 1100
+            assert pending[:1000] == originals
+        finally:
+            release.set()
+        assert exporting.result(timeout=10) == 200
+    monkeypatch.setattr(psycopg, "connect", connect)
+    assert [restarted.flush() for _ in range(6)] == [200, 200, 200, 200, 100, 0]
+    assert events(sink) == []
+    ids = [row["event_id"] for row in pending]
+    with connect(sink.dsn) as pg:
+        rows = pg.execute(
+            "SELECT event_id::text, payload FROM telemetry_events WHERE event_id::text = ANY(%s)", (ids,)
+        ).fetchall()
+    assert len(rows) == 1100
+    assert dict(rows) == {row["event_id"]: row["payload"] for row in pending}
