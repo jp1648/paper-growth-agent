@@ -218,3 +218,45 @@ def test_all_matching_facts_still_require_valid_accession(accession):
         next(iter(units.values()))[0]["accn"] = accession
     with pytest.raises(ValueError, match="accession"):
         annual_cash_flow(source, "2025-12-31", CUTOFF)
+
+
+@pytest.mark.parametrize("years", [1, 5, 10])
+@pytest.mark.parametrize("discount", [".01", ".1", "1"])
+@pytest.mark.parametrize("growth", [["-.9", "0", "1"], [".01", ".1", "1"]])
+def test_valuation_matches_exact_rational_oracle(years, discount, growth):
+    from decimal import Decimal
+    from fractions import Fraction
+
+    from trader.evaluation import scenario_values
+
+    cfg = Settings(input_cost_per_million="1", output_cost_per_million="1")
+    desk = ResearchDesk(
+        cfg,
+        Evidence(),
+        {"symbol": "ACME", "portfolio": {}},
+        Evidence().get("ACME"),
+        Budget(cfg),
+        None,
+        evaluation_at=CUTOFF.isoformat(),
+    )
+    assumptions = {
+        "cash_flow_per_share": "5",
+        "financial_source_id": "fixture-sec",
+        "financial_period_end": "2025-12-31",
+        "growth_rates": growth,
+        "discount_rate": discount,
+        "terminal_multiples": ["0", "10", "100"],
+        "years": years,
+    }
+    expected = []
+    for rate, multiple in zip(growth, assumptions["terminal_multiples"]):
+        # Exact geometric series avoids the production Decimal year-by-year sum.
+        ratio = (1 + Fraction(rate)) / (1 + Fraction(discount))
+        annuity = years if ratio == 1 else ratio * (1 - ratio**years) / (1 - ratio)
+        value = 5 * (annuity + Fraction(multiple) * ratio**years)
+        expected.append(str((Decimal(value.numerator) / Decimal(value.denominator)).quantize(Decimal(".01"))))
+    tool = next(t for t in desk.tools() if t.name == "value_scenarios")
+    result = tool.invoke(assumptions)
+    assert [result[key] for key in ("bear_value", "base_value", "bull_value")] == expected
+    assert scenario_values(assumptions) == expected
+    assert result["financial_provenance"]["cash_flow_per_share"] == "5.000000"

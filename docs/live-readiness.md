@@ -1103,3 +1103,16 @@ operator attestation, not independent API verification of delivery.
   never mutated: changes run in disposable copies. No broker/model requests.
   This is targeted invariant evidence, not exhaustive mutation coverage or proof
   of investment quality. Live readiness remains NO-GO.
+
+- Independent valuation arithmetic checks: eighteen parameter combinations compare
+  the actual value_scenarios tool and evaluation replay against an exact rational
+  geometric-series oracle. Cases cover 1/5/10-year horizons, 1%/10%/100% discount
+  rates, -90% contraction through 100% growth, zero/10x/100x terminal multiples,
+  and equal growth/discount rates. Decimal conversion occurs only at final cent
+  rounding in the oracle. Source-derived cash-flow provenance remains asserted.
+- All 42 financial tests pass; full offline suite 631 passed, six opt-in skips
+  (five Postgres integration cases plus the paper-order smoke test). Ruff and
+  whitespace checks pass. No provider/model calls or changes to calculations,
+  deployment or trading state. Arithmetic agreement does not validate forecasts,
+  discount assumptions, normalization, economic fair value or investment edge;
+  those independent-review and forward-observation gates remain open.
