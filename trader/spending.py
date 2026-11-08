@@ -38,6 +38,42 @@ def spending_status(store, limit, at=None):
     }
 
 
+def research_cost_summary(store):
+    """Run-ledger amounts, including evaluations, without re-adding per-call journal costs."""
+    import json
+
+    records = [
+        json.loads(row[0])
+        for row in store.db.execute(
+            "SELECT body FROM documents WHERE scope='global' AND kind='research_spend' "
+            "AND json_extract(body, '$.experiment_id')=?",
+            (store.scope,),
+        )
+    ]
+    summary = {
+        "provider_reconciled_usd": dec(0),
+        "estimated_usd": dec(0),
+        "unresolved_recorded_usd": dec(0),
+        "settled_runs": 0,
+        "unresolved_runs": 0,
+        "unbounded_unknown_runs": 0,
+    }
+    for record in records:
+        if record.get("status") == "settled":
+            summary["settled_runs"] += 1
+            key = (
+                "provider_reconciled_usd"
+                if record.get("cost_basis") == "provider_export_reconciled"
+                else "estimated_usd"
+            )
+        else:
+            summary["unresolved_runs"] += 1
+            summary["unbounded_unknown_runs"] += bool(record.get("unrestricted_research"))
+            key = "unresolved_recorded_usd"
+        summary[key] += dec(record["usd"])
+    return summary
+
+
 class DailyReservation:
     def __init__(self, store, cfg, run_key, *, unrestricted_research=False):
         self.store, self.key = store, str(uuid4())

@@ -111,3 +111,35 @@ def test_empty_cost_history_is_not_proof_of_cost_completeness(env):
     assert result["pnl_after_recorded_costs_usd_estimate"] == 0
     assert result["unknown_cost_requests"] == 0
     assert result["complete"] is False
+
+
+def test_run_cost_view_includes_failed_evaluations_without_double_counting(env):
+    from trader.models import dec
+
+    service, broker, _ = env
+    service.reconcile()
+    store = service.store
+    store.log("model_cost", {"estimated_usd": "3.25"})
+    for key, body in {
+        "evaluation:failed": {"status": "settled", "usd": "3.25"},
+        "provider": {"status": "settled", "usd": "1.50", "cost_basis": "provider_export_reconciled"},
+        "reservation": {"status": "reserved", "usd": "5"},
+        "uncapped": {"status": "unknown", "usd": "0.25", "unrestricted_research": True},
+        "other": {"status": "settled", "usd": "1000", "experiment_id": "other"},
+    }.items():
+        store.put(
+            key, {"experiment_id": store.scope, "run_key": key, **body}, "research_spend", scope="global"
+        )
+    report = publish_snapshot(service)["portfolio"]["economic_result"]
+    assert report["research_run_ledger"] == {
+        "provider_reconciled_usd": dec("1.50"),
+        "estimated_usd": dec("3.25"),
+        "unresolved_recorded_usd": dec("5.25"),
+        "settled_runs": 2,
+        "unresolved_runs": 2,
+        "unbounded_unknown_runs": 1,
+    }
+    assert report["recorded_operating_cost_usd_estimate"] == dec("3.25")
+    assert report["pnl_after_recorded_costs_usd_estimate"] == dec("-3.25")
+    assert report["unresolved_research_runs"] == 2 and report["complete"] is False
+    assert broker.submits == 0

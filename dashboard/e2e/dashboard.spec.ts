@@ -77,6 +77,14 @@ test("accepted investigation is readable and trace filters work", async ({
     pnl_after_recorded_costs_usd_estimate: "-6.25",
     unknown_cost_requests: 2,
     unresolved_research_runs: 1,
+    research_run_ledger: {
+      provider_reconciled_usd: "1.5",
+      estimated_usd: "3.25",
+      unresolved_recorded_usd: "5",
+      settled_runs: 2,
+      unresolved_runs: 1,
+      unbounded_unknown_runs: 0,
+    },
     complete: false,
     scope: "Current experiment journal only.",
     limitations: [
@@ -141,6 +149,14 @@ test("accepted investigation is readable and trace filters work", async ({
   );
   await page.getByRole("button", { name: /Refresh/ }).click();
   const economic = page.getByRole("region", { name: "Economic result" });
+  const runCosts = page.getByRole("region", { name: "Research run ledger" });
+  await expect(
+    runCosts.getByText(/Provider-reconciled: \$1.5000/),
+  ).toBeVisible();
+  await expect(runCosts.getByText(/Estimated: \$3.2500/)).toBeVisible();
+  await expect(
+    runCosts.getByText(/do not add the two views together/),
+  ).toBeVisible();
   await expect(economic.getByText("-$6.2500", { exact: true })).toBeVisible();
   await expect(
     economic.getByText(/2 unpriced requests · 1 unresolved research runs/),

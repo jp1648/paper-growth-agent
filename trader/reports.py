@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 from .accounting import recent_turnover
 from .models import ZERO, dec, dt, now
 from .observability import traced
-from .spending import spend_breakdown, spending_status
+from .spending import research_cost_summary, spend_breakdown, spending_status
 
 
 @traced("report.portfolio", inputs=lambda service: {})
@@ -32,18 +32,14 @@ def _portfolio_report(service):
     data_costs = store.events("data_cost")
     expenses = spend_breakdown(store, [x["body"] for x in costs])
     known_expenses = sum((row["known_usd"] or ZERO for row in expenses), ZERO)
-    unresolved = store.db.execute(
-        "SELECT count(*) FROM documents WHERE scope='global' AND kind='research_spend' "
-        "AND json_extract(body, '$.experiment_id')=? "
-        "AND json_extract(body, '$.status')!='settled'",
-        (store.scope,),
-    ).fetchone()[0]
+    run_costs = research_cost_summary(store)
     economic_result = {
         "broker_pnl_usd": pnl,
         "recorded_operating_cost_usd_estimate": known_expenses,
         "pnl_after_recorded_costs_usd_estimate": pnl - known_expenses,
         "unknown_cost_requests": sum(row["unknown_requests"] for row in expenses),
-        "unresolved_research_runs": unresolved,
+        "unresolved_research_runs": run_costs["unresolved_runs"],
+        "research_run_ledger": run_costs,
         "complete": False,
         "scope": "Current experiment journal only; not provider invoices or all platform spending.",
         "limitations": [

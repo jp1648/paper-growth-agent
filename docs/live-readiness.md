@@ -1814,3 +1814,21 @@ operator attestation, not independent API verification of delivery.
   config hashes, and the durable pause. No paid model calls or orders in this step.
   Private evidence: `state/marks-release-0f2fa44/`. No claim of complete total-return
   reporting, paper-trial activation or live readiness follows from this rollout.
+
+## Evaluation cost visibility (2026-11-08 UTC)
+
+- Added a separate current-experiment research run-ledger view to portfolio
+  snapshots and the dashboard. It includes failed evaluations and distinguishes
+  provider-export-reconciled amounts, settled estimates, and unresolved recorded
+  reservations, with counts of unresolved uncapped runs. The reconciliation
+  classification matches the retained provider settlement receipts.
+- This view overlaps per-call journal costs and is not added to the existing
+  P/L estimate. Infrastructure/data allocation and full economic-return reporting
+  remain incomplete; older snapshots render without the new optional field.
+- Validation: 670 backend tests passed, seven external opt-in tests skipped;
+  seven dashboard unit tests and eleven browser tests passed against disposable
+  local Postgres. Production build, TypeScript and Ruff checks passed. Regression
+  coverage checks experiment isolation, failed evaluation inclusion and no cost
+  double counting. No paid requests or broker submissions occurred.
+- Source is ready for CI and deployment; this entry does not claim the deployed
+  dashboard already exposes the new view. Independent Apple review remains pending.

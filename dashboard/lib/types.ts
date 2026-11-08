@@ -46,6 +46,14 @@ export interface Snapshot {
       pnl_after_recorded_costs_usd_estimate: Amount;
       unknown_cost_requests: number;
       unresolved_research_runs: number;
+      research_run_ledger?: {
+        provider_reconciled_usd: Amount;
+        estimated_usd: Amount;
+        unresolved_recorded_usd: Amount;
+        settled_runs: number;
+        unresolved_runs: number;
+        unbounded_unknown_runs: number;
+      };
       complete: boolean;
       scope: string;
       limitations: string[];

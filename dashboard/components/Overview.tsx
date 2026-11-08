@@ -78,6 +78,41 @@ export default function Overview({
               runs. These are excluded from recorded costs, not treated as free.
             </p>
             <p className="muted">{p.economic_result.scope}</p>
+            {p.economic_result.research_run_ledger && (
+              <section aria-label="Research run ledger">
+                <h3>Research run ledger · includes evaluations</h3>
+                <p>
+                  Provider-reconciled:{" "}
+                  {money(
+                    p.economic_result.research_run_ledger
+                      .provider_reconciled_usd,
+                    4,
+                  )}
+                  {" · "}Estimated:{" "}
+                  {money(
+                    p.economic_result.research_run_ledger.estimated_usd,
+                    4,
+                  )}
+                  {" · "}Unresolved amounts:{" "}
+                  {money(
+                    p.economic_result.research_run_ledger
+                      .unresolved_recorded_usd,
+                    4,
+                  )}
+                </p>
+                <p className="muted">
+                  {p.economic_result.research_run_ledger.settled_runs} settled
+                  runs · {p.economic_result.research_run_ledger.unresolved_runs}{" "}
+                  unresolved runs ·{" "}
+                  {p.economic_result.research_run_ledger.unbounded_unknown_runs}{" "}
+                  unknown uncapped runs. Current experiment only. Estimates and
+                  unresolved amounts are not final bills. This overlaps the
+                  journal costs above; do not add the two views together.
+                  Infrastructure and data costs are excluded from this
+                  model-only ledger.
+                </p>
+              </section>
+            )}
             <ul className="muted">
               {p.economic_result.limitations.map((note) => (
                 <li key={note}>{note}</li>
