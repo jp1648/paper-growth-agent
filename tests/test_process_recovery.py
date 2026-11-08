@@ -1,5 +1,6 @@
 """Real SIGKILL at durable boundaries against a loopback, non-trading broker."""
 
+import copy
 import json
 import os
 import signal
@@ -194,6 +195,7 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
             cid = next(iter(broker.orders))
             assert broker.orders[cid]["status"] == "pending_cancel"
             assert reopened.get(cid, "order")["status"] == "partially_filled"
+            stale = copy.deepcopy(reopened.get(cid, "order"))
             assert recovered.kill_path.exists()
             assert recovered.reservation_summary() == dec("601")
             # A terminal broker order arrives before its additional fill activity.
@@ -219,6 +221,18 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
             assert recovered.reservation_summary() == 0
             assert recovered.kill_path.exists()
             assert len(broker.cancels) == 1
+            assert broker.submits == 1
+            # A lagging broker replica resurfaces the earlier partial order after recovery.
+            terminal_order = copy.deepcopy(broker.orders[cid])
+            broker.orders[cid] = stale
+            recovered.reconcile()
+            assert reopened.get(cid, "order")["status"] == terminal
+            assert reopened.get(cid, "intent")["status"] == "complete"
+            assert recovered.reservation_summary() == 0
+            broker.orders[cid] = terminal_order
+            recovered.reconcile()
+            assert len(reopened.items("activity")) == 2
+            assert len(reopened.events("broker_activity")) == 2
             assert broker.submits == 1
             assert recovered.execute(decision, "new-after-process-restore")["status"] == "rejected"
         elif stage == "prepared":

@@ -2307,3 +2307,28 @@ for intents/orders/activities/acceptances/adjustments/revisions remained
 is `state/release-rollback-87afdb8` on the VM; private local release evidence is
 `state/release-87afdb8/`. These checks do not certify investment reasoning,
 normalization, the net-return measurement pipeline or prospective trial completion.
+
+## Stale broker response after combined cancellation recovery
+
+Extended the four real-SIGKILL cancellation-race drills with a stale partial-order
+response after terminal recovery. The drills already combine a four-share fill,
+cancellation (including lost acknowledgement), abrupt process death, restoration
+of an older consistent ledger, delayed final activity and either full fill or
+cancellation with six shares filled. The new stage resurfaces the earlier partial
+order while retaining the final broker cash, position and activity history.
+
+The regression failed before the fix: Store correctly retained the terminal
+order, but reconciliation used the rejected raw response to change the intent
+from complete back to submitted. Reconciliation now derives intent state from
+the same retained order after Store applies its existing monotonic update rules.
+It does not ignore missing activities, alter original fills, or invent a broker
+cancellation. The drills verify terminal intent/order agreement, zero remaining
+reservation, exactly two recorded fills, one submission and one cancellation,
+and a preserved pause after the broker returns to its current response.
+
+These are isolated loopback broker drills with actual child-process SIGKILL and
+SQLite backup restore, not evidence of a real broker incident or a destructive
+replacement-host test. Focused recovery/execution tests: 45 passed.
+Full offline validation passed: 783 tests, 7 skipped; Ruff, formatting and diff
+checks passed. This follow-up fix is not yet deployed. No provider/model calls or
+real orders were made; the executor remains paused on release `87afdb8`.

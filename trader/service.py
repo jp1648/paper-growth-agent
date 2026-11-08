@@ -150,6 +150,8 @@ class Service:
                     if intent:
                         self.validate_order(order, intent)
                     self.store.order(order)
+                    # Store rejects stale updates; intent state must use the retained order too.
+                    known[order["client_order_id"]] = self.store.get(order["client_order_id"], "order")
                 for a in incoming.values():
                     if a["id"] not in effective:
                         self.store.put(a["id"], a, "activity")
