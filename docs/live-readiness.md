@@ -1382,3 +1382,17 @@ operator attestation, not independent API verification of delivery.
   for actual broker partition timing, a replacement-host failover drill, or proof
   of recovery when both persistent storage and the remote checkpoint are lost.
   No paid calls, production state changes, or trading activation occurred.
+
+- Actual disposable Postgres verification: all fourteen observability tests passed,
+  including process SIGKILL before/after remote commit and duplicate batch replay.
+  Then paused the isolated database container for 120.99 seconds, producing 600
+  events with 4 KiB payloads across 24 failed real connection/export attempts.
+  Every failed export retained the complete queued count. After unpausing, reopened
+  the sink on the same outbox, exported all 600, and compared every event UUID and
+  payload against Postgres: exact match, no duplicates, empty final outbox.
+- Private drill script/receipt retained in `state/postgres-outage-drill/`; only
+  the named disposable container was removed afterward. Existing databases and
+  production services were untouched. This establishes a two-minute paused-server
+  outage recovery, not multi-hour retention, a full disk, production alert delivery
+  or a network partition during an in-flight database commit. Those gates remain
+  open. No model calls or orders were made.
