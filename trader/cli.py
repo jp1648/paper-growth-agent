@@ -77,6 +77,11 @@ def main(argv=None):
     )
     paper_analysis.add_argument("--input", required=True)
     paper_analysis.add_argument("--output", required=True)
+    paper_observations = sub.add_parser(
+        "build-paper-observations", help="Offline economic NAV to paired returns; no broker"
+    )
+    paper_observations.add_argument("--input", required=True)
+    paper_observations.add_argument("--output", required=True)
     actions = sub.add_parser(
         "capture-corporate-actions", help="Read-only market-data evidence capture; no broker"
     )
@@ -94,6 +99,11 @@ def main(argv=None):
     entitlement.add_argument("directory")
     entitlement.add_argument("--input", required=True)
     args = parser.parse_args(argv)
+    if args.command == "build-paper-observations":
+        from .paper_observations import build_file
+
+        print(json.dumps(build_file(args.input, args.output), indent=2))
+        return 0
     if args.command == "audit-dividend-entitlements":
         from .dividends import audit_entitlements
 

@@ -5,6 +5,29 @@ approve live activation or real-money orders. Preserve paper experiment/history,
 reservations, current deployment and approved spending limits. Local changes are
 not deployment evidence. Do not claim an investment edge from operational tests.
 
+## November 8 economic-NAV observation builder — local only
+
+The new offline `build-paper-observations` command converts supplied portfolio
+and SPY economic-NAV claims into gross and after-external-cost daily returns for
+the existing paired analysis. Net dividend receivables are added only when not
+already included in reported equity; settlement does not create income again.
+Final cumulative model/data/infrastructure/other costs are deducted once, with
+explicit category evidence and zero values required. Unknown expenses, unknown
+net entitlements, missing sessions, nonpositive NAV and any gross external flow
+stop construction. Existing broker fees must already be in reported equity.
+
+Verification: **814 passed, 7 skipped** in the full local Python suite; Ruff
+passed. New regressions cover entitlement/payment/withholding arithmetic,
+opening receivables, benchmark expenses, accumulated costs, rejected incomplete
+inputs, offsetting external flows, immutable output and the uncertainty pipeline.
+See [the input contract](paper-measurement-contract.md#economic-nav-to-paired-observations).
+
+This is not an authenticated balance/cost collector or study acceptance gate.
+Source coverage, invoice overlap/allocation, real benchmark holdings and
+reinvestment, calendar evidence and independent review remain open. The no-flow
+policy must be approved in a frozen manifest. No paid calls, broker requests,
+deployment, trial activation or trading-pause change occurred in this step.
+
 ## Requirement-to-evidence ledger
 
 | # | Requirement | Current evidence and remaining gate |

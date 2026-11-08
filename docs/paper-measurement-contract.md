@@ -181,3 +181,61 @@ high is reached. These are session-close drawdowns, not intraday extremes.
 The calculation does not upgrade input declarations into verified after-cost
 returns. Complete external-flow treatment, economic NAV, cost allocation and
 calendar/source evidence still have to be established before study acceptance.
+
+## Economic NAV to paired observations
+
+`paper-agent build-paper-observations --input nav.json --output returns.json`
+is an offline, configuration-free calculation. It creates a new output only and
+hashes the exact input bytes. The output can feed `analyze-paper-returns` once its
+60-session/12-week requirements are met. Shorter datasets can be built for
+diagnostics but cannot pass that analysis window check.
+
+Input version 1 declares `currency: "USD"`, `benchmark: "SPY"`,
+`flow_policy: "no_external_flows"`, `source_manifest_sha256`, `benchmark_method`,
+`cost_allocation_method`, and an ordered `expected_sessions` list. `opening` has a
+canonical `date` before the first session and separate `portfolio` and `benchmark`
+NAV claims. `observations` has one row per expected session, with the same two
+claims plus `date`, `flow_evidence`, `external_deposits` and `external_withdrawals`.
+Both gross flow directions must be explicitly zero. An offsetting deposit and
+withdrawal stops this calculation; they cannot be hidden as zero net flow.
+This policy requires approval in the frozen study manifest before activation.
+
+Each NAV claim contains:
+
+- `reported_equity`: cash and marked holdings, already reflecting broker fees
+  and any settled dividend cash. Supply benchmark holdings/cash under the frozen
+  investment policy separately; never submit benchmark orders.
+- `net_receivables_not_in_equity`: supported unpaid entitlements after known
+  withholding/fees, excluding receivables already included in reported equity.
+  Unknown future deductions cannot be represented by the gross entitlement.
+- `evidence`: a nonempty retained-source reference, and `complete: true` only
+  when the input preparer has reconciled the required components.
+- `cumulative_external_costs`: exactly `model`, `data`, `infrastructure`, and
+  `other`. Each has `amount`, `status: "final"`, and `evidence`. Amounts are
+  cumulative observation-window allocated expenses **not already in reported
+  equity**, including failed attempts. Explicit supported zeros are required.
+  Estimates, reservations and unknown charges stop finalization. Invoice/run
+  overlap, allocation windows and duplicate attribution require source review.
+
+Monetary inputs are decimal strings or integers. Opening cumulative costs are
+zero; subsequent costs cannot decrease within a version. A refund/correction
+requires a new consistently restated input/output pair, preserving the original.
+Each category's final cost evidence may reference a shared invoice, but the
+allocation must not charge the same expense twice. This calculator cannot infer
+that from an opaque reference.
+
+For each side, gross economic NAV is reported equity plus the net receivable;
+after-cost NAV deducts cumulative external expenses. This is an economic expense
+overlay on the actual account, not hypothetical sales or a simulation of the
+returns the account would have earned if each external expense had been paid
+from broker cash. Gross returns are before these external expenses but **after**
+broker fees and withholding. Both daily return chains divide current NAV by
+previous NAV and subtract one; nonpositive NAV blocks percentage chaining.
+Payment moves a receivable into cash without creating a second income event.
+
+Tests cover net dividend recognition, settlement, opening entitlements, separate
+benchmark costs, cumulative expense treatment, unknown/missing inputs, offsetting
+flows, immutable output and connection to the existing uncertainty calculation.
+They do not authenticate source claims or validate benchmark reinvestment, marks,
+splits or calendar coverage. The command does not collect balances, reconcile
+invoices, modify the ledger, activate a trial or confer investment acceptance.

@@ -19,7 +19,7 @@ independent acceptance of that abstention is pending.
 |---|---|---|
 | Arithmetic | Required terminal multiple includes all five annual cash flows; independently reproduce value, inverse value and separate sensitivity axes | Corrected arithmetic artifact and deterministic inspection tool tested; revised model report not yet collected |
 | Business analysis | Cite available product/category revenue and growth, Services/Products margins, China, receivables concentration and App Store regulation; distinguish available-but-unread from unavailable evidence | Filing-based analyst follow-up completed in [apple-filing-followup.md](apple-filing-followup.md), including the omitted saved evidence; revised model report and independent approval remain pending |
-| Normalization | Source-bound numerical bridge with explicit equity/enterprise basis, SBC/share treatment, taxes/escrow, reinvestment and financing; no unsupported zero adjustments or double deductions | Not implemented/accepted; narrative declarations remain insufficient |
+| Normalization | Source-bound numerical bridge with explicit equity/enterprise basis, SBC/share treatment, taxes/escrow, reinvestment and financing; no unsupported zero adjustments or double deductions | Historical CFO, financing, tax and share-count bridges documented in the analyst follow-up; recurring-tax, reinvestment and forward-share forecasts remain incomplete. No normalized valuation accepted |
 | Scenarios | Connect business drivers to growth/margins/reinvestment; identify 10% as a chosen hurdle unless cost of equity is established; explain post-year-five economics and show separate growth/multiple sensitivities | Arithmetic sensitivity implemented; economic rationale still pending |
 | Decision/review | Measurable triggers, review periods and valuation effects; reconcile holding/valuation horizons; distinguish confidence in abstention from value/performance confidence | Revised report and independent review pending |
 | Failure recovery | Rerun the missing-capex/filing case after offline checks; complete WATCH with an explicit material gap and no fabricated value | Real run missing-dev-20261108-3 completed WATCH/zero shares with all four reports; independent review pending |
@@ -110,20 +110,22 @@ settlement, remaining daily allowance, conservative grant credit with $10 buffer
 original experiment, config hash and pause, then persisted a unique authorization.
 Private recordings, reports, receipts and trace summaries are under
 `state/evaluations/missing-dev-20261108-{1,2}` and corresponding preflight folders.
-No third paid retry was made.
+No third paid retry was made before the missing-fact correction below.
 
 The expected missing-annual-fact condition now has a distinct ValueError subclass.
 `value_scenarios` and `inspect_cash_flow` convert only that condition into an
 explicit unavailable result; no calculation ID/value is created. Conflicting
 filings, company mismatch and invalid monetary inputs still raise. Focused
-regressions cover both tools. This correction is not yet model-validated or
-production-deployed. Neither failed run satisfies independent acceptance.
+regressions cover both tools. At that point the correction was not model-validated
+or production-deployed; the subsequent deployment and third run are recorded
+below. Neither failed run satisfies independent acceptance.
 
 The missing-fact correction was subsequently deployed as paused release 156277c
 (see the readiness release receipt). A full offline graph now proves tool-gap →
 unsupported valuation → critique → WATCH/zero shares completion using a scripted
-model. This does not replace the outstanding real-model rerun or independent
-review, and does not resolve the supported-valuation/normalization requirements.
+model. The subsequent real-model rerun is recorded below; independent review
+remains pending. Neither test resolves the supported-valuation/normalization
+requirements.
 
 ## Completed missing-evidence result awaiting review
 
