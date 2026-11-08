@@ -100,6 +100,55 @@ def test_invalid_request_does_not_create_capture_or_request(tmp_path, symbol, st
     assert not (tmp_path / "capture").exists()
 
 
+@pytest.mark.parametrize("failure", ["total_bytes", "http", "stream"])
+def test_later_page_failure_retains_prior_evidence_and_does_not_retry(tmp_path, monkeypatch, failure):
+    first = b'{"corporate_actions":{"cash_dividends":[{"id":"a"}]},"next_page_token":"second"}'
+    second = b'{"corporate_actions":{"cash_dividends":[{"id":"b"}]},"next_page_token":null}'
+    calls = []
+    if failure == "total_bytes":
+        monkeypatch.setattr("trader.corporate_actions.MAX_TOTAL_BYTES", len(first) + len(second) - 1)
+
+    class BrokenStream(httpx.SyncByteStream):
+        def __iter__(self):
+            yield second[:20]
+            raise httpx.ReadError("fixture-key must not appear in the failure receipt")
+
+    def handler(request):
+        calls.append(request)
+        if len(calls) == 1:
+            return httpx.Response(200, content=first)
+        assert request.url.params["page_token"] == "second"
+        if failure == "http":
+            return httpx.Response(503, text="fixture-key must not appear in the failure receipt")
+        if failure == "stream":
+            return httpx.Response(200, stream=BrokenStream())
+        return httpx.Response(200, content=second)
+
+    root = tmp_path / "failed"
+    with pytest.raises((ValueError, httpx.HTTPError)):
+        capture_actions(provider(handler), "SPY", "2026-09-01", "2026-10-31", root)
+    assert len(calls) == 2
+    assert (root / "page-001.json").read_bytes() == first
+    assert not (root / "page-002.json").exists()
+    manifest = json.loads((root / "manifest.json").read_text())
+    assert manifest["status"] == "failed" and manifest["unique_actions"] == 1
+    assert manifest["pages"] == [
+        {"file": "page-001.json", "bytes": len(first), "sha256": hashlib.sha256(first).hexdigest()}
+    ]
+    assert "fixture-key" not in (root / "manifest.json").read_text()
+
+    monkeypatch.setattr("trader.corporate_actions.MAX_TOTAL_BYTES", 10 * 1024 * 1024)
+    recovered = capture_actions(
+        provider(lambda _: httpx.Response(200, content=second)),
+        "SPY",
+        "2026-09-01",
+        "2026-10-31",
+        tmp_path / "new-attempt",
+    )
+    assert recovered["status"] == "pagination_exhausted"
+    assert json.loads((root / "manifest.json").read_text()) == manifest
+
+
 def test_cli_capture_does_not_construct_broker_or_ledger(tmp_path, monkeypatch):
     from trader import cli
 

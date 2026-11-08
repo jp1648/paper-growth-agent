@@ -2195,3 +2195,13 @@ no overwrite and no broker/ledger initialization.
 Validation: 725 offline tests passed, 7 skipped; repository Ruff/format and diff
 checks passed. No new provider requests were made during implementation. The
 capture command is not yet deployed; existing runtime behavior is unchanged.
+
+## Corporate-action capture interruption checks
+
+Three additional fixture cases fail the second page through a cumulative byte
+limit, HTTP 503, and a streamed transport exception. Each retains the exact first
+page/hash, does not publish a partial second page, records failure, and makes
+exactly two requests without retrying. Failure receipts exclude hostile response
+bodies and credential-like transport text. A new-directory attempt succeeds
+without changing the failed capture. All 18 capture tests and Ruff/format checks
+passed; no provider request or runtime change was made by these tests.
