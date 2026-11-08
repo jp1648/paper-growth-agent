@@ -468,3 +468,32 @@ def test_cached_buy_requires_normalization_review(env, decision, fault):
     assert result["status"] == "rejected"
     assert "Valuation normalization review is missing or unresolved" in result["reasons"]
     assert broker.submits == 0
+
+
+@pytest.mark.parametrize("fault", ["missing", "gap", "unknown", "string_false", "uncited", "empty"])
+@pytest.mark.parametrize("entry", ["service", "graph"])
+def test_cached_buy_rechecks_adversarial_review(env, decision, fault, entry):
+    service, broker, _ = env
+    graph = build_graph(service, FixtureTeam(decision))
+    graph.invoke({"symbol": "ACME", "run_key": "critic-cache", "research_only": True})
+    saved = service.store.get("critic-cache", "research_result")
+    if fault == "missing":
+        saved.pop("critique")
+    elif fault == "gap":
+        saved["critique"]["unresolved_material_gaps"] = True
+    elif fault == "unknown":
+        saved["critique"]["unresolved_material_gaps"] = None
+    elif fault == "string_false":
+        saved["critique"]["unresolved_material_gaps"] = "false"
+    elif fault == "uncited":
+        saved["critique"]["evidence_ids"] = ["absent-source"]
+    else:
+        saved["critique"]["evidence_ids"] = []
+    service.store.put("critic-cache", saved, "research_result")
+    if entry == "service":
+        result = service.execute(decision, "critic-cache")
+    else:
+        result = graph.invoke({"symbol": "ACME", "run_key": "critic-cache"})["execution"]
+    assert result["status"] == "rejected"
+    assert "Adversarial review is missing, unresolved or lacks retained evidence" in result["reasons"]
+    assert broker.submits == 0

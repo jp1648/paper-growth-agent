@@ -2264,3 +2264,26 @@ Validation: 61 focused capture/dividend tests and the full offline suite passed
 (771 passed, 7 skipped). Ruff, formatting and diff checks passed. The entitlement
 command was tested without configuration or ledger access. No paid requests,
 broker orders or production deployment were made for this change.
+
+## Cached adversarial review execution boundary
+
+An offline reproduction removed the critique from an otherwise fresh cached BUY
+while leaving its normalization narrative intact. Direct `Service.execute`
+submitted to the fixture broker before this fix. The fresh research path's veto
+was therefore insufficient protection for incomplete or inconsistent saved
+research. This is a reproduced local boundary failure, not evidence of an actual
+production order or a valid way to edit immutable research history.
+
+Execution now requires cached BUY/ADD critiques to explicitly report boolean
+`false` for unresolved material gaps and cite nonempty retained source IDs.
+Missing, unknown, string-valued or unresolved gap declarations and missing/unknown
+citations reject before submission. Cached graph execution passes a missing
+critique through to this shared rejection instead of raising an unrelated key
+error. Protective exits and existing-order recovery retain their prior paths.
+The check establishes structural completeness, not truth of the investment
+reasoning or numerical accounting normalization. Independent review remains open.
+
+Validation: all twelve new fault cases cover direct service and cached graph
+execution; the full offline suite passed (783 passed, 7 skipped). Ruff, formatting
+and diff checks passed. This fix is committed for release but is not yet deployed;
+production trading remains paused.

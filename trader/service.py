@@ -394,6 +394,20 @@ class Service:
                     research.get("valuation", {})
                 ):
                     research_reasons.append("Valuation normalization review is missing or unresolved")
+                if decision.action in {"BUY", "ADD"}:
+                    critique = research.get("critique")
+                    refs = critique.get("evidence_ids") if isinstance(critique, dict) else None
+                    sources = {source["id"] for source in research.get("evidence", {}).get("sources", [])}
+                    if (
+                        not isinstance(critique, dict)
+                        or critique.get("unresolved_material_gaps") is not False
+                        or not isinstance(refs, list)
+                        or not refs
+                        or any(not isinstance(ref, str) or ref not in sources for ref in refs)
+                    ):
+                        research_reasons.append(
+                            "Adversarial review is missing, unresolved or lacks retained evidence"
+                        )
                 if research["decision"] != decision.model_dump(mode="json"):
                     research_reasons.append("Decision does not match immutable research")
                 completed = dt(research["research_completed_at"])

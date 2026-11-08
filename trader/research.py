@@ -137,7 +137,7 @@ def build_graph(service, team):
                     "sources": s["evidence"],
                     "research": s["research"],
                     "valuation": s["valuation"],
-                    "critique": s["critique"],
+                    "critique": s.get("critique"),
                     "catalysts": s["catalysts"],
                 },
             )
