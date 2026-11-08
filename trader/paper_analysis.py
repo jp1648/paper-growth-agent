@@ -56,6 +56,15 @@ def paired_uncertainty(document):
         return portfolio, benchmark
 
     portfolio, benchmark = compounded(range(len(pairs)))
+    drawdowns = []
+    for side in (0, 1):
+        wealth = peak = 1.0
+        maximum = 0.0
+        for pair in pairs:
+            wealth *= 1 + pair[side]
+            peak = max(peak, wealth)
+            maximum = max(maximum, 1 - wealth / peak)
+        drawdowns.append(maximum)
     intervals = []
     for length in (5, 10):
         rng = random.Random(1648)
@@ -90,6 +99,9 @@ def paired_uncertainty(document):
         "portfolio_return": portfolio,
         "benchmark_return": benchmark,
         "excess_return": portfolio - benchmark,
+        "portfolio_max_drawdown": drawdowns[0],
+        "benchmark_max_drawdown": drawdowns[1],
+        "drawdown_method": "Positive peak-to-trough fraction of compounded session returns, including opening wealth 1; not intraday drawdown.",
         "intervals": intervals,
         "resamples": 10000,
         "seed": 1648,

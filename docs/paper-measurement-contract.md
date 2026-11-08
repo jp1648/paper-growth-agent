@@ -168,3 +168,16 @@ are **gross**: future withholding and fees remain unknown. It does not reinvest
 cash, change broker equity, generate an approved net-return series, or establish
 point-in-time source availability. Corrections require a new retained input/output
 version and independent review; original captures remain untouched.
+
+## Drawdown on the paired return series
+
+`analyze-paper-returns` reports `portfolio_max_drawdown` and
+`benchmark_max_drawdown` as nonnegative peak-to-trough fractions. Both use the
+same ordered session-return observations used for compounding and uncertainty.
+Opening indexed wealth is 1, so a loss on the first session is included. A later
+recovery does not erase the earlier drawdown. The running peak updates when a new
+high is reached. These are session-close drawdowns, not intraday extremes.
+
+The calculation does not upgrade input declarations into verified after-cost
+returns. Complete external-flow treatment, economic NAV, cost allocation and
+calendar/source evidence still have to be established before study acceptance.

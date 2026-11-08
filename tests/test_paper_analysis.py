@@ -111,3 +111,27 @@ def test_incomplete_or_noncomparable_input_is_rejected(returns, fault):
         returns.pop("cost_allocation_method")
     with pytest.raises(ValueError):
         paired_uncertainty(returns)
+
+
+def test_drawdown_includes_opening_loss_despite_full_recovery(returns):
+    for row in returns["observations"]:
+        row.update(portfolio_return="0", benchmark_return="0")
+    returns["observations"][0].update(portfolio_return="-0.2", benchmark_return="-0.1")
+    returns["observations"][1]["portfolio_return"] = "0.25"
+    result = paired_uncertainty(returns)
+    assert result["portfolio_return"] == pytest.approx(0)
+    assert result["portfolio_max_drawdown"] == pytest.approx(0.2)
+    assert result["benchmark_max_drawdown"] == pytest.approx(0.1)
+    assert "not intraday" in result["drawdown_method"]
+
+
+def test_drawdown_uses_running_peak_and_compounded_losses(returns):
+    for row in returns["observations"]:
+        row.update(portfolio_return="0", benchmark_return="0.01")
+    # Wealth: 1 -> 2 -> 1.5 -> 1.2 -> 3 -> 2.7. Worst loss is 40%, not 30% or 25%.
+    for row, value in zip(returns["observations"], ["1", "-0.25", "-0.2", "1.5", "-0.1"]):
+        row["portfolio_return"] = value
+    result = paired_uncertainty(returns)
+    assert result["portfolio_return"] == pytest.approx(1.7)
+    assert result["portfolio_max_drawdown"] == pytest.approx(0.4)
+    assert result["benchmark_max_drawdown"] == 0

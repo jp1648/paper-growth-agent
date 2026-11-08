@@ -2347,3 +2347,15 @@ revision counts were unchanged. Private receipt: `state/release-76ec9eb/`;
 consistent VM rollback backup: `state/release-rollback-76ec9eb`. No orders or paid
 research were issued. Investment review, normalization and prospective trial
 acceptance remain unproven.
+
+## Comparable session-return drawdown diagnostic
+
+The offline paired-return analysis now reports maximum drawdown separately for
+portfolio and SPY, using each supplied compounded session-return path and opening
+wealth 1. Independent arithmetic fixtures cover an opening loss followed by full
+recovery, chained losses from a later peak, a subsequent new high and a monotone
+benchmark. A positive final return cannot hide an earlier drawdown. This adds the
+protocol's risk metric to the paired analysis, not a certified source of net
+returns or intraday risk. Focused analysis tests: 20 passed. Full offline suite:
+785 passed, 7 skipped; Ruff, format and diff checks passed. No paid calls or orders.
+This offline diagnostic update is not deployed; executor remains on `76ec9eb`.
