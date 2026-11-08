@@ -1354,3 +1354,19 @@ operator attestation, not independent API verification of delivery.
   existing implementation passed; no production change or deployment required.
   Live launch remains separately gated by the account-specific contract in
   live-pilot-release.md; none of its missing approvals is inferred from this test.
+
+- Charge reconciliation narrowed using a fresh read-only query of the authoritative
+  executor ledger for `acceptance-unrestricted-2026-11-05-aapl-3`: 48 model-cost
+  records, 47 with usage estimates summing to $4.650513, one without usage.
+  The missing record is research_lead / gpt-6-astra, ending
+  `2026-11-06T03:50:11.577562Z`; the paired failure is OpenAITimeoutError.
+  Run interval: `2026-11-06T03:44:52Z` through `03:50:11Z` (November 5 New York).
+- The global spend record remains unknown at $6.455283. This is NOT a confirmed
+  bill or the sum of known per-call usage: historical Guard.record_usage retains
+  the pre-call reservation when usage is missing. Its $1.804770 difference from
+  the known sum is a retained estimate, not provider evidence. Do not settle the
+  record by subtracting it, assuming timeout means free, or equating grant balance
+  with this run's exact charge. Provider usage/cost evidence must account for the
+  timeout and identify overlapping account activity before an audited settlement.
+  Private read-only receipt: `state/charge-reconciliation/current.json`.
+  No spend records, reservations, billing settings or trading state were changed.
