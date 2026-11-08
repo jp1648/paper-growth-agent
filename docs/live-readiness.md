@@ -1919,3 +1919,22 @@ operator attestation, not independent API verification of delivery.
   Final adapter suite after making the recovery XML canonical: **59 passed**.
   Ruff/diff checks passed. No network provider calls, paid research or orders.
   Source pending CI/deployment; broader provider schema and outage cases remain open.
+
+## Provider boundary fixes deployed (2026-11-08 UTC)
+
+- Commit `4d478fee36ee4fc5c92df67c5a1931ace8da10b1` passed CI `42444506454`.
+  Build `c135611c-e9b6-4202-ab0c-1c1514eb2245` succeeded; deployed digest
+  `sha256:2334d37785cb6412514e2d313e7a4b76ef6114bb9e90ee5467234ff3a67ae619`.
+  All 26 source hashes match in the installed image. Fresh reconciliation at
+  03:56:40 UTC and runtime health pass; executor, proxy and health timer are active.
+- Before/after checks preserve original experiment/document counts, AAPL one share,
+  durable pause and exact configuration/spending hashes. Rollback retained;
+  private evidence `state/provider-release-4d478fe/`. No paid research or orders.
+- Seven-part goal remains incomplete: model-charge reconciliation and deployment
+  are evidenced; independent supported research cohort is not accepted; combined
+  local process/restore tests do not establish in-flight cloud-host recovery;
+  outage/alert evidence does not cover every operational failure. The forward
+  protocol remains `predeclared_not_started` (60 sessions AND 12 weeks), with
+  complete comparable total-return/cost measurement still required. The separate
+  live contract remains a draft without account-specific limits or user approval.
+  No independent review artifact or trial-activation approval was found or inferred.
