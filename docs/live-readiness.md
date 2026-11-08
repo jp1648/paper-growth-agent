@@ -2287,3 +2287,23 @@ Validation: all twelve new fault cases cover direct service and cached graph
 execution; the full offline suite passed (783 passed, 7 skipped). Ruff, formatting
 and diff checks passed. This fix is committed for release but is not yet deployed;
 production trading remains paused.
+
+## Cached-critique safety release verified
+
+Source `87afdb8481ffe81b6164b116cab8bd967dd46a14` is now deployed on the paused
+executor. CI run `42448660614` passed backend, dashboard and secret checks,
+including safety mutations. Cloud Build `b1174503-659e-4968-a29f-f93ebe8861ac`
+succeeded; deployed image digest is
+`sha256:e15758ae83c0d9a341ebc680090d19b85bb3e739bebd39d8b1649699e8d1708d`.
+All 29 Python source hashes matched before deployment and inside the running
+container afterward. This also deploys the offline dividend validation/arithmetic
+commands; they were not automatically run against portfolio data.
+
+Fresh reconciliation at `2026-11-08T04:58:24.318798+00:00` was successful. Executor,
+proxy and health timer were active; application health passed. Original experiment,
+configuration/spending hashes, pause and AAPL quantity 1 were preserved. Counts
+for intents/orders/activities/acceptances/adjustments/revisions remained
+2/1/3/8/1/0. No order or paid research request was made. Consistent rollback backup
+is `state/release-rollback-87afdb8` on the VM; private local release evidence is
+`state/release-87afdb8/`. These checks do not certify investment reasoning,
+normalization, the net-return measurement pipeline or prospective trial completion.
