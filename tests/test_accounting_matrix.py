@@ -187,3 +187,47 @@ def test_corporate_action_cannot_leave_orphaned_cost_basis():
             records,
             {"remove": {"cash": "0", "positions": {"ACME": {"quantity_delta": "-10", "basis_delta": "0"}}}},
         )
+
+
+def test_same_cash_distribution_reclassification_requires_review_and_preserves_history(env):
+    service, broker, _ = env
+    original = {
+        "id": "distribution-correction",
+        "activity_type": "DIVNRA",
+        "net_amount": "-3",
+        "date": "2026-10-21",
+    }
+    broker.activities = [original.copy()]
+    broker.raw_account.update(cash="99997", equity="99997")
+    service.reconcile()
+    assert service.store.get("audit")["dividends"] == "-3"
+    assert service.store.get("audit")["fees"] == "0"
+
+    corrected = {**original, "activity_type": "DIVFEE"}
+    broker.activities = [corrected.copy()]
+    with pytest.raises(RuntimeError, match="audited correction required"):
+        service.reconcile()
+    assert service.store.get("audit")["dividends"] == "-3"
+    assert not service.store.items("broker_revision")
+
+    service.kill_path.write_text("Review exact broker distribution classification")
+    revision = {
+        "before": original,
+        "after": corrected,
+        "reason": "Fixture broker reclassified withholding as a distribution fee",
+    }
+    service.acknowledge_revision(revision)
+    service.acknowledge_revision(revision)
+    service.reconcile()
+    audit = service.store.get("audit")
+    assert dec(audit["cash"]) == dec("99997")
+    assert dec(audit["dividends"]) == 0
+    assert dec(audit["fees"]) == 3
+    assert dec(audit["capital_flows"]) == 0
+    assert dec(audit["realized_average_cost"]) == 0
+    assert service.store.get(original["id"], "activity") == original
+    assert service.store.activities() == [corrected]
+    assert len(service.store.items("broker_revision")) == 1
+    assert len(service.store.events("broker_revision_approved")) == 1
+    assert service.kill_path.exists()
+    assert broker.submits == 0

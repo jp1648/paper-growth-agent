@@ -2007,3 +2007,43 @@ operator attestation, not independent API verification of delivery.
   capacity and checkpoint tests cover separate failure paths. No production code,
   orders or paid requests were involved. Billing-source and independent-review
   questions remain pending; the trial is not activated.
+
+## Same-cash distribution correction regression
+
+- A fixture broker changes a recorded withholding activity (`DIVNRA`) to a
+  distribution fee (`DIVFEE`) without changing its amount or account cash.
+  Reconciliation rejects the revised activity despite matching cash; it does not
+  silently retain the obsolete income classification or approve the revision.
+- After explicit paused review of exact before/after evidence, replay moves the
+  amount from net dividends to fees, leaves cash, capital flows and realized
+  trading profit unchanged, and preserves the original activity. Repeated approval
+  and reconciliation produce one revision and one approval receipt, with no order.
+- Validation: 71 accounting, readiness and reporting tests passed; Ruff passed.
+  This is a synthetic correction contract test, not evidence that a real broker
+  will deliver such a reclassification or that tax classifications are complete.
+  No runtime change or production deployment was required.
+
+## Normalization implementation boundary audit
+
+The current `normalization_supported` helper checks that four narrative fields
+are nonblank, cited source IDs belong to the valuation, and the report explicitly
+claims no unresolved material gaps. It does not verify the economic truth of
+those claims or compute a normalized cash-flow bridge. Its name must not be
+interpreted as independent semantic certification. The same structural predicate
+is used by lead finalization, cached execution and mechanical evaluation.
+
+`annual_cash_flow` and `value_scenarios` still bind their numerical starting point
+to reported CFO less capex divided by diluted weighted-average shares. The model
+cannot substitute an adjusted amount. Accordingly, a narrative normalization
+review alone cannot establish that the scenarios include numerical SBC,
+nonrecurring cash-flow, financing or debt/cash adjustments. This is a remaining
+implementation and independent-review gate, not solved by more narrative fields.
+A future supported bridge must retain source-bound adjustments, their signs and
+periods, avoid double counting, distinguish equity from enterprise cash flow,
+and independently verify both arithmetic and economic rationale before an
+adjusted starting value can feed scenarios. Existing historical proxy results
+and frozen cohort records must remain unchanged and labeled as proxies.
+
+Validation after the classification regression and boundary audit: full offline
+suite 702 passed, 7 skipped. External Postgres and opt-in paper execution skips
+are not new integration evidence. Ruff and diff whitespace checks passed.
