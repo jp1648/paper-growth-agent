@@ -72,7 +72,17 @@ def main(argv=None):
     comparison.add_argument("--baseline", required=True)
     comparison.add_argument("--candidate", required=True)
     comparison.add_argument("--output", required=True)
+    paper_analysis = sub.add_parser(
+        "analyze-paper-returns", help="Offline paired return diagnostics; no broker"
+    )
+    paper_analysis.add_argument("--input", required=True)
+    paper_analysis.add_argument("--output", required=True)
     args = parser.parse_args(argv)
+    if args.command == "analyze-paper-returns":
+        from .paper_analysis import analyze_file
+
+        print(json.dumps(analyze_file(args.input, args.output), indent=2))
+        return 0
     if args.command == "evaluate-compare":
         from .evaluation import compare
 

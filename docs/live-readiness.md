@@ -1938,3 +1938,25 @@ operator attestation, not independent API verification of delivery.
   complete comparable total-return/cost measurement still required. The separate
   live contract remains a draft without account-specific limits or user approval.
   No independent review artifact or trial-activation approval was found or inferred.
+
+## Offline paper uncertainty calculation (2026-11-08 UTC)
+
+- Added `analyze-paper-returns`, an offline CLI with no config, credentials, broker
+  or model calls. It consumes declared paired after-cost, flow-adjusted total
+  returns and implements the protocol's 10,000 resamples, seed 1648, 5-session
+  primary blocks and 10-session sensitivity. The exact overlapping/noncircular
+  block construction, truncation, compounding and percentile interpolation are
+  documented in `evaluations/paper-analysis.md` before trial activation.
+- Reject missing/duplicated/out-of-order observations, fewer than 60 sessions or
+  84 calendar days, wrong primary benchmark/basis, nonfinite/missing returns and
+  undefined zero-NAV chains. Exclusive output creation preserves prior results;
+  input-byte and supplied manifest hashes accompany diagnostics.
+- Independent checks cover constant analytical returns, volatile identical pairs,
+  separately compounded excess, reproducibility and different block sensitivities.
+  Full suite before the final 61-observation truncation case: **697 passed, seven
+  external tests skipped**; final focused analysis suite: **18 passed**. Ruff passed.
+- This is not trial acceptance: supplied calendar/provenance/cost completeness is
+  not authenticated by the calculator. Current price-only reports remain invalid
+  inputs, empirical interval coverage is not established, and no prospective
+  observation window has begun. Source awaits CI; no executor rollout is needed
+  to use this offline diagnostic command locally.

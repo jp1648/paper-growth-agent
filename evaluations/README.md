@@ -84,3 +84,10 @@ authenticate the named reviewer. Before promotion, the operator must verify the
 reviewer's identity and independence and retain the original review file. No
 review has been supplied or claimed by this implementation. Results from earlier scoring contracts must be rescored into new output files
 before comparison under the current contract; old results are not rewritten.
+
+## Prospective paper diagnostics
+
+The offline `analyze-paper-returns` command implements the declared paired
+block-resampling calculation. See [input contract and method](paper-analysis.md).
+It does not accept existing price-only daily reports as study evidence, verify
+input provenance, start the trial or grant live approval.
