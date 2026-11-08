@@ -2724,3 +2724,18 @@ rollback backup and release receipt are retained under `state/`. No paid researc
 order submission, trial activation or independent research approval occurred.
 The numerical bridge still needs economically justified Apple inputs and a new
 model result reviewed independently; the rejected original report remains rejected.
+
+### Benchmark-source feasibility — November 8
+
+Historical SIP requests for AAPL/SPY/QQQ succeeded with existing credentials;
+no new subscription is needed to repeat the tested historical requests. Five
+read-only responses were retained with exact hashes and verified offline. The
+November 6 comparison exposes nonidentical IEX daily, SIP daily and pre-close
+minute marks. The measurement plan now explicitly requires a single declared
+marking policy and reconciliation of broker marks, rather than treating these
+prices as interchangeable. See [source evidence and limits](paper-measurement-contract.md#historical-close-source-probe--november-8).
+
+This is source feasibility evidence, not an implemented or accepted trial return
+series. The prospective trial remains unstarted; no paid research or orders were
+made. It does not resolve missing infrastructure cost allocation or independent
+research acceptance.

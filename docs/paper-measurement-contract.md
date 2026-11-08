@@ -239,3 +239,49 @@ flows, immutable output and connection to the existing uncertainty calculation.
 They do not authenticate source claims or validate benchmark reinvestment, marks,
 splits or calendar coverage. The command does not collect balances, reconcile
 invoices, modify the ledger, activate a trial or confer investment acceptance.
+
+## Historical close-source probe — November 8
+
+Five bounded read-only requests succeeded: the paper broker calendar for November
+2–6 and raw daily/close-window minute bars for AAPL, SPY and QQQ on November 6,
+once each using IEX and SIP. Every bar response explicitly ended pagination;
+all three requested symbols appeared. Existing credentials therefore support
+these historical SIP requests. This does not establish real-time SIP entitlement,
+all-session completeness, source finality or an exchange official close.
+
+| Symbol | IEX daily close | SIP daily close | Last SIP minute before 16:00 NY |
+|---|---:|---:|---:|
+| AAPL | 342.41 | 342.37 | 342.36 |
+| SPY | 735.40 | 735.29 | 735.34 |
+| QQQ | 656.31 | 656.10 | 656.19 |
+
+The final pre-close minute starts at 20:59 UTC, following the November DST change.
+The calendar's regular close is 16:00 NY, distinct from its extended-session
+close. A bar starting at 21:00 UTC includes the following minute and cannot be
+blindly treated as the closing auction. Neither daily nor minute aggregates in
+this probe certify an official exchange auction price.
+
+[Alpaca's methodology](https://docs.alpaca.markets/us/docs/market-data-faq)
+describes different trade-condition rules for minute and daily bars, including
+extended-hours and corrected-close conditions. Its
+[historical-bar reference](https://docs.alpaca.markets/us/reference/stockbars)
+documents raw adjustments, symbol mapping and pagination. These differences
+explain why equality is not a valid invariant; the probe does not identify which
+individual trades caused the observed differences.
+
+Next implementation must retain the calendar and raw price pages, explicitly
+freeze feed, currency, symbol mapping, retrieval lag and correction policy, and
+validate all expected sessions/symbols. Use one declared method on both sides;
+do not combine broker-marked portfolio equity with differently timed benchmark
+prices without a separate, reconciled holdings-mark adjustment. Prefer the
+verified historical SIP path for evaluating a consolidated marking policy;
+do not silently change the trading feed or certify it as official-close data.
+This is a measurement design decision still requiring a frozen manifest review.
+
+Private byte-exact responses, request parameters, hashes and an assert-based
+comparison are retained in `state/benchmark-close-probe-20261108/`; manifest SHA-256
+`1529a85d31775faac610b24b6d9c3440b90e69fe06fe17a17dd565c2a48b317b`.
+The probe used documented default USD/current symbol mapping; production capture
+must make both explicit. No subscription change, paid model call, broker order,
+ledger mutation or trial activation occurred. Dividend/split entitlement,
+reinvestment, expense allocation and independent source review remain required.
