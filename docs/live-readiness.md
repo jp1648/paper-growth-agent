@@ -1851,3 +1851,21 @@ operator attestation, not independent API verification of delivery.
   zero unresolved research amounts/runs. These overlap journal costs and exclude
   data/infrastructure; they are not a complete platform bill or economic return.
   Private evidence: `state/cost-release-72f2289/`. No research or orders were run.
+
+## Process death combined with older-ledger restore (2026-11-08 UTC)
+
+- Extended the real subprocess SIGKILL cancellation drill to restore a verified
+  SQLite backup taken after the first partial fill but before cancellation. The
+  crashed ledger is retained separately. Assertions prove the restored local
+  order is still partially filled while the independent loopback broker already
+  has a pending cancellation; the external pause survives restoration.
+- Two terminal outcomes pass: remaining six shares fill, or two additional shares
+  fill and the remainder cancels. With terminal order/account state arriving before
+  fill activity, reconciliation and execution remain blocked. When activity arrives,
+  repeated reconciliation produces exactly two activities, exact cash/shares,
+  one submission, one cancellation and zero remaining reservation. New execution
+  is still rejected because the pause remains set.
+- Process/backup/execution suites: **64 passed**; Ruff passed. No production code,
+  paid calls or broker endpoints changed. This combines actual local process death
+  and backup restore with fixture broker progression; it does not prove cloud-host
+  loss, real broker cancellation semantics or network partition during takeover.

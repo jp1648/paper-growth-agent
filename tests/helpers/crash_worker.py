@@ -38,7 +38,7 @@ class Broker:
             response.raise_for_status()
             value = response.json()
             if (stage == "accepted" and name == "submit") or (
-                stage in {"cancel", "cancel_race"} and name == "cancel"
+                (stage == "cancel" or stage.startswith("cancel_race")) and name == "cancel"
             ):
                 die()
             return Snapshot.model_validate(value) if name == "snapshot" else value
@@ -84,7 +84,7 @@ with pytest.MonkeyPatch.context() as patch:
         service.acknowledge_adjustment(
             json.loads(Path(config_path).with_name("fixture-adjustments.json").read_text())
         )
-    elif stage in {"cancel", "cancel_race"}:
+    elif stage == "cancel" or stage.startswith("cancel_race"):
         service.kill("Process crash drill")
     elif stage == "activity":
         service.reconcile()

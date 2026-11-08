@@ -3,9 +3,11 @@
 import json
 import os
 import signal
+import sqlite3
 import subprocess
 import sys
 import threading
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -19,7 +21,17 @@ from trader.store import Store
 
 @pytest.mark.parametrize(
     "stage",
-    ["prepared", "accepted", "order", "cancel", "cancel_race", "activity", "adjustment", "adjustment_mid"],
+    [
+        "prepared",
+        "accepted",
+        "order",
+        "cancel",
+        "cancel_race",
+        "cancel_race_canceled",
+        "activity",
+        "adjustment",
+        "adjustment_mid",
+    ],
 )
 def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, decision, tmp_path, stage):
     service, broker, data = env
@@ -39,11 +51,13 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
             {"id": "deposit-b", "cash": "2000", "reason": "Verified B"},
         ]
         (tmp_path / "fixture-adjustments.json").write_text(json.dumps(adjustments))
-    if stage in {"cancel", "cancel_race", "activity"}:
+    backup = None
+    if stage in {"cancel", "activity"} or stage.startswith("cancel_race"):
         result = service.execute(decision, "process-drill")
-        if stage == "cancel_race":
+        if stage.startswith("cancel_race"):
             broker.fixture_fill(result["client_order_id"], "4", status="partially_filled")
             service.reconcile()
+            backup = service.store.backup()
         if stage == "activity":
             broker.fixture_fill(result["client_order_id"])
 
@@ -104,6 +118,17 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+    if backup:
+        # Recover an older durable ledger after actual process death; retain the crashed state.
+        with closing(sqlite3.connect(tmp_path / "crashed-ledger.sqlite")) as retained:
+            service.store.db.backup(retained)
+            assert retained.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        service.store.db.close()
+        with (
+            closing(sqlite3.connect(backup)) as source,
+            closing(sqlite3.connect(service.cfg.database)) as target,
+        ):
+            source.backup(target)
     reopened = Store(service.cfg.database)
     try:
         recovered = Service(service.cfg, reopened, broker, data)
@@ -120,14 +145,16 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
             assert len(reopened.items("adjustment")) == 2
             assert len(reopened.events("explicit_adjustment")) == 2
             assert reopened.get("audit")["cash"] == "103000"
-        elif stage == "cancel_race":
+        elif stage.startswith("cancel_race"):
             cid = next(iter(broker.orders))
             assert broker.orders[cid]["status"] == "pending_cancel"
+            assert reopened.get(cid, "order")["status"] == "partially_filled"
             assert recovered.kill_path.exists()
             assert recovered.reservation_summary() == dec("601")
-            # The broker fills the remainder while cancellation is in flight;
-            # its terminal order arrives before the corresponding activity.
-            late = broker.fixture_fill(cid, "6")
+            # A terminal broker order arrives before its additional fill activity.
+            canceled = stage == "cancel_race_canceled"
+            terminal = "canceled" if canceled else "filled"
+            late = broker.fixture_fill(cid, "2" if canceled else "6", status=terminal)
             broker.activities.remove(late)
             with pytest.raises(LedgerError):
                 recovered.reconcile()
@@ -139,14 +166,16 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
             for _ in range(2):
                 recovered.reconcile()
             assert reopened.get("reconciliation")["ok"] is True
-            assert reopened.get("audit")["cash"] == "99000"
-            assert reopened.get("audit")["shares"]["ACME"] == "10"
+            assert reopened.get("audit")["cash"] == ("99400" if canceled else "99000")
+            assert reopened.get("audit")["shares"]["ACME"] == ("6" if canceled else "10")
             assert len(reopened.items("activity")) == 2
-            assert reopened.get(cid, "order")["status"] == "filled"
+            assert len(reopened.events("broker_activity")) == 2
+            assert reopened.get(cid, "order")["status"] == terminal
             assert recovered.reservation_summary() == 0
             assert recovered.kill_path.exists()
             assert len(broker.cancels) == 1
             assert broker.submits == 1
+            assert recovered.execute(decision, "new-after-process-restore")["status"] == "rejected"
         elif stage == "prepared":
             with pytest.raises(LedgerError, match="Unresolved submission"):
                 recovered.execute(decision, "process-drill")
