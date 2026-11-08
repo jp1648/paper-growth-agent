@@ -1475,3 +1475,6 @@ operator attestation, not independent API verification of delivery.
   clone listener or overwrite current state from this now-aging snapshot. A
   coordinated stopped-source cutover, telemetry continuation and in-flight
   recovery acceptance remain open. No paid research or broker mutation occurred.
+- Cleanup checkpoint: replacement VM confirmed TERMINATED after verification;
+  its boot/data disks and the recovery snapshot are retained for the next drill
+  phase and continue to incur storage charges. Executor masks remain installed.
