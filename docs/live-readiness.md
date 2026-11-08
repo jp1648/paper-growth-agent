@@ -1733,3 +1733,25 @@ operator attestation, not independent API verification of delivery.
   on the missing-evidence case. The failed recording remains unchanged. Independent
   review, unseen cases, broader failure/recovery gates and the prospective paper
   trial remain open; live status remains NO-GO.
+
+## Combined partial-fill restore and broker-outage recovery (2026-11-08 UTC)
+
+- Added two isolated combined scenarios using a real SQLite backup/restore while
+  the scripted broker advances independently. A ten-share approved order fills
+  four shares, cancellation becomes pending, then the broker either fills the
+  remaining six or fills two more and cancels the remainder. Terminal order state
+  arrives before the corresponding fill activity.
+- Three consecutive broker read timeouts, with Store/Service reconstruction between
+  attempts, preserve the $601 remaining reservation, $99,600 last reconciled cash,
+  experiment identity and pause. No second submit occurs. Once snapshots return,
+  the missing activity still blocks execution, including for a fresh intent.
+- After activity delivery and another reconstruction, repeated reconciliation
+  records both fills exactly once: ten shares/$99,000 cash for the fill outcome,
+  six shares/$99,400 cash for cancellation. Reservation becomes zero, exactly one
+  submit and one cancel remain, database integrity passes and a new order remains
+  rejected by the durable pause. The original database copy is retained and checked.
+- Backup/process-death/execution suites: **63 passed**; Ruff passed. No production
+  code change, paid model calls or broker requests. These reconstructed service
+  instances are not additional SIGKILL or replacement-VM evidence; the existing
+  subprocess tests remain separate. In-flight replacement-host and real network
+  partition proof remain open. Tests: `tests/test_backup_recovery.py`.

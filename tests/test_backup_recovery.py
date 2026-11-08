@@ -322,3 +322,84 @@ def test_full_ledger_after_broker_acceptance_recovers_without_resubmit(
         assert recovered.reservation_summary() == 0
     finally:
         restored.db.close()
+
+
+@pytest.mark.parametrize(
+    "terminal,late_qty,total_qty,cash", [("filled", "6", "10", "99000"), ("canceled", "2", "6", "99400")]
+)
+def test_restore_partial_cancel_race_survives_outage_restarts_and_delayed_activity(
+    env, decision, tmp_path, monkeypatch, terminal, late_qty, total_qty, cash
+):
+    import httpx
+
+    service, broker, data = env
+    original_id = service.store.scope
+    result = service.execute(decision, "combined-restore")
+    cid = result["client_order_id"]
+    broker.fixture_fill(cid, "4", status="partially_filled")
+    service.reconcile()
+    service.kill("Restore drill: cancellation remains unresolved")
+    assert broker.orders[cid]["status"] == "pending_cancel"
+    assert service.reservation_summary() == dec("601")
+    backup = service.store.backup()
+    # Broker progresses independently while the old process and its disk are unavailable.
+    late = broker.fixture_fill(cid, late_qty, status=terminal)
+    broker.activities.remove(late)
+    retained = tmp_path / "pre-restore-retained.sqlite"
+    with closing(sqlite3.connect(retained)) as target:
+        service.store.db.backup(target)
+    service.store.db.close()
+    with closing(sqlite3.connect(backup)) as source, closing(sqlite3.connect(service.cfg.database)) as target:
+        source.backup(target)
+    snapshot = broker.snapshot
+
+    def unavailable(*args):
+        raise httpx.ReadTimeout("Isolated broker partition")
+
+    monkeypatch.setattr(broker, "snapshot", unavailable)
+    for _ in range(3):
+        restored = Store(service.cfg.database)
+        try:
+            recovered = Service(service.cfg, restored, broker, data)
+            assert restored.scope == original_id
+            with pytest.raises(httpx.ReadTimeout):
+                recovered.execute(decision, "combined-restore")
+            assert restored.get("reconciliation")["ok"] is False
+            assert recovered.reservation_summary() == dec("601")
+            assert restored.get("audit")["cash"] == "99600"
+            assert recovered.kill_path.exists() and broker.submits == 1
+        finally:
+            restored.db.close()
+    monkeypatch.setattr(broker, "snapshot", snapshot)
+    restored = Store(service.cfg.database)
+    try:
+        recovered = Service(service.cfg, restored, broker, data)
+        # Even a terminal cancellation must not release the inconsistent-account gate.
+        with pytest.raises(LedgerError):
+            recovered.execute(decision, "new-during-delayed-activity")
+        assert restored.get("reconciliation")["ok"] is False
+        assert broker.submits == 1 and len(restored.items("intent")) == 1
+    finally:
+        restored.db.close()
+    broker.activities.append(late)
+    restored = Store(service.cfg.database)
+    try:
+        recovered = Service(service.cfg, restored, broker, data)
+        for _ in range(2):
+            recovered.reconcile()
+            recovered.execute(decision, "combined-restore")
+        assert restored.get("reconciliation")["ok"] is True
+        assert restored.get("audit")["cash"] == cash
+        assert restored.get("audit")["shares"]["ACME"] == total_qty
+        assert len(restored.items("activity")) == 2
+        assert len(restored.events("broker_activity")) == 2
+        assert restored.get(cid, "order")["status"] == terminal
+        assert recovered.reservation_summary() == 0
+        assert recovered.execute(decision, "new-after-recovery")["status"] == "rejected"
+        assert broker.submits == 1 and len(broker.cancels) == 1
+        assert recovered.kill_path.exists()
+        assert restored.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        with closing(sqlite3.connect(retained)) as original:
+            assert original.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    finally:
+        restored.db.close()
