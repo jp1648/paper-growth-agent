@@ -128,6 +128,43 @@ def test_report_is_immutable_and_rejects_mixed_benchmark_feed(env, monkeypatch):
         daily_report(service)
 
 
+@pytest.mark.parametrize("failure", ["baseline_fetch", "report_write", "journal_write"])
+def test_daily_sample_is_not_published_without_completed_report(env, monkeypatch, failure):
+    service, _, data = env
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(hours=6))
+    original_close = data.session_close
+    calls = 0
+
+    def fail_baseline(*args):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise RuntimeError("Baseline provider unavailable")
+        return original_close(*args)
+
+    if failure == "baseline_fetch":
+        monkeypatch.setattr(data, "session_close", fail_baseline)
+        expected = RuntimeError
+    else:
+        table = "journal" if failure == "journal_write" else "documents"
+        service.store.db.execute(
+            f"CREATE TEMP TRIGGER fail_report BEFORE INSERT ON {table} "
+            "WHEN NEW.kind='daily_report' BEGIN SELECT RAISE(ABORT, 'disk write fault'); END"
+        )
+        expected = sqlite3.IntegrityError
+    with pytest.raises(expected):
+        daily_report(service)
+    assert service.store.items("daily") == []
+    assert service.store.items("daily_report") == []
+    assert service.store.events("daily_report") == []
+    monkeypatch.setattr(data, "session_close", original_close)
+    service.store.db.execute("DROP TRIGGER IF EXISTS fail_report")
+    report = daily_report(service)
+    assert len(service.store.items("daily")) == len(service.store.items("daily_report")) == 1
+    assert len(service.store.events("daily_report")) == 1
+    assert dec(daily_report(service)["close_equity"]) == report["close_equity"]
+
+
 def test_zero_comparison_equity_does_not_break_reporting(env, monkeypatch):
     service, broker, _ = env
     # A fully withdrawn experiment has no denominator for subsequent percentage returns.

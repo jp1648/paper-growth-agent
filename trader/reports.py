@@ -164,6 +164,11 @@ def _portfolio_report(service):
 @traced("report.daily", inputs=lambda service, date=None: {"date": date})
 def daily_report(service, date=None):
     """Mark every equity at the same completed regular session, excluding dividends for comparison."""
+    with service.store.serialized(service.cfg.control_dir, service.account_id):
+        return _daily_report(service, date)
+
+
+def _daily_report(service, date):
     store, data = service.store, service.data
     local = now().astimezone(ZoneInfo("America/New_York"))
     date = date or local.date().isoformat()
@@ -195,8 +200,9 @@ def daily_report(service, date=None):
         "feed": service.cfg.feed,
         "dividend_treatment": "Price returns, split-adjusted; dividends excluded from both sides",
     }
-    store.put(date, sample, "daily")
-    samples = store.items("daily")
+    samples = sorted(
+        [s for s in store.items("daily") if s["date"] != date] + [sample], key=lambda s: s["date"]
+    )
     indexed, peak, max_drawdown = dec(1), dec(1), ZERO
     total_index, total_peak, total_drawdown = dec(1), dec(1), ZERO
     baseline_index = None
@@ -267,6 +273,5 @@ def daily_report(service, date=None):
         flow_timing_note="Daily flow-adjusted returns treat external flows as end-of-day; intraday flow timing is approximate.",
         undefined_return_note="Returns are null when prior comparison equity is nonpositive; cannot chain a percentage return through zero.",
     )
-    store.put(date, report, "daily_report")
-    store.log("daily_report", {"date": date, "equity": close_equity, "benchmarks": benchmarks})
+    store.save_daily_report(sample, report)
     return report

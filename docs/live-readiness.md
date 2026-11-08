@@ -1869,3 +1869,20 @@ operator attestation, not independent API verification of delivery.
   paid calls or broker endpoints changed. This combines actual local process death
   and backup restore with fixture broker progression; it does not prove cloud-host
   loss, real broker cancellation semantics or network partition during takeover.
+
+## Atomic daily measurement publication (2026-11-08 UTC)
+
+- Reproduced a reporting consistency bug: the daily equity sample committed before
+  historical benchmark retrieval and final report persistence. Either failure left
+  an unmatched sample which later calculations could consume. Both reproductions
+  failed on the prior implementation before the fix.
+- Daily reporting now holds the existing account serialization lock, computes the
+  candidate series without publishing the sample, and commits sample/report/audit
+  receipt in one SQLite transaction. Telemetry is emitted only after commit.
+  Completed reports remain immutable; existing historical data is not rewritten.
+- Regression faults cover baseline retrieval, report insert and audit insert;
+  each leaves no partial daily publication, and recovery saves exactly one report
+  and receipt. Full offline suite: **674 passed, seven opt-in external tests
+  skipped**. Ruff and diff checks pass. Source awaits CI/deployment; total-return
+  benchmark comparability, complete allocated costs and uncertainty analysis
+  remain separate open requirements. No paid research or orders were run.

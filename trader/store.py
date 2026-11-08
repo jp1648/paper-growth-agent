@@ -87,6 +87,26 @@ class Store:
             emit("document.adjustment", {"key": item["id"], "value": item}, experiment_id=self.scope)
             emit("explicit_adjustment", item, experiment_id=self.scope)
 
+    def save_daily_report(self, sample, report):
+        """Publish the measurement, report and audit receipt together."""
+        date = sample["date"]
+        receipt = {"date": date, "equity": report["close_equity"], "benchmarks": report["benchmarks"]}
+        with self.db:
+            self.db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?) ON CONFLICT(scope,kind,key) DO UPDATE SET body=excluded.body",
+                (self.scope, "daily", date, dumps(sample)),
+            )
+            self.db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?)", (self.scope, "daily_report", date, dumps(report))
+            )
+            self.db.execute(
+                "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+                (self.scope, now().isoformat(), "daily_report", dumps(receipt)),
+            )
+        for kind, body in (("daily", sample), ("daily_report", report)):
+            emit("document." + kind, {"key": date, "value": body}, experiment_id=self.scope)
+        emit("daily_report", receipt, experiment_id=self.scope)
+
     def log(self, kind, body):
         with self.db:
             self.db.execute(
