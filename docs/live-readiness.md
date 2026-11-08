@@ -2119,3 +2119,22 @@ were changed. Deployment remains to be verified.
   2/1/3/8/1/0. No history repair was needed or performed. VM rollback bundle:
   `state/release-rollback-3e6610d`; local evidence:
   `state/revision-atomic-release-3e6610d/`. No orders or paid research calls.
+
+## Correction approval process-death evidence
+
+Extended the existing isolated loopback broker/SIGKILL harness with two revision
+stages. The first kills the worker from SQLite's trace callback immediately before
+the approval-receipt insert, after the revision insert within the uncommitted
+transaction. Reopening the WAL ledger leaves neither revision nor receipt and
+retains the original effective fee. The second kills immediately after the atomic
+approval method returns, before service reconciliation; reopening preserves both
+revision and receipt while the old audit snapshot remains visibly unchanged.
+
+In both cases, repeated explicit approval after restart yields exactly one
+revision/receipt, cash 99998 and fees 2, preserves the original fee record and
+operator pause, and submits no orders. The ledger passes integrity checking.
+This is actual process death and local SQLite recovery against a fixture broker;
+it is not a cloud-host loss or real-broker correction claim.
+
+Validation: 79 process-recovery, backup-recovery and readiness tests passed;
+format, Ruff and diff checks passed. Test-only change; deployed runtime unchanged.

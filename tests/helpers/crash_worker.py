@@ -73,7 +73,26 @@ with pytest.MonkeyPatch.context() as patch:
             die()
 
     store.put = put
-    if stage.startswith("adjustment"):
+    if stage.startswith("revision"):
+        if stage == "revision_mid":
+
+            def revision_checkpoint(sql):
+                if sql.startswith("INSERT INTO journal") and "broker_revision_approved" in sql:
+                    die()
+
+            store.db.set_trace_callback(revision_checkpoint)
+        else:
+            approve_revision = store.approve_revision
+
+            def revision_committed(identifier, revision):
+                approve_revision(identifier, revision)
+                die()
+
+            store.approve_revision = revision_committed
+        service.acknowledge_revision(
+            json.loads(Path(config_path).with_name("fixture-revision.json").read_text())
+        )
+    elif stage.startswith("adjustment"):
         if stage == "adjustment_mid":
 
             def checkpoint(sql):

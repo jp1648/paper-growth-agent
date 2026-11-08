@@ -34,10 +34,23 @@ from trader.store import Store
         "activity",
         "adjustment",
         "adjustment_mid",
+        "revision_mid",
+        "revision_committed",
     ],
 )
 def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, decision, tmp_path, stage):
     service, broker, data = env
+    if stage.startswith("revision"):
+        original = {"id": "fee", "activity_type": "FEE", "net_amount": "-1", "date": "2026-10-21"}
+        broker.activities = [original.copy()]
+        broker.raw_account.update(cash="99999", equity="99999")
+        service.reconcile()
+        corrected = {**original, "net_amount": "-2"}
+        broker.activities = [corrected.copy()]
+        broker.raw_account.update(cash="99998", equity="99998")
+        service.kill_path.write_text("Operator reviewing fee revision")
+        revision = {"before": original, "after": corrected, "reason": "Verified fixture correction"}
+        (tmp_path / "fixture-revision.json").write_text(json.dumps(revision))
     if stage.startswith("adjustment"):
         broker.activities.extend(
             [
@@ -149,7 +162,24 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
         recovered = Service(service.cfg, reopened, broker, data)
         assert reopened.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert reopened.scope == service.store.scope
-        if stage.startswith("adjustment"):
+        if stage.startswith("revision"):
+            committed = stage == "revision_committed"
+            assert len(reopened.items("broker_revision")) == int(committed)
+            assert len(reopened.events("broker_revision_approved")) == int(committed)
+            assert reopened.get("fee", "activity") == original
+            assert reopened.activities() == [corrected if committed else original]
+            # The worker dies before post-approval reconciliation in both cases.
+            assert reopened.get("audit")["fees"] == "1"
+            recovered.acknowledge_revision(revision)
+            recovered.acknowledge_revision(revision)
+            assert reopened.activities() == [corrected]
+            assert reopened.get("audit")["fees"] == "2"
+            assert reopened.get("audit")["cash"] == "99998"
+            assert len(reopened.items("broker_revision")) == 1
+            assert len(reopened.events("broker_revision_approved")) == 1
+            assert recovered.kill_path.exists()
+            assert broker.submits == 0
+        elif stage.startswith("adjustment"):
             before = len(reopened.items("adjustment"))
             assert before == (0 if stage == "adjustment_mid" else 2)
             assert len(reopened.events("explicit_adjustment")) == before
