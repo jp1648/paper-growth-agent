@@ -1396,3 +1396,15 @@ operator attestation, not independent API verification of delivery.
   outage recovery, not multi-hour retention, a full disk, production alert delivery
   or a network partition during an in-flight database commit. Those gates remain
   open. No model calls or orders were made.
+
+- Two-hour isolated Postgres outage completed: the database container remained
+  paused for 7203.91 seconds while 7170 events with 4 KiB payloads were queued.
+  All 1434 real failed export attempts retained the complete queued count.
+  After database recovery, a reopened Sink on the same SQLite outbox exported
+  every event; all UUIDs and payloads matched Postgres exactly and the final
+  outbox was empty. The process exited zero and the disposable container was
+  removed. Private script and receipt: `state/postgres-outage-long/`.
+- This proves two-hour backlog retention and recovery for the isolated workload.
+  It does not establish production alert response, replacement-host recovery,
+  disk-exhaustion trace retention, or a partition during remote commit. Those
+  acceptance gates remain open. No paid research or trading was initiated.
