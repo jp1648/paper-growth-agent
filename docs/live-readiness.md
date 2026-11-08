@@ -1520,3 +1520,18 @@ operator attestation, not independent API verification of delivery.
   reports remain immutable. The new regressions failed before the fix; all 59
   readiness/reporting/dashboard tests and Ruff checks pass. This does not supply
   total-return benchmarks, complete operating-cost allocation or trial acceptance.
+
+- Reporting-release CI found a genuine telemetry loss boundary: the concurrent
+  producer/backlog test retained 599 of 600 events and logged a persistence failure.
+  The local offline suite had skipped the Postgres-enabled case; its 655 passing
+  tests were insufficient release evidence. Image c4b3c1c was built but NOT deployed.
+- Reproduced the same loss without Postgres by holding one real SQLite writer's
+  commit beyond the two-second busy timeout: a second public emit returned after
+  logging an error and lost its event. Producers sharing a Sink now serialize their
+  local writes with a separate lock, without holding that lock across Postgres I/O.
+  The regression fails before and passes after the fix. This does not promise
+  losslessness under cross-process contention, disk exhaustion or a hung writer.
+- Post-fix local verification with disposable real Postgres: all fifteen
+  observability tests passed, including concurrent backlog recovery. Full suite
+  under branch coverage: 661 passed, one paper-order opt-in skipped; total
+  coverage 84 percent. No production database was used by these tests.

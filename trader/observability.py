@@ -97,6 +97,7 @@ class Sink:
             db.execute("CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, body TEXT NOT NULL)")
         self.stop = threading.Event()
         self.lock = threading.Lock()
+        self.write_lock = threading.Lock()
         self.thread = None
         if start:
             self.thread = threading.Thread(target=self.work, daemon=True, name="telemetry-export")
@@ -126,7 +127,8 @@ class Sink:
             "phase": phase,
             "payload": clean(payload),
         }
-        with self.db() as db:
+        # Queue this sink's producers instead of competing for SQLite's busy timeout.
+        with self.write_lock, self.db() as db:
             db.execute("INSERT INTO outbox VALUES (?, ?)", (row["event_id"], json.dumps(row)))
 
     def flush(self):

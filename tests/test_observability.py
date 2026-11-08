@@ -252,6 +252,42 @@ def test_redaction_refreshes_secrets_between_events(monkeypatch):
     assert obs.clean(["second-private-token"]) == ["[REDACTED]"]
 
 
+def test_concurrent_emit_waits_for_local_commit_without_losing_event(sink, monkeypatch):
+    from concurrent.futures import TimeoutError
+    from contextlib import contextmanager
+    from threading import Event
+
+    entered, release = Event(), Event()
+    database = sink.db
+    first = True
+
+    @contextmanager
+    def slow_commit():
+        nonlocal first
+        hold = first
+        first = False
+        with database() as db:
+            yield db
+            if hold:
+                entered.set()
+                assert release.wait(10)
+
+    monkeypatch.setattr(sink, "db", slow_commit)
+    with ThreadPoolExecutor(2) as workers:
+        initial = workers.submit(obs.emit, "first", {})
+        try:
+            assert entered.wait(5)
+            following = workers.submit(obs.emit, "second", {})
+            # The SQLite busy timeout is two seconds. A queued writer must not drop.
+            with pytest.raises(TimeoutError):
+                following.result(timeout=2.3)
+        finally:
+            release.set()
+        initial.result(timeout=5)
+        following.result(timeout=5)
+    assert [row["name"] for row in events(sink)] == ["first", "second"]
+
+
 @pytest.mark.skipif(
     not os.environ.get("TEST_OBSERVABILITY_DATABASE_URL"), reason="Opt-in local Postgres test"
 )
