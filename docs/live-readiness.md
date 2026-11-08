@@ -3043,3 +3043,32 @@ Scope: actual VM unavailability plus checkpoint recovery is now demonstrated for
 this fixture. The disk was retained, not destroyed. This is not a simultaneous
 live-executor partition/fencing test, actual broker cancel/fill timing, or proof
 that every complete host-loss scenario passes. Those acceptance limits remain.
+
+## Delegated review and measurement decisions — November 8, 2026
+
+User authorized independent-agent review, selection of measurement rules based on
+its outcomes, and billing-export configuration. The isolated-context reviewer
+`/root/independent_reviews` was not involved in implementing the candidate. Its
+exact-hash report is `state/independent-review-20261108/review.md` and `hashes.json`.
+This is AI review, not a human attestation or claim of freedom from model bias.
+
+- Missing-evidence Apple reasoning approved: WATCH/zero shares correctly reflects
+  missing capex/original filing. Wrong packet case hash corrected in a new
+  `review-manifest-v2.json`; original preserved. No prior rejected sufficient-
+  evidence Apple result is approved by this review.
+- Microsoft frozen numerical sources approved for historical arithmetic only.
+  Before normalized-valuation holdout, fix the rubric's unconditional raw cash-flow
+  equality check in `trader/evaluation.py`, which conflicts with valid nonzero
+  normalization bridges; version and freeze the rubric before candidate generation.
+  No Microsoft candidate exists and none was generated for this review.
+- Measurement rules selected in `paper-trial-policy-proposal.md` under the user's
+  delegation. Incorporated issuer evidence for synthetic dividends, availability-
+  aware reinvestment, fractional/zero-friction sensitivity and full operating-cost
+  burden. Implementation and exact future opening-manifest activation remain.
+- Detailed Google Cloud billing export enabled to private US dataset
+  `trader-observatory-20261105.trader_billing`. No table yet at setup verification;
+  populated cost data and attribution remain outstanding. See infrastructure plan.
+
+No paid research, broker orders, pause changes, trial activation or deployment in
+this task. Existing research budget and the prospective observation requirements
+remain unchanged. Agent review findings must not be stored as human attestation.

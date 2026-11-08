@@ -1,4 +1,4 @@
-# Infrastructure cost evidence — proposed export, not enabled
+# Infrastructure cost evidence — detailed export enabled
 
 The read-only check on 2026-11-08 found billing enabled for
 `trader-observatory-20261105`, but `bq ls` and `bq ls --all=true` returned no visible
@@ -44,6 +44,26 @@ BigQuery charges. An empty newly enabled table is not evidence of free operation
    exports can change and are not necessarily final invoices. Keep estimated versus
    provider-reconciled states visible in the paper-trial report.
 
-This plan supplies neither complete cost attribution nor approval to enable an
-export. Complete total-return benchmarks and independent research review remain
-separate trial prerequisites.
+This export does not yet supply complete cost attribution. Complete total-return
+benchmarks and independent research review remain separate trial prerequisites.
+
+## Authorized setup — November 8, 2026
+
+The user explicitly authorized configuring the billing export. The Billing console
+showed all exports disabled before setup. Created
+`trader-observatory-20261105.trader_billing` using `bq`, in US multi-region with
+Google-managed encryption and no table expiration. Enabled only Detailed usage
+cost through the supported Billing console; verified its Enabled state and exact
+destination. Standard, FOCUS, pricing and CUD exports remain disabled.
+
+Removed the new dataset's default projectReaders/projectWriters grants. Retained
+project owners, the creating operator, and Google's billing export service identity.
+No public or dashboard/runtime access was granted. Billing export is account-wide;
+any trader reporting must filter `project.id = 'trader-observatory-20261105'` before
+exposure. Project-level administrators retain their existing privileges.
+
+Proof: `state/billing-export-20261108/enabled.png` and
+`dataset-verified.json`. The first table had not appeared at verification; no cost
+query or zero-cost claim was made. Export availability/backfill can lag. Dataset
+storage and subsequent queries may incur BigQuery charges. The export does not
+change the account's payment plan, buy credits, or start trading.

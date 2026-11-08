@@ -1,10 +1,14 @@
-# Paper trial measurement policy — proposal for review
+# Paper trial measurement policy — selected rules
 
-Status: **DRAFT, NOT APPROVED, NOT STARTED**. This selects a concrete measurement
-method for implementation and review. It does not authorize orders, resume trading,
-replace the original experiment, approve research, or start the observation clock.
+Status: **SELECTED FOR IMPLEMENTATION, NOT ACTIVATED** (November 8, 2026).
+The user delegated independent reviews and authorized selecting the measurement
+rules from their outcomes. Independent AI review is retained in
+`state/independent-review-20261108/review.md` with exact hashes. This is not a human
+research attestation or approval to trade. The selected rules below incorporate
+that review; the original experiment and trading pause remain unchanged.
 The existing `evaluations/forward-paper-v1.json` remains authoritative: at least
 60 regular sessions **and** 12 calendar weeks, with all failed attempts retained.
+An exact future opening manifest still requires explicit operator activation.
 
 ## Opening boundary and comparators
 
@@ -27,11 +31,20 @@ broker-marked equity and the separate common-mark adjustment side by side.
 
 ## Hypothetical execution and reinvestment
 
-Proposed primary calculation: whole ETF shares, no borrowing. This avoids requiring
+Selected primary calculation: whole ETF shares, no borrowing. This avoids requiring
 fractional broker access. At the opening close, buy the maximum whole shares
 funded by opening capital, after the explicitly modeled transaction cost. Leave
 the remainder as cash. Disclose the resulting cash drag; neither comparator has
-a matching artificial rounding loss imposed on the actual portfolio.
+a matching artificial rounding loss imposed on the actual portfolio. Also retain
+a fractional, zero-slippage ideal ETF sensitivity to expose the whole-share
+rounding disadvantage. It is secondary, never a replacement primary chosen after
+results. The fractional sensitivity uses quantities truncated to six decimal
+places, zero slippage, the same evidenced fee/tax/payment/interest conventions,
+and the same reinvestment timing. Choose the largest quantity on that grid whose
+order notional rounded half-up to cents plus separate fees is affordable; retain
+residual cash. This is a declared hypothetical precision, not broker eligibility.
+A favorable edge must retain its direction against both the whole-share
+zero-slippage and fractional zero-slippage series.
 
 Model each hypothetical purchase at the retained raw daily mark plus **5 basis
 points** adverse slippage. This is a predeclared modeling assumption, not a measured
@@ -51,8 +64,11 @@ order's total cash notional once to USD cents, half up, and account for fees
 separately. Choose the largest whole-share quantity affordable after those rounded
 costs. This is a declared simulation convention, not verified broker rounding.
 
-Reinvest only confirmed **net** distribution cash, at the next regular-session
-close strictly after its confirmed payment date, using the same purchase policy.
+Reinvest only confirmed **net** distribution cash, at the first regular-session
+close whose session date is later than the confirmed payment date and whose
+closing timestamp is later than confirmation available-at, using the same purchase
+policy. A payment date must not be converted to midnight to allow same-day buying. Never insert a
+retroactive hypothetical fill when confirmation arrives late.
 This intentionally avoids assumptions about intraday payment availability. Unspent
 residual cash may be pooled with the next payment. No reinvestment occurs on the
 ex-date or solely because the payable date arrived. A skipped purchase due to
@@ -71,6 +87,23 @@ payment transfers receivable to cash. Unknown withholding, fees, opening unpaid
 entitlements or revised records block a final comparison. Track gross entitlement,
 withholding, fees and net cash separately. A reported payable date is not proof of
 payment. Missing corporate-action records are not cancellations.
+
+Actual portfolio payments require broker activity and reconciliation. Hypothetical
+ETF payments instead require issuer/fund-administrator evidence of completed
+payment plus a frozen, source-backed synthetic investor/account tax and fee
+convention. Retain gross/net rates, ex/record/payment dates, evidence available-at
+time and revisions. A payment schedule alone leaves a supported net entitlement
+as a receivable, with no reinvestment and a provisional series. Unknown net
+entitlement blocks final NAV. A contractual-payment assumption may appear only as
+a labeled sensitivity, never as primary confirmed payment. Newly purchased ETFs
+have no inherited pre-purchase entitlement; inherited actual rights belong in
+opening capital. Investor tax residence, account product and fee/interest terms
+must be evidenced before activation, not assumed from unrelated balances.
+
+Process verified split/entitlement boundaries using prior ownership, then fills,
+cash events, supported accruals and close marks. Retain timestamps within each
+category; ambiguous same-date events, due bills and special distributions require
+an explicit reviewed treatment before the affected series can be finalized.
 
 Apply verified splits once to quantities with raw prices. Retain the split ratio,
 effective timing and before/after quantities. Unsupported distributions, fractional
@@ -94,7 +127,15 @@ liabilities. Broker-booked fees remain in cash/equity. Deduct model, data,
 infrastructure and other allocated operating costs once in the after-cost series,
 including failed calls and unsuccessful investigations. The comparator's execution
 costs are already in its cash. Do not charge it the agent's research overhead.
-Shared measurement infrastructure allocation must be separately documented.
+For the dedicated trader project, charge all recurring operating infrastructure
+(including dashboard, logs, backups and billing-export storage/query costs) to the
+agent's after-cost series. Also show the separately identified measurement subset
+for transparency; do not subtract it from the primary cost burden. Keep historical
+development/drill costs visible in a separate pretrial total. Any shared resources
+require an evidenced allocation frozen before activation; unresolved allocation
+blocks final after-cost acceptance. Retain gross consumption costs before provider
+credits as the sustainable primary cost measure, and net-after-credit costs as a
+secondary cash-expense view.
 
 Preserve estimates, unknown charges, reservations, invoice evidence and allocation
 versions separately. Unknown amounts prevent final after-cost acceptance. A
@@ -115,21 +156,21 @@ source completeness. No final result while required economic facts remain unknow
 ## What must exist before activation
 
 1. Independent approval of sufficient-evidence research and preserved holdout review.
-2. Approval of this measurement policy and exact future opening boundary.
+2. Implementation of these selected rules and approval of the exact future opening boundary.
 3. Source-backed fee, interest, distribution, withholding and split treatment.
 4. Implemented benchmark opening/reinvestment/entitlement ledger, tested against
    independent hand calculations and retained source fixtures.
 5. Collector for actual closing inventory, common marks, actions, liabilities and
-   every allocated cost category; infrastructure billing source still pending.
+   every allocated cost category; billing export is enabled but populated cost evidence is still pending.
 6. Immutable manifest binding protocol, policy, artifact, prompts/models, config,
    original experiment, capital/inventory, calendars and reviewer identity.
 7. Explicit operator activation after all preceding evidence passes. Current pause
-   stays in force; this proposal itself grants no submission permission.
+   stays in force; this policy itself grants no submission permission.
 
 Existing helpers cover raw source retention, ordinary-dividend revision comparison,
 entitlement arithmetic, common-mark reconciliation and economic NAV/return
 calculation. They do not yet supply the complete ledger/collector above. A green
-unit suite or approval of this proposal does not start or complete the trial.
+unit suite or selection of this policy does not start or complete the trial.
 
 
 ## Worked accounting example for implementation review
@@ -153,3 +194,17 @@ price drop nor payment creates another loss/gain. If this purchase instead occur
 after the ex-date without prior ownership, it earns no earlier entitlement.
 These balances should become independent expected test values for the benchmark
 ledger, alongside splits, withheld payments, fee deductions and source revisions.
+
+## Acceptance and implementation checks
+
+Publish a completeness state for every session and comparator. Do not drop missing
+sessions from paired comparisons. Preserve gross external deposits and withdrawals
+separately, even if their net is zero. Freeze policy, code, sources, allocation and
+reviewer identities before the observation window; later material changes retain
+the predecessor and require a new preregistered candidate under the protocol.
+
+Independent expected-value tests must cover entitlement before/after ex-date, sale
+after entitlement, delayed/reversed payment, unknown net tax, late confirmation,
+splits/cash in lieu, cent-boundary affordability, initial costs, no affordable whole
+share, accrued-then-settled fees and revisions propagating through the return chain.
+Selecting the policy does not certify these implementations or research quality.
