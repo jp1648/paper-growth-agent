@@ -2066,3 +2066,19 @@ This does not make a multi-request broker snapshot atomic, or eliminate the need
 to reconcile again after approval. Deployment evidence is still required.
 
 Validation: full offline suite 704 passed, 7 skipped; Ruff and diff checks passed.
+
+## Correction approval rollout — source 79186ce
+
+- CI 42445867954 passed backend, dashboard and secret scanning. Cloud Build
+  5d9707e9-cddd-482c-b969-96d1d8cf2178 succeeded. Deployed agent digest
+  `sha256:5f928bf812868d4e159a5166de7614a4f2cf438713fa4f88a42a13677d11c487`.
+- All 27 Python source hashes matched before rollout and in the running container.
+  Fresh reconciliation succeeded at 2026-11-08T04:16:34.242209+00:00; health,
+  executor, database proxy and health timer passed.
+- Original experiment, pause, AAPL quantity one, config and spending hashes were
+  unchanged. Intent/order/activity/acceptance/adjustment counts remained 2/1/3/8/1.
+  Consistent backup retained at `state/release-rollback-79186ce` on the VM;
+  private receipts are in local `state/correction-release-79186ce/`.
+- No model requests or orders were submitted. This deployment closes the
+  correction-approval ordering defect, not the broader research, normalization,
+  operational recovery, forward-trial or live-release gates.
