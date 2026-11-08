@@ -1310,3 +1310,18 @@ operator attestation, not independent API verification of delivery.
 - Private deployment receipts: `state/safety-release-50e103c/`. Research-quality,
   provider-charge reconciliation, recovery and forward-paper gates remain open;
   this release does not establish live readiness.
+
+- Combined execution-recovery regression now covers a four-share partial fill,
+  cancellation accepted by the loopback broker, actual SIGKILL before the cancel
+  response is persisted, and reopening the original SQLite ledger. The remaining
+  six shares then fill during the cancellation race while their activity is
+  temporarily absent from the broker snapshot.
+- Recovery retains the pending-order cash reservation, rejects reconciliation
+  and execution while broker records disagree, then converges after the missing
+  activity arrives. Repeated reconciliation records exactly two fills, ten shares
+  and cash 99000, releases the reservation, preserves the kill switch, and causes
+  no duplicate submit or cancellation. Eight abrupt-death scenarios pass; full
+  offline suite now 647 passed, six opt-in skips. Ruff/format pass.
+- This is deterministic loopback evidence with a real process kill, not proof of
+  Alpaca's timing contract, replacement-host ownership transfer, or simultaneous
+  disk/network failure. No production code change, paid calls or broker orders.
