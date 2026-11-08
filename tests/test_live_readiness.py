@@ -123,7 +123,9 @@ def test_revision_conflicting_snapshot_cannot_persist_approval(env, fault):
     assert service.store.get("fee-1", "activity") == original
 
 
-@pytest.mark.parametrize("table,kind", [("documents", "broker_revision"), ("journal", "broker_revision_approved")])
+@pytest.mark.parametrize(
+    "table,kind", [("documents", "broker_revision"), ("journal", "broker_revision_approved")]
+)
 def test_revision_storage_failure_rolls_back_approval_and_receipt(env, table, kind):
     import sqlite3
 
