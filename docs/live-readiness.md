@@ -2586,3 +2586,32 @@ Both source/count identities and sensitivity sums passed assert checks against
 retained source offsets. No paid calls, changes to frozen cases, model claims of
 completion, deployment or trading changes. Forward compensation/share policy and
 independent investment approval remain open; the goal is not complete.
+
+### Hard-crash cancellation recovery with unavailable transport (November 8)
+
+Extended the four existing subprocess cancellation-race cases, including lost
+cancellation acknowledgments and both filled/canceled terminal outcomes. After
+real SIGKILL and restoration of the older partial-fill SQLite backup, the fixture
+broker advances to terminal status while its final fill activity is withheld.
+Three consecutive store/service restarts then encounter a real unavailable
+loopback snapshot endpoint (connection refusal or connection timeout, depending
+on OS). These are network transport failures, not injected exception objects.
+
+Every failed recovery keeps reconciliation false, the original four-share/$99,600
+cash audit, $601 reservation, one intent/activity, and the trading pause. Submission
+and cancellation counts remain one each. After transport recovers, the missing
+activity still blocks reconciliation. Once it arrives, repeated reconciliation
+produces exactly two activities, correct final cash/shares, terminal intent/order
+and zero reservation. A subsequent stale partial-order snapshot cannot regress
+the terminal state or cause a new submission. Fresh exposure remains paused.
+
+Validation: **36 process/backup recovery tests passed**; Ruff and whitespace
+checks passed. The initial test expected refusal only; macOS returned a connect
+timeout, so the assertion now covers those two connection failure modes without
+accepting a successful response. No production-code change was needed.
+
+This proves the composed local recovery path, not a real Alpaca network partition
+or replacement-host recovery after loss of the original disk. Broker state and
+account/activity responses are fixtures; only process death, SQLite restoration
+and the failed loopback transport are real. No provider requests, paid calls,
+deployment or trading-state changes occurred.

@@ -13,6 +13,7 @@ from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import httpx
 import pytest
 
 from trader.accounting import LedgerError
@@ -39,7 +40,9 @@ from trader.store import Store
         "revision_committed",
     ],
 )
-def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, decision, tmp_path, stage):
+def test_process_death_preserves_intent_and_reconciles_without_duplicate(
+    env, decision, tmp_path, stage, monkeypatch
+):
     service, broker, data = env
     if stage.startswith("revision"):
         original = {"id": "fee", "activity_type": "FEE", "net_amount": "-1", "date": "2026-10-21"}
@@ -203,6 +206,33 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
             terminal = "canceled" if canceled else "filled"
             late = broker.fixture_fill(cid, "2" if canceled else "6", status=terminal)
             broker.activities.remove(late)
+            # A non-listening loopback endpoint times out or refuses by OS;
+            # neither outcome is a mocked exception or an actual broker request.
+            with socket.socket() as unavailable:
+                unavailable.bind(("127.0.0.1", 0))
+                endpoint = f"http://127.0.0.1:{unavailable.getsockname()[1]}/snapshot"
+
+                def partitioned_snapshot(*_):
+                    with httpx.Client(timeout=0.2, trust_env=False) as client:
+                        client.get(endpoint)
+                    raise AssertionError("The offline partition unexpectedly answered")
+
+                with monkeypatch.context() as patch:
+                    patch.setattr(broker, "snapshot", partitioned_snapshot)
+                    for _ in range(3):
+                        reopened.db.close()
+                        reopened = Store(service.cfg.database)
+                        recovered = Service(service.cfg, reopened, broker, data)
+                        with pytest.raises((httpx.ConnectError, httpx.ConnectTimeout)):
+                            recovered.execute(decision, "process-drill")
+                        assert reopened.get("reconciliation")["ok"] is False
+                        assert reopened.get("audit")["cash"] == "99600"
+                        assert reopened.get("audit")["shares"]["ACME"] == "4"
+                        assert recovered.reservation_summary() == dec("601")
+                        assert len(reopened.items("intent")) == 1
+                        assert len(reopened.items("activity")) == 1
+                        assert recovered.kill_path.exists()
+                        assert broker.submits == 1 and len(broker.cancels) == 1
             with pytest.raises(LedgerError):
                 recovered.reconcile()
             assert reopened.get("reconciliation")["ok"] is False
