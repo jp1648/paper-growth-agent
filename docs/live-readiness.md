@@ -1408,3 +1408,12 @@ operator attestation, not independent API verification of delivery.
   It does not establish production alert response, replacement-host recovery,
   disk-exhaustion trace retention, or a partition during remote commit. Those
   acceptance gates remain open. No paid research or trading was initiated.
+
+- Ownership-transfer ambiguity regressions: simulate a successful conditional
+  ownership write followed by a lost response. The command surfaces the timeout,
+  rejects replay with the stale generation, and a read-only plan identifies the
+  already assigned target without another write; persisted previous ownership is
+  retained. A second case replaces ownership immediately after commit and verifies
+  read-back rejects success without retrying or overwriting that later owner.
+  All sixteen transfer tests and Ruff pass. These are deterministic cloud-command
+  fixtures, not a replacement-host service recovery or real network partition.

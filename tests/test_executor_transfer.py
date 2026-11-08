@@ -129,3 +129,44 @@ def test_verified_transfer_retains_previous_identity_and_checks_readback(cloud):
     assert result["owner"]["previous_status"] == "TERMINATED"
     assert run()["status"] == "unchanged"
     assert cloud["writes"] == 1
+
+
+def test_committed_transfer_with_lost_response_requires_read_only_reconciliation(cloud, monkeypatch):
+    original = transfer.cloud
+
+    def lose_response(*args):
+        result = original(*args)
+        if args[:2] == ("storage", "cp"):
+            raise subprocess.TimeoutExpired(args, 60)
+        return result
+
+    monkeypatch.setattr(transfer, "cloud", lose_response)
+    with pytest.raises(subprocess.TimeoutExpired):
+        run(apply=True, expected_generation="10")
+    assert cloud["writes"] == 1
+    assert cloud["owner"]["instance_id"] == "222"
+    with pytest.raises(ValueError, match="generation changed"):
+        run(apply=True, expected_generation="10")
+    result = run()
+    assert result["status"] == "unchanged"
+    assert result["generation"] == "11"
+    assert cloud["owner"]["previous_owner"]["instance_id"] == "111"
+    assert cloud["writes"] == 1
+
+
+def test_owner_changed_after_commit_is_not_reported_as_success(cloud, monkeypatch):
+    original = transfer.cloud
+
+    def replace_after_commit(*args):
+        result = original(*args)
+        if args[:2] == ("storage", "cp"):
+            cloud["owner"]["instance_id"] = "333"
+            cloud["generation"] = "12"
+        return result
+
+    monkeypatch.setattr(transfer, "cloud", replace_after_commit)
+    with pytest.raises(ValueError, match="Ownership changed after transfer"):
+        run(apply=True, expected_generation="10")
+    assert cloud["writes"] == 1
+    assert cloud["owner"]["instance_id"] == "333"
+    assert cloud["generation"] == "12"
