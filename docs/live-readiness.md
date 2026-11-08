@@ -2896,3 +2896,31 @@ records fail ordinary-cash comparison. No ledger mutation, source request, paid
 research or trial activation. Full local suite: **898 passed, 7 skipped**; Ruff
 and formatting passed. This comparison is not yet deployed. Benchmark holdings,
 net entitlement treatment, reinvestment and complete costs remain pending.
+
+### Sell-side combined recovery coverage — November 8
+
+Extended the existing buy-side combined restore and real-process-death drills to
+sell orders. An offline fixture first buys ten shares through the normal execution
+path, then submits an authorized fixture exit. Four shares fill before cancellation;
+a further two shares fill before a terminal cancellation, or all six remaining
+shares fill despite cancellation. Both successful and dropped cancellation
+acknowledgments are covered by actual child-process SIGKILL through loopback HTTP.
+Recovery restores an older durable SQLite backup, reopens it three times during
+real loopback connection failures, then encounters terminal order state before
+its withheld activity and finally a stale partial-order snapshot.
+
+Assertions cover the six outstanding shares during the outage (sell orders reserve
+shares, not purchase cash), unchanged last-reconciled balances while disconnected,
+blocked execution while fill history is incomplete, exactly-once activity/journal
+entries, terminal-order monotonicity, original experiment/pause, and no submissions
+beyond the fixture entry and exit. Final sell outcomes are independently checked:
+$99,600 cash/four shares after partial cancellation, or $100,000/no shares after
+complete exit. Original buy-side scenarios remain in the same tests.
+
+These are isolated broker-fixture tests with real SQLite restore, process death and
+loopback transport failures. They do not prove actual Alpaca cancel timing or a
+physical host/disk-loss scenario. No production order, liquidation, deployment,
+paid research call or pause change occurred.
+
+Validation: all **42 process-recovery/backup-recovery cases passed**, including six
+new sell-side cases; targeted Ruff checks passed. Production code is unchanged.

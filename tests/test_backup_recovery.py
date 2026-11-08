@@ -324,23 +324,35 @@ def test_full_ledger_after_broker_acceptance_recovers_without_resubmit(
         restored.db.close()
 
 
+@pytest.mark.parametrize("side", ["buy", "sell"])
 @pytest.mark.parametrize(
     "terminal,late_qty,total_qty,cash", [("filled", "6", "10", "99000"), ("canceled", "2", "6", "99400")]
 )
 def test_restore_partial_cancel_race_survives_outage_restarts_and_delayed_activity(
-    env, decision, tmp_path, monkeypatch, terminal, late_qty, total_qty, cash
+    env, decision, tmp_path, monkeypatch, terminal, late_qty, total_qty, cash, side
 ):
     import httpx
 
     service, broker, data = env
     original_id = service.store.scope
+    if side == "sell":
+        entry = service.execute(decision, "fixture-entry")["client_order_id"]
+        broker.fixture_fill(entry)
+        service.reconcile()
+        decision = decision.model_copy(update={"action": "SELL", "exit_reason": "risk"})
+    submissions = 1 if side == "buy" else 2
+    expected_reservation = dec("601") if side == "buy" else dec("0")
+    partial_cash = "99600" if side == "buy" else "99400"
+    partial_shares = "4" if side == "buy" else "6"
+    final_shares = dec(total_qty) if side == "buy" else dec("10") - dec(total_qty)
+    final_cash = dec(cash) if side == "buy" else dec("99000") + dec(total_qty) * dec("100")
     result = service.execute(decision, "combined-restore")
     cid = result["client_order_id"]
     broker.fixture_fill(cid, "4", status="partially_filled")
     service.reconcile()
     service.kill("Restore drill: cancellation remains unresolved")
     assert broker.orders[cid]["status"] == "pending_cancel"
-    assert service.reservation_summary() == dec("601")
+    assert service.reservation_summary() == expected_reservation
     backup = service.store.backup()
     # Broker progresses independently while the old process and its disk are unavailable.
     late = broker.fixture_fill(cid, late_qty, status=terminal)
@@ -365,9 +377,11 @@ def test_restore_partial_cancel_race_survives_outage_restarts_and_delayed_activi
             with pytest.raises(httpx.ReadTimeout):
                 recovered.execute(decision, "combined-restore")
             assert restored.get("reconciliation")["ok"] is False
-            assert recovered.reservation_summary() == dec("601")
-            assert restored.get("audit")["cash"] == "99600"
-            assert recovered.kill_path.exists() and broker.submits == 1
+            assert recovered.reservation_summary() == expected_reservation
+            assert sum(dec(o["qty"]) - dec(o["filled_qty"]) for o in restored.active_orders()) == 6
+            assert restored.get("audit")["cash"] == partial_cash
+            assert restored.get("audit")["shares"]["ACME"] == partial_shares
+            assert recovered.kill_path.exists() and broker.submits == submissions
         finally:
             restored.db.close()
     monkeypatch.setattr(broker, "snapshot", snapshot)
@@ -378,7 +392,7 @@ def test_restore_partial_cancel_race_survives_outage_restarts_and_delayed_activi
         with pytest.raises(LedgerError):
             recovered.execute(decision, "new-during-delayed-activity")
         assert restored.get("reconciliation")["ok"] is False
-        assert broker.submits == 1 and len(restored.items("intent")) == 1
+        assert broker.submits == submissions and len(restored.items("intent")) == submissions
     finally:
         restored.db.close()
     broker.activities.append(late)
@@ -389,14 +403,14 @@ def test_restore_partial_cancel_race_survives_outage_restarts_and_delayed_activi
             recovered.reconcile()
             recovered.execute(decision, "combined-restore")
         assert restored.get("reconciliation")["ok"] is True
-        assert restored.get("audit")["cash"] == cash
-        assert restored.get("audit")["shares"]["ACME"] == total_qty
-        assert len(restored.items("activity")) == 2
-        assert len(restored.events("broker_activity")) == 2
+        assert dec(restored.get("audit")["cash"]) == final_cash
+        assert dec(restored.get("audit")["shares"].get("ACME", "0")) == final_shares
+        assert len(restored.items("activity")) == submissions + 1
+        assert len(restored.events("broker_activity")) == submissions + 1
         assert restored.get(cid, "order")["status"] == terminal
         assert recovered.reservation_summary() == 0
         assert recovered.execute(decision, "new-after-recovery")["status"] == "rejected"
-        assert broker.submits == 1 and len(broker.cancels) == 1
+        assert broker.submits == submissions and len(broker.cancels) == 1
         assert recovered.kill_path.exists()
         assert restored.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         with closing(sqlite3.connect(retained)) as original:

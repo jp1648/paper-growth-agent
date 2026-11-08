@@ -33,6 +33,10 @@ from trader.store import Store
         "cancel_race_canceled",
         "cancel_race_lost_ack",
         "cancel_race_canceled_lost_ack",
+        "sell_cancel_race",
+        "sell_cancel_race_canceled",
+        "sell_cancel_race_lost_ack",
+        "sell_cancel_race_canceled_lost_ack",
         "activity",
         "adjustment",
         "adjustment_mid",
@@ -44,6 +48,13 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
     env, decision, tmp_path, stage, monkeypatch
 ):
     service, broker, data = env
+    selling = stage.startswith("sell_")
+    if selling:
+        stage = stage.removeprefix("sell_")
+        entry = service.execute(decision, "fixture-entry")["client_order_id"]
+        broker.fixture_fill(entry)
+        service.reconcile()
+        decision = decision.model_copy(update={"action": "SELL", "exit_reason": "risk"})
     if stage.startswith("revision"):
         original = {"id": "fee", "activity_type": "FEE", "net_amount": "-1", "date": "2026-10-21"}
         broker.activities = [original.copy()]
@@ -195,12 +206,16 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
             assert len(reopened.events("explicit_adjustment")) == 2
             assert reopened.get("audit")["cash"] == "103000"
         elif stage.startswith("cancel_race"):
-            cid = next(iter(broker.orders))
+            cid = next(
+                cid for cid, order in broker.orders.items() if order["side"] == ("sell" if selling else "buy")
+            )
+            submissions = 2 if selling else 1
+            reservation = dec("0") if selling else dec("601")
             assert broker.orders[cid]["status"] == "pending_cancel"
             assert reopened.get(cid, "order")["status"] == "partially_filled"
             stale = copy.deepcopy(reopened.get(cid, "order"))
             assert recovered.kill_path.exists()
-            assert recovered.reservation_summary() == dec("601")
+            assert recovered.reservation_summary() == reservation
             # A terminal broker order arrives before its additional fill activity.
             canceled = "canceled" in stage
             terminal = "canceled" if canceled else "filled"
@@ -226,32 +241,39 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
                         with pytest.raises((httpx.ConnectError, httpx.ConnectTimeout)):
                             recovered.execute(decision, "process-drill")
                         assert reopened.get("reconciliation")["ok"] is False
-                        assert reopened.get("audit")["cash"] == "99600"
-                        assert reopened.get("audit")["shares"]["ACME"] == "4"
-                        assert recovered.reservation_summary() == dec("601")
-                        assert len(reopened.items("intent")) == 1
-                        assert len(reopened.items("activity")) == 1
+                        assert reopened.get("audit")["cash"] == ("99400" if selling else "99600")
+                        assert reopened.get("audit")["shares"]["ACME"] == ("6" if selling else "4")
+                        assert recovered.reservation_summary() == reservation
+                        assert (
+                            sum(dec(o["qty"]) - dec(o["filled_qty"]) for o in reopened.active_orders()) == 6
+                        )
+                        assert len(reopened.items("intent")) == submissions
+                        assert len(reopened.items("activity")) == submissions
                         assert recovered.kill_path.exists()
-                        assert broker.submits == 1 and len(broker.cancels) == 1
+                        assert broker.submits == submissions and len(broker.cancels) == 1
             with pytest.raises(LedgerError):
                 recovered.reconcile()
             assert reopened.get("reconciliation")["ok"] is False
             with pytest.raises(LedgerError):
                 recovered.execute(decision, "process-drill")
-            assert broker.submits == 1
+            assert broker.submits == submissions
             broker.activities.append(late)
             for _ in range(2):
                 recovered.reconcile()
             assert reopened.get("reconciliation")["ok"] is True
-            assert reopened.get("audit")["cash"] == ("99400" if canceled else "99000")
-            assert reopened.get("audit")["shares"]["ACME"] == ("6" if canceled else "10")
-            assert len(reopened.items("activity")) == 2
-            assert len(reopened.events("broker_activity")) == 2
+            assert reopened.get("audit")["cash"] == (
+                ("99600" if canceled else "100000") if selling else ("99400" if canceled else "99000")
+            )
+            assert dec(reopened.get("audit")["shares"].get("ACME", "0")) == (
+                dec("4" if canceled else "0") if selling else dec("6" if canceled else "10")
+            )
+            assert len(reopened.items("activity")) == submissions + 1
+            assert len(reopened.events("broker_activity")) == submissions + 1
             assert reopened.get(cid, "order")["status"] == terminal
             assert recovered.reservation_summary() == 0
             assert recovered.kill_path.exists()
             assert len(broker.cancels) == 1
-            assert broker.submits == 1
+            assert broker.submits == submissions
             # A lagging broker replica resurfaces the earlier partial order after recovery.
             terminal_order = copy.deepcopy(broker.orders[cid])
             broker.orders[cid] = stale
@@ -261,9 +283,9 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
             assert recovered.reservation_summary() == 0
             broker.orders[cid] = terminal_order
             recovered.reconcile()
-            assert len(reopened.items("activity")) == 2
-            assert len(reopened.events("broker_activity")) == 2
-            assert broker.submits == 1
+            assert len(reopened.items("activity")) == submissions + 1
+            assert len(reopened.events("broker_activity")) == submissions + 1
+            assert broker.submits == submissions
             assert recovered.execute(decision, "new-after-process-restore")["status"] == "rejected"
         elif stage == "prepared":
             with pytest.raises(LedgerError, match="Unresolved submission"):
