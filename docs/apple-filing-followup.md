@@ -128,3 +128,81 @@ is low. The model's confidence number must identify its referent and remain an
 uncalibrated judgment, not a probability of positive returns. A five-year valuation
 does not establish weeks-to-months convergence; missing near-term catalysts do not
 refute long-term ownership, but do leave the shorter-horizon thesis unsupported.
+
+## Numerical operating-cash bridge and tax reconciliation
+
+The frozen cash-flow statement supports the following exact bridge (USD billions).
+These are accounting movements, not estimates of recurring cash generation:
+
+| Component | FY2025 | FY2024 | Change |
+|---|---:|---:|---:|
+| Net income | 112.010 | 93.736 | +18.274 |
+| Depreciation/amortization | 11.698 | 11.445 | +0.253 |
+| SBC add-back in cash-flow statement | 12.863 | 11.688 | +1.175 |
+| Other reconciliation adjustments | -0.089 | -2.266 | +2.177 |
+| Subtotal before operating asset/liability changes | 136.482 | 114.603 | +21.879 |
+| Operating asset/liability changes | -25.000 | +3.651 | -28.651 |
+| Operating cash flow | 111.482 | 118.254 | -6.772 |
+| Capex | -12.715 | -9.447 | -3.268 |
+| Historical CFO-minus-capex proxy | 98.767 | 108.807 | -10.040 |
+
+The largest line in the operating-change swing is other current/noncurrent
+liabilities: -$11.076bn versus +$15.552bn, a -$26.628bn change. This is a reason
+to inspect the liability/tax movements, not evidence that the entire swing is
+nonrecurring or available for add-back. Receivables, inventory, payables and other
+assets also contribute. Removing all operating changes would discard actual
+reinvestment and timing effects without establishing a sustainable replacement.
+
+Net-income growth also needs qualification: pretax income increased $9.244bn,
+while tax expense fell $9.030bn, together explaining the $18.274bn increase.
+Removing only the disclosed State Aid tax effects yields $111.524bn for FY2025
+and $103.982bn for FY2024, or 7.25% growth. This narrow accounting comparison does
+not normalize the rest of earnings or convert earnings to cash.
+
+The annual tax note supports current tax expense of $22.058bn and a deferred tax
+benefit of $1.339bn, summing to the $20.719bn total provision. Cash taxes were
+$43.369bn. Current income-tax payable declined from $26.601bn to $13.016bn:
+
+`22.058 + (26.601 - 13.016) + 7.726 = 43.369`
+
+The $7.726bn is an **unreconciled residual of this deliberately incomplete bridge**,
+not a new expense or an approved adjustment. Current tax-payable balances alone
+do not cover every tax-related asset/liability, settlement, credit, FX or
+classification movement. Deferred expense also is not automatically a cash
+adjustment. A full recurring-tax forecast remains open.
+
+Twenty source rows, exact character offsets, filing-text hash and assert-checked
+identities are retained in `state/evaluations/apple-filing-followup-20261108/normalization.json`;
+`normalization.py` reproduces them from the untouched frozen suite.
+
+## Supplemental pre-cutoff Ireland settlement evidence
+
+Apple's Q2 FY2025 10-Q reports that the first six fiscal months included an escrow
+release of €14.2bn/$15.4bn to Ireland that fully settled the State Aid obligation.
+This provides cash-settlement evidence distinct from the earlier $15.8bn payable
+and $10.2bn accounting charge. The [SEC filing index](https://www.sec.gov/Archives/edgar/data/320193/000032019325000057/0000320193-25-000057-index.html)
+shows acceptance on May 2, 2025, before the exercise cutoff. See the filing's
+[State Aid Decision Tax Payable disclosure](https://www.sec.gov/Archives/edgar/data/320193/000032019325000057/aapl-20250329.htm).
+
+Conditional gross-settlement sensitivity: if the rounded $15.4bn release is wholly
+included in reported annual CFO/cash taxes, cash taxes excluding that payment are
+$27.969bn; CFO plus settlement is $126.882bn; after capex and an SBC-cost deduction,
+the resulting historical sensitivity is $101.304bn. It does not reconcile other
+cash-tax effects, recurring taxes or future reinvestment. Do not also deduct
+repurchases/employee dilution for the same SBC cost, or add the escrow securities
+back as an asset after treating them as spent.
+
+| Historical basis, not approved normalized cash | $bn | Per historical diluted share |
+|---|---:|---:|
+| CFO minus capex | 98.767 | $6.582405 |
+| Same, less SBC-cost sensitivity | 85.904 | $5.725141 |
+| Same SBC sensitivity, plus conditional gross settlement adjustment | 101.304 | $6.751486 |
+
+The per-share figures use historical weighted-average diluted shares only; they
+are not forward valuation inputs. The settlement amount is rounded, so the
+six-decimal arithmetic does not imply economic precision. The supplemental
+source is retained separately in `tax-supplement.json` with its URL and filing
+metadata; raw original HTML bytes/hash have not been captured. No original
+frozen case or model output was modified. A future expanded development case
+must explicitly version any added source. This follow-up remains implementation-
+agent analysis requiring independent review, not a replacement accepted valuation.

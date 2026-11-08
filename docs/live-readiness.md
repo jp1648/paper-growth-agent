@@ -2531,3 +2531,20 @@ outputs remain preserved. Post-completion reconciliation at
 2026-11-08T05:47:05.035046Z is healthy; original experiment, config, pause, one
 AAPL share and execution/acceptance counts are unchanged. No broker order was
 submitted. No additional paid retry is justified solely to repeat this result.
+
+### Apple accounting investigation beyond gap disclosure (November 8)
+
+Completed numerical CFO and partial tax bridges from 20 exact frozen-filing rows,
+with retained offsets/hash and assert-checked sums. CFO's $6.772bn decline
+reconciles to +$21.879bn earnings/noncash subtotal and -$28.651bn operating-change
+swing. The current-tax-expense/current-tax-payable bridge leaves an explicit
+$7.726bn residual; it is not silently normalized away.
+
+A separately verified pre-cutoff SEC Q2 2025 filing establishes a rounded
+$15.4bn Ireland escrow release and full settlement, distinct from the historical
+$15.8bn payable and $10.2bn accounting charge. Added conditional cash/SBC
+sensitivities and their limitations to [the filing follow-up](apple-filing-followup.md).
+This narrows the tax evidence gap, but does not establish recurring taxes, forward
+shares/reinvestment, or an approved normalized valuation. The new source is
+separate from the original frozen cases; no paid call, production change or
+trade occurred. The missing-evidence independent review remains pending.
