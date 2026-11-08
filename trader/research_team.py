@@ -24,6 +24,7 @@ from pydantic import Field
 from .alpaca import safe_error
 from .evidence import EvidenceTooLarge
 from .financials import (
+    MissingAnnualFact,
     annual_cash_flow,
     cash_flow_diagnostics,
     normalization_supported,
@@ -718,7 +719,14 @@ class ResearchDesk:
                 raise ValueError("Unknown financial evidence")
             if financial_source_id not in target_sources:
                 raise ValueError("Financial evidence must belong to the company being valued")
-            provenance = annual_cash_flow(source, financial_period_end, self.evaluation_at or now())
+            try:
+                provenance = annual_cash_flow(source, financial_period_end, self.evaluation_at or now())
+            except MissingAnnualFact as exc:
+                return {
+                    "available": False,
+                    "reason": str(exc),
+                    "note": "No calculation created. Report the material evidence gap and unsupported valuation; never infer the missing input.",
+                }
             if dec(cash_flow_per_share) != dec(provenance["cash_flow_per_share"]):
                 raise ValueError(
                     "Cash flow must equal source-derived annual per-share proxy: "
@@ -772,7 +780,14 @@ class ResearchDesk:
                 target_sources = {item["id"] for item in self.companies[self.context["symbol"]]["sources"]}
             if source is None or financial_source_id not in target_sources:
                 raise ValueError("Financial evidence must belong to the company being valued")
-            return cash_flow_diagnostics(source, financial_period_end, self.evaluation_at or now())
+            try:
+                return cash_flow_diagnostics(source, financial_period_end, self.evaluation_at or now())
+            except MissingAnnualFact as exc:
+                return {
+                    "available": False,
+                    "reason": str(exc),
+                    "note": "No accounting bridge available. Report the material evidence gap; never infer the missing input.",
+                }
 
         @tool
         def inspect_valuation(calculation_id: str, target_price: str) -> dict:

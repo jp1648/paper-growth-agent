@@ -6,6 +6,10 @@ from datetime import date
 from .models import dec, dt
 
 
+class MissingAnnualFact(ValueError):
+    """An expected evidence gap, not permission to infer a financial input."""
+
+
 def annual_facts(source, period_end, cutoff, fields, *, optional=False):
     content = source.get("content")
     if not isinstance(content, dict) or not isinstance(content.get("facts"), dict):
@@ -36,7 +40,9 @@ def annual_facts(source, period_end, cutoff, fields, *, optional=False):
         if not eligible:
             if optional:
                 continue
-            raise ValueError(f"Missing matching annual {tag} in {unit}; do not infer units or annualize YTD")
+            raise MissingAnnualFact(
+                f"Missing matching annual {tag} in {unit}; do not infer units or annualize YTD"
+            )
         latest = max(r["filed"] for r in eligible)
         latest_records = [r for r in eligible if r["filed"] == latest]
         if len({(r["start"], str(dec(r["val"]))) for r in latest_records}) != 1:

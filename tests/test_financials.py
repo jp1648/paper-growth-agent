@@ -400,3 +400,33 @@ def test_accounting_diagnostic_optional_input_is_not_silently_trusted(fault):
         result = cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
         assert "StockBasedCompensation" in result["missing_facts"]
         assert result["sbc_deduction_sensitivity_usd"] is None
+
+
+@pytest.mark.parametrize("tool_name", ["value_scenarios", "inspect_cash_flow"])
+def test_missing_required_fact_returns_gap_without_creating_valuation(tool_name):
+    cfg = Settings(input_cost_per_million="1", output_cost_per_million="1")
+    desk = ResearchDesk(
+        cfg,
+        Evidence(),
+        {"symbol": "ACME", "portfolio": {}},
+        Evidence().get("ACME"),
+        Budget(cfg),
+        None,
+        evaluation_at=CUTOFF.isoformat(),
+    )
+    desk.sources["fixture-sec"]["content"]["facts"].pop(CAPEX)
+    tool = next(t for t in desk.tools() if t.name == tool_name)
+    args = {"financial_source_id": "fixture-sec", "financial_period_end": "2025-12-31"}
+    if tool_name == "value_scenarios":
+        args.update(
+            cash_flow_per_share="5",
+            growth_rates=["0", "0", "0"],
+            discount_rate=".1",
+            terminal_multiples=["0", "0", "0"],
+            years=1,
+        )
+    result = tool.invoke(args)
+    assert result["available"] is False
+    assert CAPEX in result["reason"]
+    assert "calculation_id" not in result
+    assert not desk.calculations

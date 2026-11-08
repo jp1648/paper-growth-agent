@@ -2471,3 +2471,22 @@ added optional-input fault cases passed in a 90-test financial/SEC focused run.
 Ruff and diff checks passed. No paid research, production deployment or trading
 state change occurred. This does not implement or certify a complete normalized
 valuation; see the Apple remediation checklist for remaining requirements.
+
+### Missing-evidence evaluation and recovery correction (November 8)
+
+See [Apple remediation](apple-review-remediation.md#november-8-missing-evidence-reruns)
+for retained run IDs, exact costs and failures. Two isolated runs settled a total
+estimated $1.901715 with zero unknown model calls. One hit its undersized cap;
+the diagnosed retry reached the missing-capex tool exception. Neither completed
+an accepted decision. PostgreSQL retained the request/response and error traces;
+the failed next-call reservation did not become an additional provider call.
+
+The expected missing-fact path now returns an explicit evidence gap from both
+financial tools; other validation errors remain fatal. Post-run reconciliation
+at 2026-11-08T05:35:38.675321Z was healthy. Original experiment, configuration,
+pause, one AAPL share, and intent/order/activity/acceptance/adjustment counts were
+unchanged. Production remains at 76ec9eb; the built d06e441 image was used only
+for isolated evaluation. The newest missing-fact correction requires a later
+image and real evaluation; do not treat deployment or offline tests as acceptance.
+Validation of the correction: 796 offline tests passed, seven opt-in checks
+skipped; Ruff and diff checks passed. No additional paid call followed the fix.

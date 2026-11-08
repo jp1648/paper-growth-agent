@@ -82,3 +82,39 @@ financing flows, select future shares or justify forecast growth. SBC deduction 
 explicitly a sensitivity; cash taxes already included in CFO are not deducted
 again. The valuation instructions request the diagnostic and preserve material-gap
 reporting. A full normalized model and independent acceptance remain outstanding.
+
+## November 8 missing-evidence reruns
+
+The isolated `d06e441` image matched all 29 Python source hashes; CI
+42450816535 passed. Cloud Build ce87eeb4-bd50-44f4-b2e9-4f29a2d30cd5 succeeded
+under the scoped builder. Image digest:
+`sha256:4c74ab126b0c6ecad23703e5ed7a6223f0ba522a45d93a309eb241b22b486291`.
+The production executor was not upgraded or unpaused.
+
+Two development-only runs used the original Apple missing-capex/filing case,
+without modifying its evidence or inspecting Microsoft candidate outputs:
+
+- `missing-dev-20261108-1`: $1.25 cap, $0.6549325 settled estimated cost,
+  16 model calls, 19 tools. Business/catalysts completed; lead next-call reserve
+  would have brought the total to $2.0640575, so the guard stopped it. The cap
+  chosen for this test was too small; this was not a successful abstention.
+- After inspecting that exact limit, `missing-dev-20261108-2`: $4.50 cap,
+  $1.2467825 settled estimated cost, 22 model calls, 22 tools. The valuation
+  stage reached missing annual capex and raised a ValueError that terminated the
+  case before critique/decision. Evaluator category `invalid_schema` is generic;
+  the retained PostgreSQL exception identifies the missing financial fact.
+
+Total $1.901715, both settled with zero unknown calls. The second cap plus first
+spend remained below the configured $6/day ceiling. Each preflight checked prior
+settlement, remaining daily allowance, conservative grant credit with $10 buffer,
+original experiment, config hash and pause, then persisted a unique authorization.
+Private recordings, reports, receipts and trace summaries are under
+`state/evaluations/missing-dev-20261108-{1,2}` and corresponding preflight folders.
+No third paid retry was made.
+
+The expected missing-annual-fact condition now has a distinct ValueError subclass.
+`value_scenarios` and `inspect_cash_flow` convert only that condition into an
+explicit unavailable result; no calculation ID/value is created. Conflicting
+filings, company mismatch and invalid monetary inputs still raise. Focused
+regressions cover both tools. This correction is not yet model-validated or
+production-deployed. Neither failed run satisfies independent acceptance.
