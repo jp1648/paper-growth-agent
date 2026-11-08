@@ -88,7 +88,17 @@ def main(argv=None):
         "validate-cash-dividends", help="Offline capture integrity and cash-field checks; no broker"
     )
     validate_actions.add_argument("directory")
+    entitlement = sub.add_parser(
+        "audit-dividend-entitlements", help="Offline dividend receivable/payment arithmetic"
+    )
+    entitlement.add_argument("directory")
+    entitlement.add_argument("--input", required=True)
     args = parser.parse_args(argv)
+    if args.command == "audit-dividend-entitlements":
+        from .dividends import audit_entitlements
+
+        print(dumps(audit_entitlements(args.directory, json.loads(Path(args.input).read_text()))))
+        return 0
     if args.command == "validate-cash-dividends":
         from .corporate_actions import validate_cash_dividends
 

@@ -134,3 +134,37 @@ entitlement and net withholding verification to false. It does not establish
 currency treatment, quantities owned at ex-date, actual settlement, reinvestment,
 returns, source sufficiency or trial acceptance. Missing/canceled/revised economic
 facts require separate review; no amounts or dates are invented.
+
+## Offline entitlement and payment arithmetic
+
+`paper-agent audit-dividend-entitlements CAPTURE_DIRECTORY --input claims.json`
+first revalidates the source capture. It never opens the trading ledger or contacts
+a provider. The input has:
+
+- `version: 1`, `as_of` (canonical date), `capture_manifest_sha256`, and the
+  explicitly selected diagnostic policy `rounding: "USD_cent_half_up"`.
+- `entitlements`: exactly one entry per captured action whose ex-date is on or
+  before `as_of`. Each entry names `action_id`, `entitled_quantity`, a nonempty
+  `entitlement_evidence` reference, and a `payments` list. Supply explicit zero
+  entitlement when supported; missing quantities do not become zero. Quantities
+  represent ex-date entitlement, not current holdings or payment-date purchases.
+- Each payment contains a unique `id`, canonical `date`, `net_cash`, `withholding`,
+  `fee`, and nonempty `evidence` reference. Monetary quantities use decimal strings
+  or integers. Unknown deductions are not zero; payment amounts use cents. Empty
+  payments means no confirmed payment, including after the announced payable date.
+
+The diagnostic derives gross entitlement from quantity times the original rate,
+retains the unrounded amount, and rounds once under the selected cent policy.
+Gross settled is net cash plus withholding plus fees. Gross receivable is rounded
+entitlement less gross settled. Payment does not add another dividend entitlement.
+Partial payments retain a receivable; unpaid balances after the payable date are
+flagged overdue. Duplicate IDs, excess payments, negative correction amounts and
+payments before ex-date or after `as_of` fail for review.
+
+This is a calculation over supplied claims, not authentication of entitlement or
+settlement evidence. It does not verify USD treatment or issuer/broker rounding;
+those policies must be independently approved before study use. Unpaid balances
+are **gross**: future withholding and fees remain unknown. It does not reinvest
+cash, change broker equity, generate an approved net-return series, or establish
+point-in-time source availability. Corrections require a new retained input/output
+version and independent review; original captures remain untouched.

@@ -2243,3 +2243,24 @@ its explicit unverified coverage/entitlement/withholding flags. Private output:
 `state/capture-validation-5fab33c/validation.json`. Only the existing request file
 was retrieved from the VM; no new market-data/model requests or orders occurred.
 This local command update is not yet deployed to the executor.
+
+## Offline dividend entitlement arithmetic
+
+Added `audit-dividend-entitlements` over a revalidated source capture and explicit
+quantity/payment evidence references. It distinguishes earned gross receivables
+from confirmed net cash, withholding and fees, retains partial/unpaid balances,
+and flags overdue payments without assuming settlement. It rejects missing or
+duplicate claims, unknown deductions, excess or duplicate payments and out-of-window
+payments. Decimal arithmetic and an explicit cent-rounding diagnostic policy are
+retained; policy/evidence authenticity are not certified by code.
+
+Independent fixture balances verify the ex-dividend NAV offset, no second income
+on payment, deductions once, partial settlement, explicit zero entitlement,
+ex-date boundary and half-cent rounding. No quantities/payments were invented for
+the user's SPY evidence or actual holdings. This is offline diagnostic groundwork;
+net-return construction, independent economic review and trial gates remain open.
+
+Validation: 61 focused capture/dividend tests and the full offline suite passed
+(771 passed, 7 skipped). Ruff, formatting and diff checks passed. The entitlement
+command was tested without configuration or ledger access. No paid requests,
+broker orders or production deployment were made for this change.
