@@ -2430,3 +2430,28 @@ changes are not deployed and no paid rerun occurred. The numerical normalization
 bridge, available-filing business analysis, economically grounded assumptions,
 measurable triggers/confidence and missing-evidence rerun remain open; see
 `docs/apple-review-remediation.md`. This arithmetic fix is not research approval.
+
+## Available-filing business and funding follow-up
+
+Completed an analyst follow-up over the preserved Apple filing in
+`docs/apple-filing-followup.md`, with nine exact source excerpts/offsets, source
+hash and checked arithmetic retained under
+`state/evaluations/apple-filing-followup-20261108/`. Services supplied 51.70% of
+revenue growth and 77.59% of gross-profit growth using the reported dollar tables.
+The funding bridge reconciles all listed investing/financing components to the
+$5.991bn cash increase. The share roll-forward reconciles exactly, identifies the
+October 17 share base, and distinguishes net employee issuance from gross grants.
+An explicitly unapproved SBC-cost sensitivity is $85.904bn; it is not labeled
+normalized owner earnings. Tax/escrow, reinvestment, repurchase timing/price and
+forward share-count judgments remain open.
+
+Business instructions now require quantitative available category/geography/margin
+analysis and distinguish unread evidence from unavailable sources. The decision
+mandate requires explicit subjective confidence meaning, measurable review
+conditions and a valuation/holding-horizon explanation. These are prospective
+prompt changes, not proof the model complies. Original Apple outputs and unseen
+Microsoft candidate status are preserved. No paid run or deployment occurred.
+Validation: 106 focused research/financial tests passed, Ruff/format/diff checks
+passed, and the private source/arithmetic script verified the nine excerpts and
+both cash/share reconciliations. This is implementation-agent analysis awaiting
+independent review, not acceptance of the model's original or future research.

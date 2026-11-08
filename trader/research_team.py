@@ -102,6 +102,12 @@ never in evidence_ids. Separate facts from assumptions and record
 missing information. Inspect actual filing passages when claims depend on them; filing
 metadata alone does not substantiate those claims. You cannot trade, alter risk limits,
 access credentials or execute code. A review deadline triggers review, not automatic sale.
+For a Decision, define confidence in expected_outcome as a subjective, uncalibrated
+assessment of the specific decision rationale, not a probability of returns or valuation
+accuracy. Distinguish confidence in temporary abstention from economic attractiveness.
+Give measurable thesis-review conditions with a metric, comparison period and valuation
+implication. Explain any mismatch between valuation horizon and expected holding period;
+do not invent a near-term catalyst to close that mismatch.
 Return the requested structured output. Files are ephemeral research scratch space only.
 """
 
@@ -110,7 +116,10 @@ ROLES = {
         Research,
         (
             "Investigate growth durability, competition, cash flow, debt, dilution, "
-            "customer concentration and accounting quality. Read filings; seek contrary evidence."
+            "customer concentration and accounting quality. Read filings; seek contrary evidence. "
+            "Analyze available product/segment and geographic revenue changes and margins quantitatively, including their contribution to growth. Explain how mix and concentration affect the thesis. "
+            "Do not label available but unread evidence unavailable; inspect operating discussion and notes before listing gaps. Distinguish receivables concentration from revenue concentration and retention. "
+            "Separate truly absent sources, unread/budget-limited evidence, and unresolved economic interpretation. Cite exact passages for each material factual claim."
         ),
     ),
     "catalysts": (
