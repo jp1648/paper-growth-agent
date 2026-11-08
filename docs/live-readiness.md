@@ -5,7 +5,30 @@ approve live activation or real-money orders. Preserve paper experiment/history,
 reservations, current deployment and approved spending limits. Local changes are
 not deployment evidence. Do not claim an investment edge from operational tests.
 
-## November 8 economic-NAV observation builder — local only
+## Current seven-goal audit — November 8, 06:48 UTC
+
+This is a gate audit, not a claim of live readiness. Fresh read-only production
+records are retained in `state/goal-audit-20261108/runtime.jsonl`; the requirement
+ledger and chronological entries below retain the fuller evidence and limitations.
+
+| Goal | Verified state | Remaining requirement / next action |
+|---|---|---|
+| 1. Unknown API charges | 33 model-spend records, all settled. Original uncapped run reconciled to $1.92903470, baseline timeout allocation to $1.49436290, two October holds to zero using retained provider exports and audited receipts. | Provider allocations can be corrected later; they are not per-request invoices. Flovia's separate blocked/unknown operations and missing full infrastructure allocation are not declared resolved by this model-spend audit. |
+| 2. Deploy safety fixes | Paused runtime source 2ea0ff5, immutable image verified against 30 Python files; release CI 42454901215/42454905238 passed. Fresh reconciliation is healthy, original experiment and one AAPL share preserved; configuration/spend hashes unchanged. | New price-capture, integrity, inventory and liability tools are local/branch changes, not part of that image. Deploy only after their CI/release checks; no reason to resume autonomous execution. |
+| 3. Independent research | Original sufficient-evidence Apple result remains rejected by Jay. Arithmetic/filing follow-up and numerical normalization support exist; missing-evidence run completed but independent review is pending. | Finish economically supported scenarios, measurable triggers and revised normalized research; preserve unseen Microsoft outputs. New full-team research awaits adequate daily allowance: November 8 spent $4.281305 of $6. Pending human review cannot be replaced by implementation-agent approval. |
+| 4. Combined execution failures | Actual local SIGKILL, partial-fill/cancel races, delayed activity, repeated unavailable transport and restored-checkpoint tests exist; separate two-host fencing and paused takeover evidence exists. | Full in-flight replacement-host recovery after original-disk loss/network partition and broker correction/bust contracts remain unproved. Do not aggregate separate tests into proof of this combined case. |
+| 5. Operations | Two-hour PostgreSQL outage/backlog recovery, independent host-outage alerts, recovery notifications and fresh-host snapshot drill have retained evidence. | Disk exhaustion can lose telemetry; broader fault/load combinations and in-flight replacement recovery remain. No claim of lossless traces under every failure. |
+| 6. Prospective trial | Protocol is predeclared_not_started. Raw SIP access/capture, integrity/revision checks and offline NAV/marking helpers are available. Historical fee/mark audit demonstrates existing daily reports are not finalized trial observations. | Complete end-to-end benchmark entitlements/holdings, closing inventory verification, late-posting/restatement policy and all cost allocation; obtain frozen-manifest approval. Then collect at least 60 regular sessions AND 12 weeks prospectively. No backdating, forced trades or fabricated observations. |
+| 7. Live gate | Separate draft contract requires account eligibility, settled funds, exact artifact/account binding, capital/exposure/loss limits, shutdown/recovery and explicit user approval. Application remains paper-only. | Account-specific release evidence and approval do not exist. Drafting the contract does not satisfy live activation requirements. |
+
+Pending external inputs remain the independent research reviews and a usable
+infrastructure billing export/table or approved export setup. No new request for
+the same input is implied by this audit. Safe engineering work remains, so the
+overall goal is active rather than complete or blocked. No paid calls, orders,
+billing changes or trial activation were made during this audit.
+
+## Historical milestone: economic-NAV observation builder
+
 
 The new offline `build-paper-observations` command converts supplied portfolio
 and SPY economic-NAV claims into gross and after-external-cost daily returns for
@@ -49,8 +72,8 @@ deployment, trial activation or trading-pause change occurred in this step.
 | 15 | Accounting/performance | Independent lifecycle balances cover distributions, withholding, fees, flows, splits, sales and audited return of capital. Unknown actions fail closed. Full broker cost-basis/correction cases, comparable total-return benchmarks and all operating costs remain open. |
 | 16 | Investment effectiveness | Not achieved. Predeclared unseen cohorts and forward paper observations after costs, independent review and uncertainty reporting remain required. No demonstrated investment edge. |
 
-This table summarizes the latest evidence; the chronological log below preserves
-older states and findings. Both services are deployed, but trading remains paused.
+This detailed table records requirement coverage; consult the current seven-goal
+audit and dated release entries for newer counts and deployment state. Both services are deployed, but trading remains paused.
 
 ## Release gates
 
