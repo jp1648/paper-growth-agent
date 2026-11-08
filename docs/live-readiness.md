@@ -16,7 +16,7 @@ ledger and chronological entries below retain the fuller evidence and limitation
 | 1. Unknown API charges | 33 model-spend records, all settled. Original uncapped run reconciled to $1.92903470, baseline timeout allocation to $1.49436290, two October holds to zero using retained provider exports and audited receipts. | Provider allocations can be corrected later; they are not per-request invoices. Flovia's separate blocked/unknown operations and missing full infrastructure allocation are not declared resolved by this model-spend audit. |
 | 2. Deploy safety fixes | Paused runtime source 2ea0ff5, immutable image verified against 30 Python files; release CI 42454901215/42454905238 passed. Fresh reconciliation is healthy, original experiment and one AAPL share preserved; configuration/spend hashes unchanged. | New price-capture, integrity, inventory and liability tools are local/branch changes, not part of that image. Deploy only after their CI/release checks; no reason to resume autonomous execution. |
 | 3. Independent research | Original sufficient-evidence Apple result remains rejected by Jay. Arithmetic/filing follow-up and numerical normalization support exist; missing-evidence run completed but independent review is pending. | Finish economically supported scenarios, measurable triggers and revised normalized research; preserve unseen Microsoft outputs. New full-team research awaits adequate daily allowance: November 8 spent $4.281305 of $6. Pending human review cannot be replaced by implementation-agent approval. |
-| 4. Combined execution failures | Actual local SIGKILL, partial-fill/cancel races, delayed activity, repeated unavailable transport and restored-checkpoint tests exist; separate two-host fencing and paused takeover evidence exists. | Full in-flight replacement-host recovery after original-disk loss/network partition and broker correction/bust contracts remain unproved. Do not aggregate separate tests into proof of this combined case. |
+| 4. Combined execution failures | Actual local SIGKILL, partial-fill/cancel races, delayed activity, repeated unavailable transport and restored-checkpoint tests exist; separate two-host fencing and paused takeover evidence exists. A later cross-host drill restored an actual pre-POST GCS checkpoint after source SIGKILL and reconciled replayed partial/full fills with one submission. | Full in-flight replacement-host recovery after original-disk loss/network partition and broker correction/bust contracts remain unproved. Do not aggregate separate tests into proof of this combined case. |
 | 5. Operations | Two-hour PostgreSQL outage/backlog recovery, independent host-outage alerts, recovery notifications and fresh-host snapshot drill have retained evidence. | Disk exhaustion can lose telemetry; broader fault/load combinations and in-flight replacement recovery remain. No claim of lossless traces under every failure. |
 | 6. Prospective trial | Protocol is predeclared_not_started. Raw SIP access/capture, integrity/revision checks and offline NAV/marking helpers are available. Historical fee/mark audit demonstrates existing daily reports are not finalized trial observations. | Complete end-to-end benchmark entitlements/holdings, closing inventory verification, late-posting/restatement policy and all cost allocation; obtain frozen-manifest approval. Then collect at least 60 regular sessions AND 12 weeks prospectively. No backdating, forced trades or fabricated observations. |
 | 7. Live gate | Separate draft contract requires account eligibility, settled funds, exact artifact/account binding, capital/exposure/loss limits, shutdown/recovery and explicit user approval. Application remains paper-only. | Account-specific release evidence and approval do not exist. Drafting the contract does not satisfy live activation requirements. |
@@ -2820,3 +2820,52 @@ field. **36 focused observation/inventory tests passed**, including six new chec
 Ruff passed. This change is not deployed. Actual closing inventory verification,
 fee effective-date policy, complete operating costs and independent research
 acceptance still block trial activation. No paid model call or order occurred.
+
+### Cross-host recovery from a pre-POST GCS checkpoint
+
+An isolated Linux container on `trader-executor` ran the verified 2ea0ff5 image
+with only synthetic account/configuration/data and a loopback fixture broker.
+No production ledger, broker credentials or control directory was mounted. The
+normal `replicate_checkpoint` path saved and read back a 36,864-byte checkpoint in
+the existing recovery bucket. The fixture broker asserted that the durable
+replication receipt existed before accepting the simulated POST. The source child
+then actually exited via SIGKILL (-9), before it could save the acceptance locally.
+There was exactly one simulated submission; the broker fixture advanced to a
+four-share partial fill after source death.
+
+The other physical computer (macOS) downloaded the exact object generation
+`1794120803735663` from GCS, verified SHA-256
+`de62890016b8a89c71bdbb7d616b3e8d566552a759ad30e92ddccadca2e6b213`, and restored
+it into a fresh isolated directory. Recovery inputs did **not** include the source
+ledger or its disk. The original synthetic experiment/client-order identity was
+preserved. Only the local database/control paths changed for the isolated host;
+a fresh pause and matching local registry were established before recovery.
+
+Three real loopback transport failures, each followed by closing/reopening the
+restored store, did not create a second submission. Withholding the fixture's fill
+activity blocked reconciliation. Releasing it produced cash $99,600, four shares
+and $601 reserved. A subsequent six-share fill reconciled to $99,000, ten shares,
+two activities, one intent/order and zero reservation; repeated reconciliation and
+execution of the same intent preserved one submission and the pause.
+
+The clock/account/order are synthetic. Broker truth on the destination was an
+explicit replay of the isolated fixture state, not a live Alpaca or cross-host RPC
+connection. The source host remained running: this proves cross-host recovery
+without access to its ledger input, not physical disk destruction, full-host-loss
+response, simultaneous-executor fencing or network-partition safety. Those remain
+separate open gates. Execution/accounting/checkpoint sources are identical between
+the source image and the local recovery code.
+
+Private source/recovery scripts, source bundle, GCS receipt, downloaded checkpoint,
+assertions and hash manifest are in `state/crosshost-order-20261108/`. The GCS fixture
+object and source records are retained; no production reservation/history was
+removed. A host-Python archive-extraction incompatibility occurred before the first
+container launch; the empty setup directory was verified before correcting it.
+The source process/order drill itself ran once. No extra VM or public listener was
+created; the container was removed after completion.
+
+Post-drill production readback preserved the original experiment, every document
+kind count, one AAPL share, pause and config/spending hashes; reconciliation was
+healthy. No Alpaca order or paid model call occurred. Cloud storage/access costs
+remain part of infrastructure allocation, not asserted zero. Separately, CI
+42456156892 passed for the liability-input change; this drill did not deploy it.
