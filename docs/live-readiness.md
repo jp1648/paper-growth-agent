@@ -2359,3 +2359,23 @@ protocol's risk metric to the paired analysis, not a certified source of net
 returns or intraday risk. Focused analysis tests: 20 passed. Full offline suite:
 785 passed, 7 skipped; Ruff, format and diff checks passed. No paid calls or orders.
 This offline diagnostic update is not deployed; executor remains on `76ec9eb`.
+
+## Source-only holdout review preparation
+
+Prepared private `state/evaluations/msft-source-review-20261108/review.html` with
+the exact frozen Microsoft annual text, structured source records, content hashes
+and source-sufficiency/normalization questions. Case hash:
+`2eda3ebda4987ffeb4d5cc16a4a25fdc1adb8c6b07f53510bc95b5876a68f8b3`.
+The packet contains no model output, prefilled approval or invented adjustment;
+the frozen suite is unchanged. Review is pending. Sufficiency review and subsequent
+hash-bound candidate review are distinct; neither is supplied by this packet.
+
+Read-only executor ledger inspection found 30 research-spend records, all settled,
+and zero recorded November 8 research spend. The historical
+`evaluation:candidate-holdout-20261106-1` charge is settled at $4.008954. Its retained
+suite is `frozen-research-baseline-v1`, with cases adequate-high-price,
+missing-share-count, missing-primary-passage and unit-mismatch; it is not the
+Microsoft annual-filings-v2 case. Only its suite/manifest metadata were inspected,
+not candidate outputs. No new model request, broker order or billing change was
+made. The available daily budget does not establish independent sufficiency or
+semantic approval, and the prior credit balance was not refreshed here.
