@@ -1976,3 +1976,16 @@ operator attestation, not independent API verification of delivery.
   Test-only change; no deployment, real broker requests or paid calls. This proves
   a local lost HTTP response plus actual process death and restore, not a regional
   outage or replacement-cloud-host recovery during a real broker request.
+
+## Infrastructure billing evidence discovery (2026-11-08 UTC)
+
+- Read-only Cloud Billing project lookup confirms billing enabled. Both normal
+  and `--all=true` BigQuery dataset listings return no visible datasets in the
+  trader project. This is not proof that no export exists elsewhere in the account.
+  Private receipt: `state/billing-source-audit-20261108/`.
+- Asked the user for an existing export table, approval for a new detailed export,
+  or a billing CSV. Billing-change approval is required by the prior instruction
+  not to change billing. No dataset, export, role or billing setting was changed.
+- Concrete proposed scope and attribution requirements are documented in
+  `docs/infrastructure-cost-plan.md`. Infrastructure cost is still unknown, not
+  zero; the prospective cost-adjusted study cannot claim complete reporting yet.
