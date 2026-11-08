@@ -3,6 +3,7 @@
 import json
 import os
 import signal
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -28,6 +29,8 @@ from trader.store import Store
         "cancel",
         "cancel_race",
         "cancel_race_canceled",
+        "cancel_race_lost_ack",
+        "cancel_race_canceled_lost_ack",
         "activity",
         "adjustment",
         "adjustment_mid",
@@ -61,6 +64,8 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
         if stage == "activity":
             broker.fixture_fill(result["client_order_id"])
 
+    dropped_responses = []
+
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             method = self.path.removeprefix("/")
@@ -79,6 +84,12 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
                 return
             args = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             result = getattr(broker, method)(*args)
+            if stage.endswith("lost_ack") and method == "cancel":
+                dropped_responses.append(method)
+                self.connection.shutdown(socket.SHUT_RDWR)
+                self.connection.close()
+                self.close_connection = True
+                return
             body = dumps(result).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -114,6 +125,10 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
             timeout=20,
         )
         assert result.returncode == -signal.SIGKILL, result.stderr
+        if stage.endswith("lost_ack"):
+            assert dropped_responses == ["cancel"]
+            failure = json.loads((tmp_path / "transport-failure.json").read_text())
+            assert failure == {"operation": "cancel", "error": "RemoteProtocolError"}
     finally:
         server.shutdown()
         server.server_close()
@@ -152,7 +167,7 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(env, de
             assert recovered.kill_path.exists()
             assert recovered.reservation_summary() == dec("601")
             # A terminal broker order arrives before its additional fill activity.
-            canceled = stage == "cancel_race_canceled"
+            canceled = "canceled" in stage
             terminal = "canceled" if canceled else "filled"
             late = broker.fixture_fill(cid, "2" if canceled else "6", status=terminal)
             broker.activities.remove(late)

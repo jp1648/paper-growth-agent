@@ -1960,3 +1960,19 @@ operator attestation, not independent API verification of delivery.
   inputs, empirical interval coverage is not established, and no prospective
   observation window has begun. Source awaits CI; no executor rollout is needed
   to use this offline diagnostic command locally.
+
+## Lost cancellation acknowledgment combined recovery (2026-11-08 UTC)
+
+- Added two real loopback TCP-fault cases to the subprocess recovery drill. The
+  fixture broker records cancellation, then shuts down the socket before sending
+  an HTTP response. The child records an actual `RemoteProtocolError` and receives
+  SIGKILL; an assertion distinguishes this from the prior acknowledged-cancel crash.
+- Restore the pre-cancellation SQLite backup, preserve the external pause, and
+  advance the broker to either full fill or additional partial fill plus cancellation.
+  Withheld fill activity blocks reconciliation/execution; later delivery reconciles
+  exact balances and two unique activity records without repeating submission or
+  cancellation. Reservation recovery and the post-recovery pause are checked.
+- Process/backup/execution suites: **66 passed**; Ruff and diff checks passed.
+  Test-only change; no deployment, real broker requests or paid calls. This proves
+  a local lost HTTP response plus actual process death and restore, not a regional
+  outage or replacement-cloud-host recovery during a real broker request.

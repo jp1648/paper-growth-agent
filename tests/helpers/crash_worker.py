@@ -34,7 +34,15 @@ class Broker:
         def invoke(*args, before_send=None):
             if before_send is not None:
                 before_send()
-            response = httpx.post(endpoint + "/" + name, json=list(args), timeout=5)
+            try:
+                response = httpx.post(endpoint + "/" + name, json=list(args), timeout=5)
+            except httpx.TransportError as error:
+                if stage.endswith("lost_ack") and name == "cancel":
+                    Path(config_path).with_name("transport-failure.json").write_text(
+                        json.dumps({"operation": name, "error": type(error).__name__})
+                    )
+                    die()
+                raise
             response.raise_for_status()
             value = response.json()
             if (stage == "accepted" and name == "submit") or (
