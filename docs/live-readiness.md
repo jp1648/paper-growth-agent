@@ -1832,3 +1832,22 @@ operator attestation, not independent API verification of delivery.
   double counting. No paid requests or broker submissions occurred.
 - Source is ready for CI and deployment; this entry does not claim the deployed
   dashboard already exposes the new view. Independent Apple review remains pending.
+
+## Evaluation cost view deployed (2026-11-08 UTC)
+
+- Source `72f2289ba3150d2dd6bffddf462f9b5ea0109de5` passed CI `42443572090`.
+  Both Cloud Builds succeeded: agent `ba94a2de-7475-4a58-b0ef-a5f6a4da8307`,
+  dashboard `aa115859-fe75-4177-bd30-6facb0bda400`.
+- Executor image digest `sha256:2d6f68dea00e32c322af0d0277e47be8e2892e9f00108a44663b19ab25b5e62f`
+  matches all 26 source files before and after activation. Rollback copies retained.
+  Fresh reconciliation and health pass; original experiment, all document counts,
+  AAPL one share, spending/config hashes and durable pause are preserved.
+- Dashboard image digest `sha256:a8ac1db3acaa2f295f147e161fbfe12028f008bf2ef12579e4a486f9e4f2e9e9`
+  is revision `trader-dashboard-00011-fnq`, explicitly routed to 100% primary traffic.
+  Login responds 200 and unauthenticated data access 401. Authenticated rendering
+  was tested locally against isolated Postgres, not repeated in the live browser.
+- Production snapshot at 03:42:14 UTC matches a read-only computation from the
+  ledger: 30 settled runs, $3.423397600 provider-reconciled, $48.9692615 estimated,
+  zero unresolved research amounts/runs. These overlap journal costs and exclude
+  data/infrastructure; they are not a complete platform bill or economic return.
+  Private evidence: `state/cost-release-72f2289/`. No research or orders were run.
