@@ -1325,3 +1325,18 @@ operator attestation, not independent API verification of delivery.
 - This is deterministic loopback evidence with a real process kill, not proof of
   Alpaca's timing contract, replacement-host ownership transfer, or simultaneous
   disk/network failure. No production code change, paid calls or broker orders.
+
+- Rechecked the existing OpenAI billing tab: it still presents the login form;
+  no authenticated balance or provider charge evidence is available. No paid
+  research was attempted or historical spend record changed.
+- Added a real SQLite capacity regression using max_page_count to trigger
+  SQLITE_FULL during telemetry insertion. The failed transaction preserves all
+  previously queued event IDs/payloads and database integrity. The public emitter
+  logs its persistence error; a reopened sink accepts new events after the limit
+  is removed. Observability module: ten passed, four opt-in Postgres skips;
+  Ruff/format and whitespace pass. No production behavior changed.
+- This confirms the documented loss boundary: events generated while the local
+  outbox cannot write are not recoverable from that outbox. It is not a full
+  filesystem ENOSPC, multi-hour outage, or alert-response drill. Lossless traces
+  under disk exhaustion are NOT established; capacity monitoring and broader
+  recovery acceptance remain open. No trading state or credentials changed.

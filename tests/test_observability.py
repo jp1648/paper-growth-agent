@@ -310,3 +310,40 @@ def test_export_outage_backlog_recovers_with_concurrent_producers(sink, monkeypa
         ).fetchall()
     assert len(rows) == 1100
     assert dict(rows) == {row["event_id"]: row["payload"] for row in pending}
+
+
+def test_sqlite_full_preserves_queued_events_and_recovers(sink, monkeypatch, caplog):
+    from contextlib import contextmanager
+
+    obs.emit("before.capacity", {"index": 1})
+    original = events(sink)
+    database = sink.db
+
+    @contextmanager
+    def capacity_limited():
+        with database() as db:
+            pages = db.execute("PRAGMA page_count").fetchone()[0]
+            db.execute(f"PRAGMA max_page_count={pages}")
+            yield db
+
+    with monkeypatch.context() as patch:
+        patch.setattr(sink, "db", capacity_limited)
+        # Exercise SQLite's real SQLITE_FULL rollback, not a mocked write error.
+        import sqlite3
+
+        with pytest.raises(sqlite3.OperationalError) as failure:
+            sink.emit("direct.capacity", "event", {"body": "x" * 100_000}, {})
+        assert failure.value.sqlite_errorcode == sqlite3.SQLITE_FULL
+        obs.emit("lost.capacity", {"body": "x" * 100_000})
+        assert "Telemetry event could not be persisted: lost.capacity" in caplog.text
+        assert events(sink) == original
+        with database() as db:
+            assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+
+    # Simulate restored capacity and a reopened exporter without replacing the DB.
+    restarted = obs.Sink(sink.path, sink.dsn, start=False)
+    monkeypatch.setattr(obs, "_sink", restarted)
+    obs.emit("after.capacity", {"body": "y" * 100_000})
+    recovered = events(restarted)
+    assert recovered[:1] == original
+    assert [row["name"] for row in recovered] == ["before.capacity", "after.capacity"]
