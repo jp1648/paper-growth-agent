@@ -1565,3 +1565,28 @@ operator attestation, not independent API verification of delivery.
   assumption. Reproducible private comparison with assertions and source hashes:
   `state/charge-reconciliation/provider-20261108/compare.py` and `comparison.json`.
   The original unknown charge remains preserved and no paid retry was made.
+
+## Uncapped incident cost reconciled (2026-11-08 UTC)
+
+- The pricing uncertainty above is resolved by official provider documentation:
+  [incentive-tier tokens are complimentary](https://help.openai.com/en/articles/10306912-sharing-feedback-evaluation-and-fine-tuning-data-and-api-inputs-and-outputs-with-openai),
+  and [published standard input/output/cache rates](https://developers.openai.com/api/docs/pricing)
+  reproduce every November 6 billing line exactly. All activity quantities match
+  billing quantities, with no residual daily token charge. The incident's 47 known
+  responses exactly match provider counts and input/output totals by model.
+- Provider-export allocation for `acceptance-unrestricted-2026-11-05-aapl-3` is
+  **$1.92903470**. This is reconciled as of the export, not an individual request-ID
+  invoice or a guarantee against later provider corrections. Original reservation
+  $6.455283 and unknown status are preserved in the immutable before/after audit.
+- Applied atomic journal + audit document + spending update after a private SQLite
+  backup. Self-check verifies exact predecessor, preserved before record and
+  idempotent replay. Production readback confirms settled status, one audit event,
+  unchanged pause and database integrity. Receipt ID:
+  `provider-reconciliation-20261108-unrestricted-aapl-3`; private evidence remains
+  under `state/charge-reconciliation/provider-20261108/` locally and on the VM.
+- Other unresolved bounded holds remain: October 29 research $0.41388, diagnostic
+  $0.02, and November 6 baseline evaluation $5. None was cleared by this action.
+  No paid model requests or orders were made. Before the next paid evaluation,
+  correct the input-price estimate: its current base-rate calculation ignores
+  higher-priced cache writes, so it is not necessarily conservative even though
+  it ignores cache-read savings. Research acceptance and the paper trial remain open.
