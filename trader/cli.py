@@ -77,7 +77,24 @@ def main(argv=None):
     )
     paper_analysis.add_argument("--input", required=True)
     paper_analysis.add_argument("--output", required=True)
+    actions = sub.add_parser(
+        "capture-corporate-actions", help="Read-only market-data evidence capture; no broker"
+    )
+    actions.add_argument("symbol")
+    actions.add_argument("--start", required=True, help="Inclusive processing date")
+    actions.add_argument("--end", required=True, help="Inclusive processing date")
+    actions.add_argument("--output-dir", required=True, help="New evidence directory; never overwritten")
     args = parser.parse_args(argv)
+    if args.command == "capture-corporate-actions":
+        from .corporate_actions import capture_actions
+
+        provider = AlpacaData(Settings.load(args.config))
+        try:
+            result = capture_actions(provider, args.symbol, args.start, args.end, args.output_dir)
+            print(json.dumps(result, indent=2))
+            return 0
+        finally:
+            provider.client.close()
     if args.command == "analyze-paper-returns":
         from .paper_analysis import analyze_file
 

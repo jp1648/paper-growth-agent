@@ -82,3 +82,33 @@ An empty response cannot independently certify no distributions.
 These are implementation and review requirements, not results of completed tests.
 The source probe made no orders, paid model calls, billing changes or trial
 activation. The protocol remains `predeclared_not_started`.
+
+## Implemented source capture
+
+```sh
+paper-agent --config config.toml capture-corporate-actions SPY \
+  --start 2026-09-01 --end 2026-10-31 \
+  --output-dir state/corporate-actions/spy-20260901-20261031-capture1
+```
+
+This explicit command uses the existing market-data credentials and only GETs the
+fixed corporate-action endpoint. It does not open the ledger, construct a broker,
+run models, schedule collection or enable trading. The output directory must be
+new; a repeated invocation cannot overwrite evidence or silently repeat a capture.
+
+It retains the request, byte-exact completed response pages with SHA-256 hashes,
+and a terminal manifest. Bounds are 100 pages, 1 MiB decoded bytes per page,
+10 MiB total, and 366 days per processing-date interval. Redirects, missing or
+repeated pagination tokens, malformed groups/identities and conflicting versions
+of an ID fail the capture. Identical repeated records are retained in raw pages
+and counted once. HTTP failures are not automatically retried. On an ordinary
+failure the manifest records `failed`; an interrupted process may leave no
+manifest and must be treated as incomplete. Failed or oversized partial pages
+are not a complete source record.
+
+`pagination_exhausted` means only that the requested traversal ended with an
+explicit null continuation token. Every manifest keeps
+`history_completeness_verified: false` and `economic_fields_validated: false`.
+Incomplete economic records and unknown action groups are retained for review,
+not interpreted or silently discarded. This implements source capture only;
+entitlement accounting, return construction and trial activation remain pending.

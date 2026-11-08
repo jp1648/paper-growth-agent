@@ -2178,3 +2178,20 @@ This is source access evidence, not complete history or a measured return.
 receivable/cash, common-flow, cost allocation and revision checks before paired
 trial observations can be accepted. Existing reports and the inactive protocol
 are unchanged. No broker orders, model calls or billing changes occurred.
+
+## Bounded corporate-action source capture
+
+Added an explicit `capture-corporate-actions` CLI path before broker/ledger
+construction. The fixed market-data endpoint uses streamed byte limits, explicit
+all-quality processing-date requests, bounded pagination, immutable output
+directories, exact completed page bytes and hashes, and terminal success/failure
+manifests. Conflicting identities, missing/cyclic pagination, malformed records,
+redirects and oversized responses fail without claiming economic completeness.
+No scheduler or trading path calls it. Both economic-field validation and complete
+history remain explicitly false even after pagination ends. Operational docs and
+fixture tests cover successful capture, retained failures, duplicate IDs,
+no overwrite and no broker/ledger initialization.
+
+Validation: 725 offline tests passed, 7 skipped; repository Ruff/format and diff
+checks passed. No new provider requests were made during implementation. The
+capture command is not yet deployed; existing runtime behavior is unchanged.
