@@ -2490,3 +2490,27 @@ for isolated evaluation. The newest missing-fact correction requires a later
 image and real evaluation; do not treat deployment or offline tests as acceptance.
 Validation of the correction: 796 offline tests passed, seven opt-in checks
 skipped; Ruff and diff checks passed. No additional paid call followed the fix.
+
+### Paused release 156277c and complete offline gap recovery (November 8)
+
+Deployed source `156277ccb4cd37cfb673a4ee739b33c03efd226e` to the paper executor.
+CI 42451478157 passed backend/real PostgreSQL, dashboard and secret checks.
+Cloud Build `8bff9f2d-b166-4993-8748-a97fb4cc0e8f` succeeded under the scoped
+builder. Immutable image digest:
+`sha256:806d1d617d4f4386024f552691ee46ae6625f26d633cc9711dd1f9f400dfe40c`.
+All 29 Python source hashes matched in both the isolated image and running
+container. Rollback state was saved before switching the image.
+
+Executor, proxy and health timer are active. A fresh post-restart reconciliation
+at 2026-11-08T05:41:25.745935Z passed. Experiment, configuration, spending ledger,
+pause, one AAPL share and intent/order/activity/acceptance/adjustment counts were
+unchanged. Private release evidence: `state/release-156277c/`.
+
+Added an offline full-graph regression: the scripted valuation model calls the
+actual calculator with missing annual capex, observes the explicit gap, and
+finishes all four reports with null valuation, unresolved critique and WATCH,
+zero shares. No calculation or broker action is created. Evaluation acceptance
+remains pending human review. All 39 evaluation tests passed; Ruff/diff checks
+passed. This proves orchestration recovery, not real-model compliance or
+investment-quality research. No additional paid research occurred this turn;
+the new fix still requires a real evaluation before that gate can close.

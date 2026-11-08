@@ -138,7 +138,8 @@ def test_failures_are_included_in_cost_denominator(tmp_path):
     assert result["summary"]["known_cost_per_completed_decision"] == str(__import__("decimal").Decimal(2) / 9)
 
 
-def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeypatch):
+@pytest.mark.parametrize("missing_capex", [False, True])
+def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeypatch, missing_capex):
     from test_research_team import TeamModel, financial_facts
 
     from trader import alpaca, observability
@@ -179,17 +180,56 @@ def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeyp
             "text": "Revenue and cash flow grew. Customer concentration creates risk.",
         }
     ]
+    if missing_capex:
+        case["inputs"]["sources"][0]["content"]["facts"].pop("PaymentsToAcquirePropertyPlantAndEquipment")
+        case["expected"].update(
+            outcome="abstain",
+            allowed_actions=["WATCH"],
+            valuation_required=False,
+            abstention_reason="Annual capex is missing; no supported cash-flow valuation",
+        )
     suite["cases"] = [case]
     suite_path = tmp_path / "suite.json"
     suite_path.write_text(json.dumps(suite))
     decision = recording["cases"][case["id"]]["decision"]
-    model = TeamModel(decision=decision)
+
+    class GapAwareModel(TeamModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            from langchain_core.messages import ToolMessage
+
+            if kwargs["response_format"]["json_schema"]["name"] == "Valuation":
+                replies = [m for m in messages if isinstance(m, ToolMessage)]
+                if replies:
+                    gap = json.loads(replies[-1].content)
+                    assert gap["available"] is False
+                    assert "PaymentsToAcquirePropertyPlantAndEquipment" in gap["reason"]
+                    self.unsupported_valuation = True
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    if missing_capex:
+        decision.update(
+            price_attraction="No supported valuation: annual capex is missing",
+            expected_outcome="Abstain pending the missing annual capex evidence",
+            holding_period_days=0,
+        )
+    model = GapAwareModel(decision=decision, gap=True) if missing_capex else TeamModel(decision=decision)
     cfg = Settings(
         database=str(tmp_path / "operational.sqlite"), input_cost_per_million="1", output_cost_per_million="1"
     )
     result = run_suite(cfg, suite_path, tmp_path / "run", "real-graph-offline", "1", models=model)
     assert result["cases"][0]["complete"]
     assert result["cases"][0]["mechanical_pass"], result["cases"][0]
+    if missing_capex:
+        recorded = json.loads((tmp_path / "run" / "recording.json").read_text())["cases"][case["id"]]
+        assert recorded["failure_category"] is None
+        assert set(recorded["reports"]) == {"business", "valuation", "catalysts", "adversarial"}
+        assert recorded["decision"]["action"] == "WATCH"
+        assert recorded["decision"]["quantity"] == "0"
+        assert recorded["reports"]["valuation"]["calculation_id"] is None
+        assert recorded["reports"]["adversarial"]["unresolved_material_gaps"] is True
+        assert not recorded["calculations"]
+        assert result["cases"][0]["acceptance"] == "pending_human_review"
+
     assert result["cases"][0]["metrics"]["model_calls"] > 5
     assert result["cases"][0]["metrics"]["tool_calls"] >= 4
     assert result["cases"][0]["metrics"]["peak_context_bytes"] > 0

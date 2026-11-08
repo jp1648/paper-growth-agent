@@ -118,3 +118,9 @@ explicit unavailable result; no calculation ID/value is created. Conflicting
 filings, company mismatch and invalid monetary inputs still raise. Focused
 regressions cover both tools. This correction is not yet model-validated or
 production-deployed. Neither failed run satisfies independent acceptance.
+
+The missing-fact correction was subsequently deployed as paused release 156277c
+(see the readiness release receipt). A full offline graph now proves tool-gap →
+unsupported valuation → critique → WATCH/zero shares completion using a scripted
+model. This does not replace the outstanding real-model rerun or independent
+review, and does not resolve the supported-valuation/normalization requirements.
