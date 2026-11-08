@@ -2047,3 +2047,22 @@ and frozen cohort records must remain unchanged and labeled as proxies.
 Validation after the classification regression and boundary audit: full offline
 suite 702 passed, 7 skipped. External Postgres and opt-in paper execution skips
 are not new integration evidence. Ruff and diff whitespace checks passed.
+
+## Reject inconsistent evidence before correction approval
+
+Reproduced a revision-approval ordering defect: a snapshot containing two
+conflicting versions of the same activity could match the proposed replacement
+on its first row, persist an approval, and only then fail reconciliation. The
+trading gate remained closed, but the durable approval was premature.
+
+Reconciliation, adjustment approval and revision approval now share the existing
+account identity, duplicate-position and conflicting-activity checks. Revision
+approval performs these checks before writing its revision or approval receipt.
+Identical repeated activity rows remain acceptable. Regression tests verify no
+approval/history change on either conflicting activities or duplicate positions,
+then successful exactly-once approval after consistent evidence returns. Original
+activity history and the pause are retained; the fixture submits no orders.
+This does not make a multi-request broker snapshot atomic, or eliminate the need
+to reconcile again after approval. Deployment evidence is still required.
+
+Validation: full offline suite 704 passed, 7 skipped; Ruff and diff checks passed.

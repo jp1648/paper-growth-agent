@@ -107,6 +107,19 @@ class Service:
         ):
             raise LedgerError("Broker order differs from approved intent; operator review required")
 
+    def validate_snapshot(self, snap):
+        if snap.account["id"] != self.account_id:
+            raise LedgerError("Broker account identity does not match experiment")
+        if len({p["symbol"] for p in snap.positions}) != len(snap.positions):
+            raise LedgerError("Duplicate broker position rows require a consistent snapshot")
+        incoming = {}
+        for activity in snap.activities:
+            identifier = activity["id"]
+            if identifier in incoming and incoming[identifier] != activity:
+                raise BrokerHistoryError(f"Conflicting broker activities share ID {identifier}")
+            incoming[identifier] = activity
+        return incoming
+
     @traced("service.reconcile")
     def reconcile(self):
         with self.lock():
@@ -119,16 +132,7 @@ class Service:
                 ]
                 tracked += [o["client_order_id"] for o in self.store.active_orders()]
                 snap = self.broker.snapshot(self.store.experiment["started_at"], sorted(set(tracked)))
-                if snap.account["id"] != self.account_id:
-                    raise LedgerError("Broker account identity does not match experiment")
-                if len({p["symbol"] for p in snap.positions}) != len(snap.positions):
-                    raise LedgerError("Duplicate broker position rows require a consistent snapshot")
-                incoming = {}
-                for activity in snap.activities:
-                    identifier = activity["id"]
-                    if identifier in incoming and incoming[identifier] != activity:
-                        raise BrokerHistoryError(f"Conflicting broker activities share ID {identifier}")
-                    incoming[identifier] = activity
+                incoming = self.validate_snapshot(snap)
                 effective = {a["id"]: a for a in self.store.activities()}
                 missing = effective.keys() - incoming.keys()
                 if missing:
@@ -629,8 +633,7 @@ class Service:
                 return self.reconcile()
             tracked = [o["client_order_id"] for o in self.store.items("order")]
             snap = self.broker.snapshot(self.store.experiment["started_at"], tracked)
-            if snap.account["id"] != self.account_id:
-                raise LedgerError("Broker account identity does not match experiment")
+            self.validate_snapshot(snap)
             if any(effective.get(a["id"]) != a for a in snap.activities):
                 raise LedgerError("Broker activities changed; reconcile before approving adjustments")
             if not {item["id"] for item in pending}.issubset({a["id"] for a in snap.activities}):
@@ -662,9 +665,8 @@ class Service:
                 raise ValueError("Revision predecessor does not match current audited activity")
             tracked = [o["client_order_id"] for o in self.store.items("order")]
             snap = self.broker.snapshot(self.store.experiment["started_at"], tracked)
-            if snap.account["id"] != self.account_id:
-                raise LedgerError("Broker account identity does not match experiment")
-            if next((a for a in snap.activities if a["id"] == after["id"]), None) != after:
+            incoming = self.validate_snapshot(snap)
+            if incoming.get(after["id"]) != after:
                 raise ValueError("Replacement does not match current broker activity")
             if before["activity_type"] == "FILL" or after["activity_type"] == "FILL":
                 if any(
