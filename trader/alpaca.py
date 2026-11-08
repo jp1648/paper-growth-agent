@@ -139,7 +139,7 @@ class AlpacaData:
 
     @traced("alpaca.get")
     def get(self, path, params):
-        r = self.client.get(self.BASE + path, params=params, headers=self.headers)
+        r = self.client.get(self.BASE + path, params=params, headers=self.headers, follow_redirects=False)
         r.raise_for_status()
         return r.json(parse_float=dec)
 
@@ -163,6 +163,8 @@ class AlpacaData:
             halted = set()
             for item in items:
                 ticker = item.findtext("n:IssueSymbol", namespaces=ns)
+                if not ticker or ticker != ticker.strip():
+                    raise ValueError("Malformed halt symbol")
                 date = item.findtext("n:ResumptionDate", namespaces=ns)
                 time = item.findtext("n:ResumptionTradeTime", namespaces=ns)
                 if not date or not time:

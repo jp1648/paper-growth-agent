@@ -1902,3 +1902,20 @@ operator attestation, not independent API verification of delivery.
   retained on the VM; private receipts in `state/atomic-report-cc25b59/`.
   No daily market session was fabricated to exercise the new path in production;
   fault/recovery behavior is established by offline tests, not a new live close.
+
+## Market-data boundary audit (2026-11-08 UTC)
+
+- Reproduced two adapter gaps offline. A supplied HTTP client configured to follow
+  redirects could redirect authenticated market-data requests; unlike the trading
+  adapter, the data adapter did not override that setting per request. The default
+  production client already disables redirects; this is not evidence of credential
+  exposure. Data requests now explicitly refuse redirects regardless of client defaults.
+- A halt-feed item with a missing, empty or whitespace-padded symbol could yield
+  a false clear result for a requested ticker. Such items now raise before the
+  feed is cached. Regression coverage verifies failure and recovery to a confirmed
+  halt when the provider subsequently returns a valid item.
+- Five original reproductions failed before the fix; missing-element coverage was
+  added afterward. Full suite: **680 passed, seven opt-in external tests skipped**.
+  Final adapter suite after making the recovery XML canonical: **59 passed**.
+  Ruff/diff checks passed. No network provider calls, paid research or orders.
+  Source pending CI/deployment; broader provider schema and outage cases remain open.

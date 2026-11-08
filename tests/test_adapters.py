@@ -39,6 +39,43 @@ def test_no_redirect_to_live(keys):
         broker.account()
 
 
+def test_data_credentials_never_follow_redirect_with_injected_client(keys):
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        if req.url.host == "data.alpaca.markets":
+            return httpx.Response(307, headers={"Location": "https://untrusted.example/quotes"})
+        return httpx.Response(200, json={})
+
+    data = AlpacaData(Settings(), httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True))
+    with pytest.raises(httpx.HTTPStatusError):
+        data.get("/v2/stocks/ACME/quotes/latest", {"feed": "iex"})
+    assert len(seen) == 1
+
+
+@pytest.mark.parametrize("ticker", [None, "", " ", " ACME", "ACME "])
+def test_malformed_halt_symbol_cannot_be_reported_as_clear(keys, monkeypatch, ticker):
+    monkeypatch.setattr("trader.alpaca.now", lambda: AT)
+    xml = f"""<rss xmlns:n="http://www.nasdaqtrader.com/"><channel><title>NASDAQTrader.com</title>
+    <pubDate>{AT.strftime("%a, %d %b %Y %H:%M:%S GMT")}</pubDate><n:numItems>1</n:numItems>
+    <item><n:IssueSymbol>{ticker}</n:IssueSymbol></item></channel></rss>"""
+    if ticker is None:
+        xml = xml.replace("<n:IssueSymbol>None</n:IssueSymbol>", "")
+    recovered_xml = (
+        xml.split("<item>")[0] + "<item><n:IssueSymbol>ACME</n:IssueSymbol></item></channel></rss>"
+    )
+    responses = [xml, recovered_xml]
+    data = AlpacaData(
+        Settings(),
+        httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(200, text=responses.pop(0)))),
+    )
+    with pytest.raises(ValueError, match="halt symbol"):
+        data.halt_status("ACME")
+    assert data._halts is None
+    assert data.halt_status("ACME")[0] is True
+
+
 @pytest.mark.parametrize(
     "page", [{}, {"error": "unavailable"}, None, "", [None], [{}], [{"id": ""}], [{"id": 1}]]
 )
