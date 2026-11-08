@@ -18,7 +18,7 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 | 7 | Execution economics/account restrictions | Deployed spread/depth/participation/notional controls and non-marginable balance checks. Actual settlement/account eligibility, early-close baseline semantics and adverse execution evidence remain open. |
 | 8 | Isolated live release boundary | Paper-only enforcement and negative endpoint/credential tests pass. Draft live contract exists; no live adapter, account-specific release or user approval exists. |
 | 9 | Crash consistency | Eight subprocess SIGKILL scenarios, atomic adjustments, disk/flush faults and checkpoint-restore regressions pass. Deployed mandatory pre-POST local checkpoint and configured verified off-host replication. Full service/infrastructure combined-failure proof remains open. |
-| 10 | Single executor and recovery | Actual two-VM owner transfer/restart and storage IAM-loss drill passed. Saved cloud ledger reconciled against paper broker; off-host generation/hash restored. Deployed owner admission guard enabled. Full restored-service failover, in-flight requests and network partition remain open. |
+| 10 | Single executor and recovery | Actual two-VM fencing/IAM-loss drill, snapshot restore on a fresh host, and paused service takeover/return using the original retained disk passed. Replacement service reconciled against Alpaca and exported verified Cloud SQL telemetry; original host restored healthy with history/spend/pause intact. In-flight requests, network partition and service takeover after loss of the original disk remain open. |
 | 11 | Provider/evidence/stream failure matrix | Future evidence, bounded retrieval, stream failure/backoff and duplicate-hint tests pass. Broader reconnect/backfill, schema drift, throttling, hostile-content and combined-failure matrix remains open. |
 | 12 | Complete authenticated traces | Deployed and verified on production: 557 unique events across six pages, full-event authentication, logout, malformed cursor rejection and mobile rendering. Real Postgres equal-timestamp fixture passes. Isolated two-hour Postgres outage recovered all 7170 queued events exactly. Disk-exhaustion event loss is confirmed; production alert-response and broader load/partition scenarios remain open under 11/14. |
 | 13 | Notifications/independent alerts | Deployed bounded Telegram retries, audited uncertain-delivery resolution and correction notices. Actual health/spend emails previously verified against cloud incidents. Actual metric-publisher outage opened a missing-heartbeat incident and delivered an authenticated email; publishing recovered. Automatic incident closure and matching recovery email verified. Whole-host stop/restart and independent alert delivery are now verified below; replacement-host in-flight recovery remains separate. |
@@ -1478,3 +1478,34 @@ operator attestation, not independent API verification of delivery.
 - Cleanup checkpoint: replacement VM confirmed TERMINATED after verification;
   its boot/data disks and the recovery snapshot are retained for the next drill
   phase and continue to incur storage charges. Executor masks remain installed.
+
+- Actual paused-service takeover and return (2026-11-08): first verified no working
+  orders or unresolved submissions, the original experiment, AAPL one share,
+  configuration hash and all global research-spend records. Stopped the exact
+  original VM, independently confirmed TERMINATED, detached its retained
+  `trader-state` disk and attached that same disk to the replacement with
+  autoDelete false. No stale snapshot was substituted for authoritative history.
+- Replacement booted with execution masked, reconciled the original disk against
+  Alpaca through a GET-only client, then received generation-conditional ownership
+  from 1794007927132826 to 1794104859840134. Started the normal deployed service
+  with the original pause marker. Fresh reconciliation at 02:28:02 UTC and health
+  checks passed. A unique `host-takeover-20261108` telemetry probe reached Cloud
+  SQL with its exact payload, one matching event and empty outbox; the installed
+  health publisher completed with Result=success / ExecMainStatus=0.
+- Stopped and remasked the replacement executor, confirmed its VM TERMINATED,
+  and returned the same disk to the original VM. Original boot reconciliation at
+  02:31:35 UTC passed before conditional ownership return. Read-back verified
+  original owner 3629391648980512917, and original executor/proxy/health timer
+  are active with a passing runtime health check. Config and research-spend hashes,
+  experiment, trading/research counts and AAPL position match preflight; journal
+  count increased from 27115 to 27129 rather than being rolled back. Pause stayed
+  set throughout. Sixteen ownership-transfer regression tests also passed.
+- Private receipts/scripts: `state/takeover-20261108/`. This is an actual paused
+  service migration and return with single-host shutdown fencing and preserved
+  storage, not proof of in-flight order recovery, network-partition behavior or
+  combined service takeover after loss of the original disk. No new model calls,
+  orders, liquidation, experiment reset or automated-trading resume occurred.
+- Final cleanup verified only the original VM and its original boot/state disks
+  remain. Deleted the temporary VM/boot disk and detached restored clone disk;
+  retained the recovery snapshot and private receipts. Snapshot/object storage
+  charges remain, but temporary VM/disk charges no longer accrue.
