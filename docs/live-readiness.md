@@ -1627,3 +1627,28 @@ operator attestation, not independent API verification of delivery.
   error/incomplete-response path; it is not proof of telemetry loss or zero billing.
   Original $5 hold remains unknown. Private data and asserted comparison:
   `state/charge-reconciliation/baseline-20261108/`. No new model calls or trades.
+
+## Baseline evaluation charge reconciled (2026-11-08 UTC)
+
+- Recovered the missing known response from the `model.call` error trace: a
+  structured-output validation failure preserved its 6484 input/3000 output usage
+  and cache detail. All 62 known baseline responses now match saved evaluation
+  events. There was no missing telemetry for that known response.
+- Across the wider 18:52–19:30 UTC window, subtracting all known response/error
+  usage (including overlapping candidate evaluations and normal graph runs) from
+  provider usage leaves exactly one Astra request: 9047 input, 3000 output, 8427
+  cache-read and 617 cache-write tokens. This is unchanged from the shorter window;
+  the only provider-timeout trace is the baseline's 19:01:24 call. The matching
+  unique incentive-tier request is excluded, and every full-day billed line is
+  reproduced at published rates.
+- Reconciled baseline allocation **$1.49436290** comprises $1.32819340 for known
+  responses and $0.16616950 attributed to the timeout. This is a residual allocation
+  supported by provider exports and window-wide traces, not a request-ID invoice;
+  future provider corrections remain possible. It does not certify research output.
+- Preserved the original $5 unknown hold in an immutable before/after audit and
+  took a private database backup. Atomic audit/journal/spending update self-check
+  passed, including replay idempotence. Production readback confirms settled cost,
+  one audit event and database integrity. Pause remained set; no calls or orders.
+  Receipt `provider-reconciliation-20261108-baseline-dev-2`, evidence under
+  `state/charge-reconciliation/baseline-20261108/`. Two October 29 bounded unknown
+  holds remain ($0.41388 and $0.02); they were not cleared or discarded.
