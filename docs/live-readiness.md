@@ -1774,3 +1774,27 @@ operator attestation, not independent API verification of delivery.
   readable local HTML packet with original reports, scenario inputs, cited saved
   passages, hashes, unresolved questions and failure/cost disclosures. No review
   approval was inferred; semantic review and live activation remain pending.
+
+## Regular-session valuation mark validation (2026-11-08 UTC)
+
+- Measurement review reproduced four failures in `AlpacaData.session_close`:
+  zero/negative closing prices were accepted, and conflicting bars sharing a
+  timestamp silently selected whichever row appeared first. These marks feed
+  daily portfolio/benchmark snapshots and supervised historical research inputs.
+  NaN/infinities were already rejected by the shared decimal parser.
+- Reject nonpositive selected closes and conflicting regular-session timestamp
+  rows before returning a mark. Identical repeated bars remain acceptable; the
+  existing session-boundary, pagination and stale-bar checks remain unchanged.
+  An integration regression verifies invalid marks publish neither daily samples
+  nor reports, and a later valid response recovers without rewriting history.
+- Full offline suite before the final identical-row positive case: **668 passed,
+  seven opt-in external tests skipped**. Final adapter suite: **53 passed**;
+  Ruff lint/format passed. No provider requests, paid research or trades. This
+  source change is pending CI/deployment; no prior report was rewritten.
+- Total-return comparability is still open. Alpaca's [historical bars reference](https://docs.alpaca.markets/us/reference/stockbarsingle-1)
+  documents `all` as split/dividend/spin-off adjustments, but a parameter switch
+  alone does not establish this protocol's ex-date/payment-date accrual, net
+  withholding, common external-flow timing or investable baseline costs. Current
+  reports retain their explicit price-only benchmark label. Complete allocated
+  model/data/infrastructure costs and paired uncertainty analysis remain required
+  before activation of the prospective study.

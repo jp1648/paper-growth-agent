@@ -272,10 +272,19 @@ class AlpacaData:
         bars = [b for b in page.get("bars") or [] if opening <= dt(b["t"]) < closing]
         if page.get("next_page_token") or not bars:
             raise ValueError(f"Incomplete regular-session close for {symbol}")
+        by_time = {}
+        for bar in bars:
+            stamp = dt(bar["t"])
+            if stamp in by_time and by_time[stamp] != bar:
+                raise ValueError(f"Conflicting regular-session bars for {symbol}")
+            by_time[stamp] = bar
         last = max(bars, key=lambda b: dt(b["t"]))
         if (closing - dt(last["t"])).total_seconds() > 300:
             raise ValueError(f"Stale regular-session close for {symbol}")
-        return dec(last["c"])
+        close = dec(last["c"])
+        if close <= 0:
+            raise ValueError(f"Nonpositive regular-session close for {symbol}")
+        return close
 
 
 def safe_error(error):

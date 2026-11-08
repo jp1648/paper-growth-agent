@@ -190,7 +190,8 @@ def test_feed_metadata_and_halt_feed(keys, monkeypatch, feed, coverage):
     assert data.quote("ACME").halted is None
 
 
-def test_regular_session_close_excludes_extended_hours(keys):
+@pytest.mark.parametrize("duplicate", [False, True])
+def test_regular_session_close_excludes_extended_hours(keys, duplicate):
     def handler(req):
         assert req.url.params["timeframe"] == "1Min"
         assert req.url.params["adjustment"] == "split"
@@ -198,7 +199,8 @@ def test_regular_session_close_excludes_extended_hours(keys):
         return httpx.Response(
             200,
             json={
-                "bars": [{"t": "2026-10-21T19:59:00Z", "c": 100}, {"t": "2026-10-21T20:00:00Z", "c": 200}],
+                "bars": [{"t": "2026-10-21T19:59:00Z", "c": 100}] * (2 if duplicate else 1)
+                + [{"t": "2026-10-21T20:00:00Z", "c": 200}],
                 "next_page_token": None,
             },
         )
@@ -302,3 +304,62 @@ def test_news_incomplete_pagination_never_returns_partial_results(keys, cycle):
     with pytest.raises(RuntimeError, match="News pagination"):
         data.news("ACME", AT.isoformat())
     assert len(calls) == (2 if cycle else 100)
+
+
+@pytest.mark.parametrize("close", [0, -1, "NaN", "Infinity", "-Infinity"])
+def test_regular_close_rejects_invalid_valuation_marks(keys, close):
+    data = AlpacaData(
+        Settings(),
+        httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200, json={"bars": [{"t": "2026-10-21T19:59:00Z", "c": close}]}
+                )
+            )
+        ),
+    )
+    with pytest.raises(ValueError):
+        data.session_close("ACME", {"date": "2026-10-21", "open": "09:30", "close": "16:00"})
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_regular_close_rejects_conflicting_duplicate_bars(keys, reverse):
+    bars = [{"t": "2026-10-21T19:59:00Z", "c": value} for value in [100, 150]]
+    data = AlpacaData(
+        Settings(),
+        httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, json={"bars": bars[::-1] if reverse else bars})
+            )
+        ),
+    )
+    with pytest.raises(ValueError, match="Conflicting"):
+        data.session_close("ACME", {"date": "2026-10-21", "open": "09:30", "close": "16:00"})
+
+
+def test_invalid_close_does_not_publish_daily_sample_and_can_recover(env, keys, monkeypatch):
+    from trader.reports import daily_report
+
+    service, _, _ = env
+    close = 0
+    service.data = AlpacaData(
+        service.cfg,
+        httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200, json={"bars": [{"t": "2026-10-21T19:59:00Z", "c": close}]}
+                )
+            )
+        ),
+    )
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(hours=6))
+    with pytest.raises(ValueError, match="Nonpositive"):
+        daily_report(service)
+    assert not service.store.items("daily")
+    assert not service.store.items("daily_report")
+    assert not service.store.events("daily_report")
+    close = 100
+    report = daily_report(service)
+    assert report["marks"] == {"SPY": D(100), "QQQ": D(100)}
+    assert len(service.store.items("daily")) == 1
+    assert len(service.store.events("daily_report")) == 1
