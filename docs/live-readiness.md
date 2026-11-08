@@ -22,7 +22,7 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 | 11 | Provider/evidence/stream failure matrix | Future evidence, bounded retrieval, stream failure/backoff and duplicate-hint tests pass. Broader reconnect/backfill, schema drift, throttling, hostile-content and combined-failure matrix remains open. |
 | 12 | Complete authenticated traces | Deployed and verified on production: 557 unique events across six pages, full-event authentication, logout, malformed cursor rejection and mobile rendering. Real Postgres equal-timestamp fixture passes. Isolated two-hour Postgres outage recovered all 7170 queued events exactly. Disk-exhaustion event loss is confirmed; production alert-response and broader load/partition scenarios remain open under 11/14. |
 | 13 | Notifications/independent alerts | Deployed bounded Telegram retries, audited uncertain-delivery resolution and correction notices. Actual health/spend emails previously verified against cloud incidents. Actual metric-publisher outage opened a missing-heartbeat incident and delivered an authenticated email; publishing recovered. Automatic incident closure and matching recovery email verified. Whole-host stop/restart and independent alert delivery are now verified below; replacement-host in-flight recovery remains separate. |
-| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; full offline suite last passed 651 tests with six opt-in skips; all fourteen observability tests also passed against isolated Postgres. Sixteen safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
+| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; latest full suite passed 661 tests with one paper-order opt-in skipped and real isolated Postgres enabled; all fifteen observability tests passed. Sixteen safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
 | 15 | Accounting/performance | Independent lifecycle balances cover distributions, withholding, fees, flows, splits, sales and audited return of capital. Unknown actions fail closed. Full broker cost-basis/correction cases, comparable total-return benchmarks and all operating costs remain open. |
 | 16 | Investment effectiveness | Not achieved. Predeclared unseen cohorts and forward paper observations after costs, independent review and uncertainty reporting remain required. No demonstrated investment edge. |
 
@@ -1535,3 +1535,23 @@ operator attestation, not independent API verification of delivery.
   observability tests passed, including concurrent backlog recovery. Full suite
   under branch coverage: 661 passed, one paper-order opt-in skipped; total
   coverage 84 percent. No production database was used by these tests.
+
+## Reporting and telemetry release verified (2026-11-08 UTC)
+
+- Deployed commit `7766c4c` after CI run `42439552338` completed successfully.
+  Image digest `sha256:7372ede3cc239b4842dc3fbefaa3db456c0f068fb053897a68f18a01d1d3159d`;
+  all 26 Python source hashes match inside the running executor. This includes
+  the reporting and same-Sink SQLite producer fixes described above, plus the
+  previously deployed unresolved-spend and broker-identity guards.
+- Runtime health passed; reconciliation succeeded at 02:48:13 UTC. Executor,
+  Cloud SQL proxy and health timer are active; health publisher exited successfully.
+  Original experiment, AAPL one-share position, eight acceptance records, three
+  activities, two intents and one order remain intact. Config and global research
+  spending hashes match pre-release; pause remains set. Private receipts and
+  rollback backup references: `state/reporting-release-7766c4c/`.
+- Authenticated provider CSV exports are now available privately in
+  `state/charge-reconciliation/provider-20261108/`: minute-level activity and daily
+  line-item costs for November 6. Account-wide daily cost is $16.33869385; incident
+  window shows 47 requests. These are new reconciliation inputs, not an accepted
+  per-run allocation or proof that the timed-out request was free. Unknown spend
+  remains unchanged and paid research remains blocked. No new orders were sent.
