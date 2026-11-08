@@ -2167,3 +2167,14 @@ spending hashes were unchanged; intent/order/activity/acceptance/adjustment/revi
 counts remained 2/1/3/8/1/0. Rollback bundle: VM `state/release-rollback-df2b72d`;
 private receipts: local `state/order-identity-release-df2b72d/`. No orders or model
 calls were submitted. Broader readiness and prospective-trial gates remain open.
+
+## Prospective measurement source audit
+
+Read-only SPY corporate-action access succeeded (HTTP 200). One retained record
+separates September 18 entitlement from October 30 payment/processing, confirming
+that a payment-date-only approach would misstate some study-boundary outcomes.
+This is source access evidence, not complete history or a measured return.
+`docs/paper-measurement-contract.md` now specifies the remaining source retention,
+receivable/cash, common-flow, cost allocation and revision checks before paired
+trial observations can be accepted. Existing reports and the inactive protocol
+are unchanged. No broker orders, model calls or billing changes occurred.
