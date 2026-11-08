@@ -433,3 +433,29 @@ output identifies `input_version`; its return-series schema remains version 1 fo
 the existing analysis tool. Neither input version grants trial acceptance. Tests
 cover fee recognition followed by settlement, explicit-zero requirements, unknown
 and negative liabilities, missing evidence and accidental use of the legacy schema.
+
+## Dividend revision comparison
+
+`compare-cash-dividends BEFORE_DIRECTORY AFTER_DIRECTORY` is an offline,
+configuration-free comparison of two retained ordinary-cash captures. It runs
+existing integrity and economic-field validation on both, requires identical
+processing windows and all request parameters, and rejects a replacement whose
+capture completion precedes the original. It reports both manifest hashes and
+full before/after records, with changed field names for matching IDs.
+
+A new ID is `added`; an absent ID is `missing`, **not canceled**. A changed ID
+appears as missing plus added, requiring economic-identity review rather than
+being automatically counted as a second dividend. Processing-date revisions may
+move a record outside the compared window; missing records therefore require
+an overlapping-window source investigation. Unsupported/special distributions
+or invalid replacement fields block this ordinary-cash comparison and require
+review of the raw retained source. No files, entitlements or returns are rewritten.
+
+No differences means only no observed changes between these versions, not source
+finality or complete history. The command does not authenticate sources, validate
+net withholding or settlement, reinvest distributions, or approve trial inputs.
+Tests cover rate/date changes, changed IDs, missing records, immutable captures,
+wrong windows, reversed retrieval order, corrupted pages, unsupported records and
+CLI isolation from configuration, network clients and the ledger. This closes the
+ordinary-dividend revision-reporting gap; benchmark holdings and reinvestment
+accounting still require implementation and frozen-policy review.

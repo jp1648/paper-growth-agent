@@ -190,9 +190,53 @@ def validate_cash_dividends(directory):
     return {
         "status": "ordinary_cash_fields_validated",
         "symbol": symbol,
+        "params": params,
+        "finished_at": manifest["finished_at"],
         "manifest_sha256": hashlib.sha256(manifest_raw).hexdigest(),
         "dividends": list(records.values()),
         "history_completeness_verified": False,
         "entitlements_verified": False,
         "net_withholding_verified": False,
+    }
+
+
+def compare_cash_dividends(before, after):
+    """Expose revisions without inferring cancellations or restating entitlements."""
+    old, new = validate_cash_dividends(before), validate_cash_dividends(after)
+    if old["params"] != new["params"]:
+        raise ValueError("Dividend comparison requires identical processing windows and request policies")
+    if dt(new["finished_at"]) < dt(old["finished_at"]):
+        raise ValueError("Replacement capture predates the original")
+    previous = {a["id"]: a for a in old["dividends"]}
+    current = {a["id"]: a for a in new["dividends"]}
+    changes = []
+    for identifier in sorted(previous.keys() | current.keys()):
+        left, right = previous.get(identifier), current.get(identifier)
+        if left == right:
+            continue
+        changes.append(
+            {
+                "action_id": identifier,
+                "change": "added" if left is None else "missing" if right is None else "changed",
+                "before": left,
+                "after": right,
+                "changed_fields": sorted(k for k in left.keys() | right.keys() if left.get(k) != right.get(k))
+                if left is not None and right is not None
+                else [],
+            }
+        )
+    return {
+        "status": "revision_review_required" if changes else "no_observed_changes",
+        "before_manifest_sha256": old["manifest_sha256"],
+        "after_manifest_sha256": new["manifest_sha256"],
+        "params": old["params"],
+        "changes": changes,
+        "history_completeness_verified": False,
+        "trial_accepted": False,
+        "limitations": [
+            "Missing records are not proof of cancellation; moved processing dates or provider omissions need investigation.",
+            "Changed identifiers are not automatically matched to earlier economic events.",
+            "No-change is not source finality. Hash integrity is not source authentication.",
+            "Entitlements, withholding, settlements and observation revisions require separate review; no ledger is changed.",
+        ],
     }

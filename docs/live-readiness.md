@@ -2885,3 +2885,14 @@ Deployed revision `c6ef26a6ae2fc184b07975a5fc8f73995b678df9`, including the rese
 CI run `42457099276` passed backend, dashboard and secret checks: **894 tests passed, one paper test skipped, 86% branch coverage**, safety mutations caught. Production service/proxy/health timer are active; fresh reconciliation at `2026-11-08T07:05:04.742416+00:00` is healthy. Original experiment, every document-kind count, the one AAPL share, pause, spending hash and config hash match the pre-release audit. No research calls or orders were made. Rollback backup retained at `state/release-rollback-c6ef26a` on the executor; private release receipt and evidence are in local `state/release-c6ef26a/`.
 
 This supersedes the prior section's not-deployed status. Paid research acceptance, independent reviews and prospective trial readiness remain incomplete. Deploying measurement tools does not start the trial or approve their input data; no real-money activation is authorized.
+
+### Ordinary dividend revisions — offline validation
+
+Added `compare-cash-dividends` to expose changed, added and missing records between
+validated same-request captures, retaining both source versions and hashes.
+Missing is deliberately not cancellation; changed IDs are not silently deduplicated
+as the same economic event or automatically booked twice. Invalid/unsupported
+records fail ordinary-cash comparison. No ledger mutation, source request, paid
+research or trial activation. Full local suite: **898 passed, 7 skipped**; Ruff
+and formatting passed. This comparison is not yet deployed. Benchmark holdings,
+net entitlement treatment, reinvestment and complete costs remain pending.

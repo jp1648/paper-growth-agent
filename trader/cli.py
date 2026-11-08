@@ -105,6 +105,11 @@ def main(argv=None):
         "validate-cash-dividends", help="Offline capture integrity and cash-field checks; no broker"
     )
     validate_actions.add_argument("directory")
+    compare_actions = sub.add_parser(
+        "compare-cash-dividends", help="Offline retained dividend revision comparison"
+    )
+    compare_actions.add_argument("before")
+    compare_actions.add_argument("after")
     entitlement = sub.add_parser(
         "audit-dividend-entitlements", help="Offline dividend receivable/payment arithmetic"
     )
@@ -135,6 +140,11 @@ def main(argv=None):
         from .dividends import audit_entitlements
 
         print(dumps(audit_entitlements(args.directory, json.loads(Path(args.input).read_text()))))
+        return 0
+    if args.command == "compare-cash-dividends":
+        from .corporate_actions import compare_cash_dividends
+
+        print(dumps(compare_cash_dividends(args.before, args.after)))
         return 0
     if args.command == "validate-cash-dividends":
         from .corporate_actions import validate_cash_dividends

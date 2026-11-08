@@ -1,5 +1,6 @@
 import hashlib
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -281,3 +282,82 @@ def test_validation_cli_needs_no_config_credentials_or_broker(tmp_path, monkeypa
     monkeypatch.setattr(cli, "AlpacaData", lambda _: pytest.fail("No provider expected"))
     monkeypatch.setattr(cli, "Store", lambda _: pytest.fail("No ledger expected"))
     assert cli.main(["validate-cash-dividends", str(root)]) == 0
+
+
+@pytest.mark.parametrize(
+    "changes", [{}, {"rate": "2.00"}, {"payable_date": "2026-10-31"}, {"id": "replacement"}]
+)
+def test_dividend_revision_comparison_retains_both_versions(tmp_path, changes):
+    from trader.corporate_actions import compare_cash_dividends
+
+    before, original = ordinary_capture(tmp_path / "old")
+    after, revised = ordinary_capture(tmp_path / "new", **changes)
+    saved = {str(p): p.read_bytes() for root in (before, after) for p in root.iterdir()}
+    result = compare_cash_dividends(before, after)
+    assert result["history_completeness_verified"] is False and result["trial_accepted"] is False
+    if not changes:
+        assert result["status"] == "no_observed_changes" and not result["changes"]
+    elif "id" in changes:
+        assert [r["change"] for r in result["changes"]] == ["missing", "added"]
+    else:
+        assert result["changes"] == [
+            {
+                "action_id": "a",
+                "change": "changed",
+                "before": original,
+                "after": revised,
+                "changed_fields": sorted(changes),
+            }
+        ]
+    assert all(Path(p).read_bytes() == raw for p, raw in saved.items())
+
+
+def test_missing_dividend_is_not_a_cancellation(tmp_path):
+    from trader.corporate_actions import compare_cash_dividends
+
+    before, _ = ordinary_capture(tmp_path / "old")
+    after = tmp_path / "empty"
+    p = provider(lambda _: httpx.Response(200, json={"corporate_actions": {}, "next_page_token": None}))
+    capture_actions(p, "SPY", "2026-10-01", "2026-10-31", after)
+    p.client.close()
+    result = compare_cash_dividends(before, after)
+    assert result["changes"][0]["change"] == "missing"
+    assert result["changes"][0]["after"] is None
+    assert result["status"] == "revision_review_required"
+
+
+@pytest.mark.parametrize("fault", ["window", "time", "corruption", "unsupported"])
+def test_dividend_comparison_rejects_unusable_replacement(tmp_path, fault):
+    from trader.corporate_actions import compare_cash_dividends
+
+    before, _ = ordinary_capture(tmp_path / "old")
+    after, _ = ordinary_capture(tmp_path / "new", **({"special": True} if fault == "unsupported" else {}))
+    manifest = json.loads((after / "manifest.json").read_text())
+    if fault == "window":
+        request = json.loads((after / "request.json").read_text())
+        request["params"]["start"] = "2026-09-01"
+        manifest["params"] = request["params"]
+        (after / "request.json").write_text(json.dumps(request))
+    elif fault == "time":
+        request = json.loads((after / "request.json").read_text())
+        request["started_at"] = "2020-01-01T00:00:00+00:00"
+        manifest["started_at"] = request["started_at"]
+        manifest["finished_at"] = "2020-01-01T00:01:00+00:00"
+        (after / "request.json").write_text(json.dumps(request))
+    elif fault == "corruption":
+        (after / "page-001.json").write_text("{}")
+    (after / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        compare_cash_dividends(before, after)
+
+
+def test_dividend_comparison_cli_is_offline(tmp_path, monkeypatch, capsys):
+    from trader import cli
+
+    before, _ = ordinary_capture(tmp_path / "old")
+    after, _ = ordinary_capture(tmp_path / "new", rate="2")
+    monkeypatch.setattr(cli.Settings, "load", lambda *a: pytest.fail("Configuration read"))
+    monkeypatch.setattr(cli, "AlpacaData", lambda *a: pytest.fail("Network client"))
+    monkeypatch.setattr(cli, "Store", lambda *a: pytest.fail("Ledger opened"))
+    assert cli.main(["compare-cash-dividends", str(before), str(after)]) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "revision_review_required"
