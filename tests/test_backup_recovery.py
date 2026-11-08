@@ -261,7 +261,10 @@ def test_existing_checkpoint_with_changed_intent_blocks_post(env, decision, monk
     assert "does not match" in result["error"]
 
 
-def test_full_ledger_after_broker_acceptance_recovers_without_resubmit(env, decision, monkeypatch):
+@pytest.mark.parametrize("recovery_fault", [None, "timeout", "missing_order"])
+def test_full_ledger_after_broker_acceptance_recovers_without_resubmit(
+    env, decision, monkeypatch, recovery_fault
+):
     service, broker, data = env
     submit = broker.submit
 
@@ -286,6 +289,26 @@ def test_full_ledger_after_broker_acceptance_recovers_without_resubmit(env, deci
     restored = Store(service.cfg.database)
     try:
         recovered = Service(service.cfg, restored, broker, data)
+        if recovery_fault:
+            import httpx
+
+            snapshot = broker.snapshot
+
+            def unavailable_snapshot(*args):
+                if recovery_fault == "timeout":
+                    raise httpx.ReadTimeout("Offline recovery fixture timeout")
+                return snapshot(*args).model_copy(update={"orders": []})
+
+            with monkeypatch.context() as patch:
+                patch.setattr(broker, "snapshot", unavailable_snapshot)
+                for _ in range(2):
+                    with pytest.raises((httpx.ReadTimeout, LedgerError)):
+                        recovered.execute(decision, "accepted-ledger-full")
+                    assert restored.get("reconciliation")["ok"] is False
+                    assert recovered.reservation_summary() == dec("1001")
+                    assert broker.submits == 1
+                    assert restored.items("order") == []
+                    assert len(restored.items("intent")) == 1
         for _ in range(2):
             recovered.execute(decision, "accepted-ledger-full")
         assert broker.submits == 1

@@ -1370,3 +1370,15 @@ operator attestation, not independent API verification of delivery.
   timeout and identify overlapping account activity before an audited settlement.
   Private read-only receipt: `state/charge-reconciliation/current.json`.
   No spend records, reservations, billing settings or trading state were changed.
+
+- Extended the post-acceptance SQLITE_FULL/restart drill with two separate
+  recovery faults: broker snapshot timeout and successful snapshot missing the
+  accepted order. Two repeated executions under either fault fail reconciliation,
+  retain the full 1001 reservation and original single intent, and never submit
+  again. Once complete broker visibility returns, the same intent recovers and
+  the eventual fill reconciles exactly once. All 21 backup/recovery tests pass;
+  Ruff/format pass. Existing production behavior required no fix.
+- These combined faults use deterministic broker fixtures. They do not substitute
+  for actual broker partition timing, a replacement-host failover drill, or proof
+  of recovery when both persistent storage and the remote checkpoint are lost.
+  No paid calls, production state changes, or trading activation occurred.
