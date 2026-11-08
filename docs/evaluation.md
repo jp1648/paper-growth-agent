@@ -323,3 +323,30 @@ false is not proof of economic correctness. Synthetic test reports explicitly
 state their assumptions and cannot serve as real-company normalization evidence.
 Original frozen recordings remain unchanged. New results use
 `financial-provenance-v5`; comparisons against older scoring contracts are rejected.
+
+### Completion versus reviewed acceptance
+
+`completed` and `sufficient_case_completion_rate` retain their mechanical meaning
+for compatibility. A report rejected by the independent reviewer may still be
+mechanically complete. Never use those fields alone as evidence of research
+acceptance. Summaries also expose:
+
+- `accepted_completed_decisions`: mechanically complete cases with acceptance
+  `passed`; expected rejection cases do not inflate this decision count.
+- `reviewed_failed_cases`: cases with a supplied separate review whose final
+  acceptance is failed, whether for semantic or mechanical reasons.
+- `sufficient_case_acceptance_rate`: accepted sufficient-evidence cases divided
+  by **all** sufficient-evidence cases, including pending reviews and failures.
+  It is null when there are no sufficient-evidence cases.
+- `known_cost_per_accepted_completed_decision`: total known attempt costs divided
+  by accepted completed decisions, or null when none exist. Unknown costs remain
+  separately reported; this is not a claim of final provider billing.
+
+Paired comparisons show each side's acceptance separately from mechanical pass.
+These additive metrics do not change case scoring or confer execution permission.
+Original recordings/results stay immutable; replay creates a new result file.
+The reviewed Apple development recording replayed on November 8 has one
+mechanically completed sufficient case but zero accepted decisions: completion
+100%, reviewed acceptance 0%. Its $3.8150975 recorded known cost therefore has no
+cost-per-accepted-decision value. This is the original two-case recording, not
+the later missing-evidence reruns or cumulative programme spend.

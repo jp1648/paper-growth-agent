@@ -261,6 +261,7 @@ def summarize(rows):
     sufficient = [r for r in rows if r["sufficient_evidence"]]
     costs = [Decimal(r["metrics"]["known_cost_usd"]) for r in rows]
     completed = sum(r["complete"] for r in rows)
+    accepted_completed = sum(r["complete"] and r["acceptance"] == "passed" for r in rows)
     latencies = sorted(r["metrics"]["latency_seconds"] for r in rows)
     stage_names = sorted({stage for row in rows for stage in row["stages"]})
     stages = {}
@@ -281,14 +282,25 @@ def summarize(rows):
     return {
         "cases": len(rows),
         "completed": completed,
+        "accepted_completed_decisions": accepted_completed,
+        "reviewed_failed_cases": sum(
+            r["semantic_review"] == "reviewed" and r["acceptance"] == "failed" for r in rows
+        ),
         "mechanical_passes": sum(r["mechanical_pass"] for r in rows),
         "pending_semantic_reviews": sum(r["semantic_review"] == "pending" for r in rows),
         "sufficient_case_completion_rate": sum(r["complete"] for r in sufficient) / len(sufficient)
         if sufficient
         else None,
+        "sufficient_case_acceptance_rate": sum(r["acceptance"] == "passed" for r in sufficient)
+        / len(sufficient)
+        if sufficient
+        else None,
         "known_cost_usd": str(sum(costs, Decimal(0))),
         "unknown_cost_calls": sum(r["metrics"]["unknown_cost_calls"] for r in rows),
         "known_cost_per_completed_decision": str(sum(costs, Decimal(0)) / completed) if completed else None,
+        "known_cost_per_accepted_completed_decision": str(sum(costs, Decimal(0)) / accepted_completed)
+        if accepted_completed
+        else None,
         "median_known_case_cost_usd": str(statistics.median(costs)) if costs else None,
         "p95_known_case_cost_usd": str(sorted(costs)[math.ceil(len(costs) * 0.95) - 1]) if costs else None,
         "median_latency_seconds": statistics.median(latencies) if latencies else None,
@@ -707,6 +719,8 @@ def compare(baseline_path, candidate_path, output_path):
                 "split": a["split"],
                 "baseline_pass": a["mechanical_pass"],
                 "candidate_pass": b["mechanical_pass"],
+                "baseline_acceptance": a["acceptance"],
+                "candidate_acceptance": b["acceptance"],
                 "known_cost_delta_usd": str(
                     Decimal(b["metrics"]["known_cost_usd"]) - Decimal(a["metrics"]["known_cost_usd"])
                 ),

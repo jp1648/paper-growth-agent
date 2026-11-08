@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from trader.evaluation import fingerprint, load_suite, model_inputs, replay, scenario_values, score
+from trader.evaluation import fingerprint, load_suite, model_inputs, replay, scenario_values, score, summarize
 
 SUITE = Path("evaluations/baseline-v1.json")
 RECORDING = Path("tests/fixtures/evaluation/recording.json")
@@ -263,6 +263,9 @@ def test_comparison_rejects_different_evidence_and_reports_regression(tmp_path):
     result = compare(baseline, path, tmp_path / "comparison.json")
     assert result["regressions"] == [changed["case_id"]]
     assert not result["promotion_recommended"]
+    pair = next(row for row in result["pairs"] if row["case_id"] == changed["case_id"])
+    assert pair["baseline_acceptance"] == pair["candidate_acceptance"] == "pending_human_review"
+    assert result["candidate_summary"]["accepted_completed_decisions"] == 0
     candidate["cases"][0]["inputs_hash"] = "different"
     path.write_text(json.dumps(candidate))
     with pytest.raises(ValueError, match="identical cases"):
@@ -548,6 +551,45 @@ def test_candidate_cannot_self_certify_semantic_acceptance():
     assert result["acceptance"] == "failed"
     assert result["semantic_review"] == "pending"
     assert "embedded_review_not_accepted" in result["failures"]
+
+
+def test_summary_distinguishes_completed_rejected_pending_and_accepted_research():
+    suite, recording = inputs()
+    case = suite["cases"][4]
+    candidate = recording["cases"][case["id"]]
+    # Use a mechanically valid abstention to exercise the real review validator.
+    review = {
+        "case_hash": fingerprint(case),
+        "candidate_hash": fingerprint(candidate),
+        "reviewer": "synthetic independent reviewer",
+        "reviewed_at": "2026-11-06T00:00:00Z",
+        "claims_supported": False,
+        "abstention_reason_correct": True,
+        "independent": True,
+        "notes": "Synthetic rejection of reasoning despite a complete report.",
+    }
+    rejected = score(case, candidate, review)
+    pending = score(case, candidate)
+    accepted = score(case, candidate, dict(review, claims_supported=True))
+    rows = []
+    for row in (rejected, pending, accepted):
+        rows.append(
+            dict(row, sufficient_evidence=True, metrics=candidate["metrics"], stages=candidate["stages"])
+        )
+        rows[-1]["metrics"] = dict(candidate["metrics"], known_cost_usd="1")
+    result = summarize(rows)
+    assert result["completed"] == 3
+    assert result["sufficient_case_completion_rate"] == 1
+    assert result["accepted_completed_decisions"] == 1
+    assert result["reviewed_failed_cases"] == 1
+    assert result["sufficient_case_acceptance_rate"] == pytest.approx(1 / 3)
+    assert result["known_cost_per_accepted_completed_decision"] == "3"
+    failed_only = summarize(rows[:2])
+    assert failed_only["accepted_completed_decisions"] == 0
+    assert failed_only["sufficient_case_acceptance_rate"] == 0
+    assert failed_only["known_cost_per_accepted_completed_decision"] is None
+    abstention_only = summarize([dict(rows[2], sufficient_evidence=False)])
+    assert abstention_only["sufficient_case_acceptance_rate"] is None
 
 
 @pytest.mark.parametrize("change", [None, "case", "candidate", "suite", "recording", "unknown_case"])
