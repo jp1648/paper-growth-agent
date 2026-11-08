@@ -20,7 +20,7 @@ MUTATIONS = {
     ),
     "financial_basis": (
         "trader/research_team.py",
-        'if dec(cash_flow_per_share) != dec(provenance["cash_flow_per_share"]):',
+        'if dec(cash_flow_per_share) != dec(required_cash):',
         "if False:",
     ),
     "reservation": ("trader/service.py", "        return amount\n", "        return ZERO\n"),
@@ -62,6 +62,8 @@ def main():
         target = Path(directory)
         for folder in ("trader", "tests"):
             shutil.copytree(ROOT / folder, target / folder, ignore=shutil.ignore_patterns("__pycache__"))
+        (target / "evaluations").mkdir()
+        shutil.copy2(ROOT / "evaluations/baseline-v1.json", target / "evaluations/baseline-v1.json")
         for name, mutation in [("baseline", None), *MUTATIONS.items()]:
             if mutation:
                 file, before, after = mutation
@@ -81,6 +83,7 @@ def main():
                         "tests/test_execution.py",
                         "tests/test_live_readiness.py",
                         "tests/test_financials.py",
+                        "tests/test_normalization.py",
                         "tests/test_loss_limits.py",
                         "tests/test_executor_owner.py",
                         "tests/test_adapters.py",
