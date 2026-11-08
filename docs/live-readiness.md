@@ -2514,3 +2514,20 @@ remains pending human review. All 39 evaluation tests passed; Ruff/diff checks
 passed. This proves orchestration recovery, not real-model compliance or
 investment-quality research. No additional paid research occurred this turn;
 the new fix still requires a real evaluation before that gate can close.
+
+### Real missing-evidence completion, semantic review pending (November 8)
+
+`missing-dev-20261108-3` completed all four specialists and WATCH/zero shares on
+156277c after the missing-fact recovery fix. No valuation was fabricated; material
+gaps remain explicit. This case now passes mechanical checks and awaits Jay's
+independent review. It is not an accepted supported-valuation case, unseen holdout
+result, paper trial or live approval. Details and packet location are in the
+[Apple remediation record](apple-review-remediation.md#completed-missing-evidence-result-awaiting-review).
+
+The $3.75-capped run settled at estimated $2.3795900 with no unknown calls.
+All 36 model requests have responses and all 35 tools have terminal spans.
+Today's three evaluation attempts total $4.281305. All prior run IDs and failed
+outputs remain preserved. Post-completion reconciliation at
+2026-11-08T05:47:05.035046Z is healthy; original experiment, config, pause, one
+AAPL share and execution/acceptance counts are unchanged. No broker order was
+submitted. No additional paid retry is justified solely to repeat this result.

@@ -10,8 +10,8 @@ The separate private review is in
 agent transcribed the user-message verdict and bound it to retained hashes. Jay
 explicitly did not independently attest those hashes or mechanical checks from
 the HTML. Rescoring rejects semantic acceptance (`human_review_failed`); mechanical
-completion is not approved investment research. The missing-data case remains a
-failure, not an accepted abstention.
+completion is not approved investment research. The missing-data case subsequently completed in run `missing-dev-20261108-3`;
+independent acceptance of that abstention is pending.
 
 ## Required revised result and evidence
 
@@ -22,7 +22,7 @@ failure, not an accepted abstention.
 | Normalization | Source-bound numerical bridge with explicit equity/enterprise basis, SBC/share treatment, taxes/escrow, reinvestment and financing; no unsupported zero adjustments or double deductions | Not implemented/accepted; narrative declarations remain insufficient |
 | Scenarios | Connect business drivers to growth/margins/reinvestment; identify 10% as a chosen hurdle unless cost of equity is established; explain post-year-five economics and show separate growth/multiple sensitivities | Arithmetic sensitivity implemented; economic rationale still pending |
 | Decision/review | Measurable triggers, review periods and valuation effects; reconcile holding/valuation horizons; distinguish confidence in abstention from value/performance confidence | Revised report and independent review pending |
-| Failure recovery | Rerun the missing-capex/filing case after offline checks; complete WATCH with an explicit material gap and no fabricated value | Still unvalidated by a new model run |
+| Failure recovery | Rerun the missing-capex/filing case after offline checks; complete WATCH with an explicit material gap and no fabricated value | Real run missing-dev-20261108-3 completed WATCH/zero shares with all four reports; independent review pending |
 
 ## Arithmetic correction
 
@@ -63,8 +63,8 @@ captured in cash-flow projections again.
 
 Changes are developed on Apple. Preserve Microsoft as the unseen annual holdout;
 never tune on its candidate outputs. A new development run requires the existing
-spending preflight, a fresh stable ID and preserved original artifacts. No paid
-rerun has been performed for this remediation yet.
+spending preflight, a fresh stable ID and preserved original artifacts. The original complete-evidence Apple valuation has not been rerun for this
+remediation; the separate missing-evidence reruns are documented below.
 
 ## Accounting diagnostic implementation
 
@@ -124,3 +124,29 @@ The missing-fact correction was subsequently deployed as paused release 156277c
 unsupported valuation → critique → WATCH/zero shares completion using a scripted
 model. This does not replace the outstanding real-model rerun or independent
 review, and does not resolve the supported-valuation/normalization requirements.
+
+## Completed missing-evidence result awaiting review
+
+`missing-dev-20261108-3` ran the deployed 156277c image with a fresh stable ID
+and a $3.75 cap after settlement/daily/credit/pause checks. It completed all four
+reports and returned WATCH, quantity/price zero, holding period zero. No
+calculation or scenario values were created; valuation and critique explicitly
+retain material gaps. The model distinguishes missing supplied evidence from
+nonexistence of the public filing, historical reference price from executable
+price, and confidence in abstention from confidence in value/returns. It does
+not replace the rejected complete-evidence Apple research.
+
+Estimated cost $2.3795900, 36 model calls, 35 tools, 167.56 seconds, 15 repeated
+calls across roles, peak context 58,792 bytes. PostgreSQL shows matching 36
+requests/responses and 35 tool starts/ends, four completed specialist spans,
+completed final evaluation, and no errors. Cost settled with zero unknown calls.
+November 8 total for three attempts: $4.281305, below $6/day. No more paid run
+was made in this turn.
+
+Mechanical checks pass; independent semantic review is pending. A private HTML
+packet with unmodified reports, full frozen facts and hash identifiers is at
+`state/evaluations/missing-dev-20261108-3/review-for-jay.html`. Implementation-agent
+checks of citations and selected financial inputs are labeled as such; they are
+not Jay's approval. The packet explicitly separates the fictional $100,000 cash
+portfolio from the actual paused paper account holding one AAPL share. Original
+recording/suite bytes are retained. Jay was asked to review this abstention only.
