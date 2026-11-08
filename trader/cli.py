@@ -82,6 +82,10 @@ def main(argv=None):
     )
     paper_observations.add_argument("--input", required=True)
     paper_observations.add_argument("--output", required=True)
+    prices = sub.add_parser("capture-daily-prices", help="Retain raw historical SIP marks; no broker")
+    prices.add_argument("symbols", nargs="+")
+    prices.add_argument("--calendar", required=True, help="Retained broker calendar JSON")
+    prices.add_argument("--output-dir", required=True, help="New evidence directory")
     actions = sub.add_parser(
         "capture-corporate-actions", help="Read-only market-data evidence capture; no broker"
     )
@@ -114,6 +118,17 @@ def main(argv=None):
 
         print(dumps(validate_cash_dividends(args.directory)))
         return 0
+    if args.command == "capture-daily-prices":
+        from .price_capture import capture_prices
+
+        provider = AlpacaData(Settings.load(args.config))
+        try:
+            print(
+                json.dumps(capture_prices(provider, args.symbols, args.calendar, args.output_dir), indent=2)
+            )
+            return 0
+        finally:
+            provider.client.close()
     if args.command == "capture-corporate-actions":
         from .corporate_actions import capture_actions
 

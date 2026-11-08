@@ -285,3 +285,43 @@ The probe used documented default USD/current symbol mapping; production capture
 must make both explicit. No subscription change, paid model call, broker order,
 ledger mutation or trial activation occurred. Dividend/split entitlement,
 reinvestment, expense allocation and independent source review remain required.
+
+## Implemented raw daily-price capture
+
+```sh
+paper-agent --config config.toml capture-daily-prices AAPL SPY QQQ \
+  --calendar state/retained-broker-calendar.json \
+  --output-dir state/daily-prices/capture-1
+```
+
+This explicit read-only command retains raw historical SIP daily bars. It fixes
+`currency=USD`, `adjustment=raw`, and symbol mapping `asof` to the last supplied
+session. Calendar dates must be completed historical sessions in increasing order;
+New York midnight bounds preserve DST offsets. It copies the exact supplied
+calendar and hashes it, but cannot authenticate the calendar's origin or detect a
+session omitted from that input. Retain the original broker request/response too.
+
+A new output directory contains request parameters, retrieval times, byte-exact
+pages and a terminal manifest. Capture requires every requested symbol/session
+pair, positive finite closes, New York midnight daily-bar timestamps and explicit
+exhausted pagination. It rejects conflicting duplicates, unexpected symbols/dates,
+missing marks, cursor cycles and redirects. Exact repeated records are counted
+once. Limits are 100 symbols, 366 sessions within 366 days, 100 pages, 1 MiB per
+page and 10 MiB total. Failure leaves evidence and a failed manifest; interruption
+without a terminal manifest is incomplete. There is no automatic retry, forward
+fill, feed fallback or overwrite of earlier captures.
+
+The CLI creates only a market-data client, never a broker, ledger or runner. It
+does not change the trading feed, interpret dividends/splits, submit benchmark
+orders or activate the trial. `complete_requested_matrix` means only coverage of
+the supplied symbol/session matrix, not official exchange closing prices, source
+finality, authenticity or approved research/performance. Revisions require another
+retained capture and explicit comparison; the command does not reconcile revisions.
+
+A real isolated invocation on November 8 captured AAPL/SPY/QQQ for November 2–6:
+15 expected and received marks, one 1,754-byte page, explicit null continuation.
+Page SHA-256 `decc6cfa3056b273b5cdbd018ba40e4656aa18a306544d20fa66a03e838556c1`;
+calendar SHA-256 `d92bfbce23eb39b4a3436c7eb2ef93e9eebc69ec74d1868ade3af4148ba07693`.
+The calendar exactly matches the earlier retained broker response. Private evidence
+is `state/benchmark-close-probe-20261108/daily-capture/`. The source was loaded only
+for the isolated capture process; the running executor image was not changed.

@@ -2739,3 +2739,19 @@ This is source feasibility evidence, not an implemented or accepted trial return
 series. The prospective trial remains unstarted; no paid research or orders were
 made. It does not resolve missing infrastructure cost allocation or independent
 research acceptance.
+
+### Raw daily-mark capture implemented and exercised
+
+`capture-daily-prices` retains explicit raw/USD/SIP bars and symbol mapping,
+checks every supplied calendar/symbol pair, preserves pages/hashes, and refuses
+missing marks, conflicting identities, unbounded pagination and redirects.
+Twenty-one focused tests cover DST, bounds, failures, exclusive creation and
+CLI isolation from execution. Full local suite: **851 passed, 7 skipped**;
+Ruff checks and formatting passed.
+
+The isolated real invocation retained and verified 15 marks across five broker
+sessions for AAPL/SPY/QQQ. It used existing market-data credentials without a
+subscription change, paid model call or broker order. The running image remains
+the previously verified paused release; this new capture command is not deployed
+there. Source-finality/revision handling, matched portfolio marking, distributions,
+complete cost allocation and independent acceptance still block trial activation.
