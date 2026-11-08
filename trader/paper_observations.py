@@ -9,8 +9,8 @@ from .models import ZERO, dec
 
 
 def build_observations(document):
-    if type(document.get("version")) is not int or document["version"] != 1:
-        raise ValueError("Require observation input version 1")
+    if type(document.get("version")) is not int or document["version"] not in (1, 2):
+        raise ValueError("Require observation input version 1 or 2")
     if document.get("currency") != "USD" or document.get("benchmark") != "SPY":
         raise ValueError("Require primary SPY comparison in USD")
     if document.get("flow_policy") != "no_external_flows":
@@ -52,6 +52,15 @@ def build_observations(document):
             raise ValueError("Incomplete NAV, entitlement, withholding or cost evidence")
         # Receivables here exclude amounts already included in reported equity.
         gross = amount(claim["reported_equity"]) + amount(claim["net_receivables_not_in_equity"])
+        if document["version"] == 2:
+            # Accruals exclude amounts already booked in cash/equity or external expenses.
+            liability = claim["accrued_liabilities_not_in_equity"]
+            evidence(liability["evidence"])
+            if liability.get("status") != "final":
+                raise ValueError("Unknown accrued liabilities cannot finalize economic NAV")
+            gross -= amount(liability["amount"])
+        elif "accrued_liabilities_not_in_equity" in claim:
+            raise ValueError("Accrued liabilities require input version 2; never silently ignore them")
         costs = claim["cumulative_external_costs"]
         if not isinstance(costs, dict) or set(costs) != {"model", "data", "infrastructure", "other"}:
             raise ValueError("Require every cost category, including explicit evidenced zeros")
@@ -90,6 +99,7 @@ def build_observations(document):
     return {
         "version": 1,
         "status": "diagnostic_only",
+        "input_version": document["version"],
         "return_basis": "flow_adjusted_net_total_return",
         "currency": "USD",
         "benchmark": "SPY",
@@ -105,6 +115,7 @@ def build_observations(document):
             "Reported equity must already include broker fees; external costs exclude amounts already in equity.",
             "Net receivables require supported entitlement and deductions; gross unpaid dividends are insufficient.",
             "Calendar, marks, splits, benchmark holdings/reinvestment and cost allocation need independent review.",
+            "Version 1 has no liability bridge; version 2 requires explicit evidenced unbooked liabilities.",
             "No trial activation, acceptance or trading authorization follows from this calculation.",
         ],
     }

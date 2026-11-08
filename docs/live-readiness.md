@@ -2779,3 +2779,21 @@ checks and related observation/capture tests passed (**64 focused tests**); Ruff
 passed. Closing inventory truth, corporate-action reconciliation and cost evidence
 are still external requirements, not inferred from an input completeness flag.
 No real portfolio close, total-return series or prospective trial was certified.
+
+### Historical inventory/fee timing audit and NAV liability support
+
+Retained production records show the November 6 saved report uses a post-close
+snapshot and excludes a later-posted one-cent fee dated November 6. Repricing its
+one-share inventory on the retained SIP daily basis changes the saved IEX closing
+calculation by -$0.04. Recognizing the later fee on its business date would change
+it by another -$0.01; this remains conditional, not an approved restatement.
+Original records were preserved and hashed. This evidence prevents certifying the
+operational reports as finalized trial observations.
+
+Observation input version 2 adds explicit supported unbooked liabilities, including
+zeros, for both sides and opening NAV. Settlement transfers liability to cash
+without a second expense. Legacy inputs cannot silently carry an ignored liability
+field. **36 focused observation/inventory tests passed**, including six new checks;
+Ruff passed. This change is not deployed. Actual closing inventory verification,
+fee effective-date policy, complete operating costs and independent research
+acceptance still block trial activation. No paid model call or order occurred.

@@ -162,3 +162,60 @@ def test_cli_immutable_output_and_existing_uncertainty_pipeline(document, tmp_pa
     with pytest.raises(FileExistsError):
         main(args)
     assert output.read_bytes() == raw
+
+
+def test_fee_accrual_then_booked_cash_is_not_two_losses(document):
+    document["version"] = 2
+    for point in [document["opening"], *document["observations"]]:
+        for side in ["portfolio", "benchmark"]:
+            point[side]["accrued_liabilities_not_in_equity"] = {
+                "amount": "0",
+                "status": "final",
+                "evidence": "synthetic-no-unbooked-liabilities",
+            }
+    document["observations"][0]["portfolio"]["accrued_liabilities_not_in_equity"] = {
+        "amount": ".01",
+        "status": "final",
+        "evidence": "synthetic-fee-assessment",
+    }
+    for row in document["observations"][1:]:
+        row["portfolio"]["reported_equity"] = "99.99"
+    result = build_observations(document)
+    assert result["input_version"] == 2
+    assert all(row["portfolio"]["gross_nav"] == "99.99" for row in result["balances"])
+    assert Decimal(result["observations"][0]["portfolio_return"]) == Decimal("-.0001")
+    assert all(Decimal(row["portfolio_return"]) == 0 for row in result["observations"][1:])
+
+
+@pytest.mark.parametrize("fault", ["missing", "unknown", "negative", "no_evidence"])
+def test_new_observation_version_requires_supported_liability_including_zero(document, fault):
+    document["version"] = 2
+    for point in [document["opening"], *document["observations"]]:
+        for side in ["portfolio", "benchmark"]:
+            point[side]["accrued_liabilities_not_in_equity"] = {
+                "amount": "0",
+                "status": "final",
+                "evidence": "synthetic",
+            }
+    claim = document["observations"][0]["portfolio"]
+    liability = claim["accrued_liabilities_not_in_equity"]
+    if fault == "missing":
+        del claim["accrued_liabilities_not_in_equity"]
+    elif fault == "unknown":
+        liability["status"] = "unknown"
+    elif fault == "negative":
+        liability["amount"] = "-.01"
+    else:
+        liability["evidence"] = ""
+    with pytest.raises((KeyError, ValueError)):
+        build_observations(document)
+
+
+def test_legacy_version_cannot_silently_discard_accrued_fee(document):
+    document["observations"][0]["portfolio"]["accrued_liabilities_not_in_equity"] = {
+        "amount": ".01",
+        "status": "final",
+        "evidence": "fee",
+    }
+    with pytest.raises(ValueError, match="version 2"):
+        build_observations(document)

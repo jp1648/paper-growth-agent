@@ -393,3 +393,43 @@ Thirteen tests cover independent arithmetic, distinct portfolio/benchmark marks,
 explicit post-split quantities, cash-only holdings, immutable input, missing marks,
 unknown cash, residuals, duplicates, shorts, wrong snapshot basis and offline CLI
 isolation. No real closing inventory was certified by these synthetic tests.
+
+## Actual November 6 inventory audit and unbooked liabilities
+
+A read-only extract retained six immutable daily reports, six daily samples,
+three activities and the original adjustment. The November 6 report was captured
+at 21:17:28 UTC, after the 21:00 regular close. Its cash was $99,655.67 and it held
+one AAPL share marked by the broker at $342.08: reported equity $99,997.75. The
+saved IEX close calculation used $342.41 and yielded $99,998.08. Applying the
+retained raw SIP daily mark of $342.37 to that same inventory yields $99,998.04:
+a $0.29 marking adjustment to snapshot equity and $0.04 less than the saved
+IEX closing calculation. This is a diagnostic, not proof of closing inventory.
+
+The retained CAT fee has business date November 6, amount -$0.01, and creation
+time November 7 at 01:08:00 UTC. Saved cash exactly equals $100,000 minus the
+$344.33 fill, excluding that later fee. Recognizing the fee on its business date
+would conditionally reduce SIP-marked equity to $99,998.03, but choosing that
+recognition policy requires a frozen study policy and revision review. No original
+report or broker ledger was changed. Snapshot time, fee business date, posting
+time and settlement date must remain distinct; a later snapshot must not silently
+replace a prior close. Private evidence and assert-based calculations are in
+`state/closing-inventory-audit-20261108/`, extract SHA-256
+`b8345acbe276363c0a961b917387a545cbc418009954c30ef462718122d24769`.
+
+Observation **input version 2** now requires each portfolio/benchmark NAV claim,
+including opening, to include `accrued_liabilities_not_in_equity` with `amount`,
+`status: "final"` and nonempty `evidence`. Explicit supported zero is required.
+Gross economic NAV is equity plus net unbooked receivables minus these unbooked
+liabilities. Cumulative external operating costs are then deducted as before.
+Liabilities must exclude fees already booked in broker cash/equity and expenses
+already in the external-cost overlay. On settlement, cash falls and the liability
+is released; settlement is not a second expense. Unknown or unsupported liabilities
+block version 2 calculation. A historical correction requires a new retained
+observation version; this command does not decide the correct effective date.
+
+Version 1 remains readable as the earlier diagnostic without a liability bridge;
+it rejects any supplied liability field rather than silently ignoring it. The
+output identifies `input_version`; its return-series schema remains version 1 for
+the existing analysis tool. Neither input version grants trial acceptance. Tests
+cover fee recognition followed by settlement, explicit-zero requirements, unknown
+and negative liabilities, missing evidence and accidental use of the legacy schema.
