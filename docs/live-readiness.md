@@ -1674,3 +1674,41 @@ operator attestation, not independent API verification of delivery.
 - The original uncapped-charge blocker is now resolved. Next paid evaluation still
   requires current credit/daily allowance verification, stable run ID and the
   existing research-only cohort controls. Trading remains paused; live NO-GO.
+
+## Annual-filings development evaluation (2026-11-08 UTC)
+
+- Authenticated credit-grants UI showed $81.92 available, expiring November 29.
+  Production had no unresolved model spending records and no NY November 7
+  spending. Stable run `annual-dev-20261107-2` used a $4.50 cap under the unchanged
+  $6/day and $5/run controls, plus a $10 grant buffer. Authorization was persisted
+  before calls. An initial container working-directory error occurred before
+  ledger initialization/model access; its failed container was retained and the
+  launcher corrected. The original paused service was not stopped or unpaused.
+- Frozen Apple complete-filing case finished all four specialists and a WATCH
+  decision: 41 model calls, 47 tool calls, 190.4 seconds, estimated $3.2510625.
+  Exact-source provenance and deterministic scenario checks passed under v5.
+  Scenarios $107.62/$167.89/$250.84 use the historical $6.582405 cash-flow proxy;
+  unresolved normalization means these are not accepted normalized fair values.
+  There is no investment-performance or live-price claim.
+- Missing-capex/filing variant failed after 13 model calls ($0.564035), when the
+  business specialist guessed an unlisted document ID and the lookup raised
+  `Unknown document; list filing_documents first`. The stored classifier calls
+  this `invalid_schema`; the trace identifies the actual tool-lookup failure.
+  Partial reports are not successful abstention. Do not rewrite this recording.
+- Run total **$3.8150975 estimated**, settled with zero unknown-cost calls. All 54
+  model requests/responses and corresponding call completions reached Postgres.
+  Original experiment, AAPL one share, two intents and one order were unchanged;
+  fresh broker reconciliation passed and pause remained set. No broker orders.
+  Private artifacts: `state/evaluations/annual-dev-20261107-2/` and
+  `state/annual-dev-20261108-preflight/`. Reviewer packet contains exact hashes;
+  independent semantic approval is pending. Microsoft holdout remains untouched.
+- Reproduced the unknown-document failure offline. The shared tool now returns an
+  explicit unavailable/non-citable response, matching existing unknown-source
+  behavior. It does not fetch an arbitrary reference, register evidence or weaken
+  citation validation. Tests verify hostile URL/path rejection, unchanged evidence,
+  refusal of fabricated citations and successful later lookup of a listed document.
+  Focused research/evaluation tests: 100 passed. This tool fix is local pending
+  release; the paid result above used the previous deployed implementation.
+
+- Full offline validation after the lookup fix: **658 passed, six opt-in external
+  tests skipped**; Ruff lint/format passed. No paid retry after diagnosis.

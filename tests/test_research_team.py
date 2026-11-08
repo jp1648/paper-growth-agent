@@ -457,8 +457,7 @@ def test_decimal_valuation_and_fabricated_calculation_rejected():
         desk.validate(Valuation, output | {"evidence_ids": ["fixture-sec", calc["calculation_id"]]})
     with pytest.raises(ValueError, match="deterministic"):
         desk.validate(Valuation, output | {"base_value": "1000"})
-    with pytest.raises(ValueError, match="Unknown document"):
-        tools["read_document"].invoke({"document_id": "/private/project/.env"})
+    assert tools["read_document"].invoke({"document_id": "/private/project/.env"})["available"] is False
     with pytest.raises(ValueError, match="Accession"):
         tools["filing_documents"].invoke({"symbol": "ACME", "accession": "../../.env"})
 
@@ -1351,8 +1350,9 @@ def test_source_instructions_cannot_turn_references_into_fetches(reference):
     )  # Preserve original evidence; do not pretend it is sanitized truth.
     unknown = tools["read_source"].invoke({"source_id": reference})
     assert unknown["available"] is False
-    with pytest.raises(ValueError, match="Unknown document"):
-        tools["read_document"].invoke({"document_id": reference})
+    missing = tools["read_document"].invoke({"document_id": reference})
+    assert missing["available"] is False
+    assert "id" not in missing and "content" not in missing
     assert set(desk.sources) == {"fixture-sec", "hostile-text"}
     assert not desk.calculations and not desk.reports
 
@@ -1419,3 +1419,32 @@ def test_configured_budget_covers_most_expensive_cache_write():
         with pytest.raises(ResearchLimit, match="estimated cost"):
             budget.model(size, role)
         assert budget.models == 0
+
+
+def test_unknown_document_is_recoverable_without_creating_evidence():
+    cfg = Settings()
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    tools = {t.name: t for t in desk.tools()}
+    before = dict(desk.sources)
+    missing = tools["read_document"].invoke({"document_id": "document-guessed"})
+    assert missing["available"] is False
+    assert desk.sources == before and not desk.texts and not desk.documents
+    report = {
+        "business_quality": "Unknown",
+        "growth_evidence": "Unknown",
+        "financial_health": "Unknown",
+        "contrary_evidence": [],
+        "missing_information": ["No document"],
+        "evidence_ids": ["document-guessed"],
+    }
+    from trader.research_team import Research
+
+    with pytest.raises(ValueError, match="unknown evidence"):
+        desk.validate(Research, report)
+    # A later correct listing/read still works; absence does not become a permanent negative cache.
+    document = tools["filing_documents"].invoke({"symbol": "ACME", "accession": "0000000001-26-000001"})[0]
+    passage = tools["read_document"].invoke({"document_id": document["document_id"]})
+    assert passage["id"] in desk.sources and "cash flow" in passage["content"]

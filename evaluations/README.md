@@ -49,8 +49,10 @@ to pass the cohort; separately test bounded document access or honest abstention
 - Missing-evidence variants remove capex and the filing itself. They must finish
   WATCH with an explicit material gap and no fabricated valuation. Their modified
   sources are labeled controlled fixtures, never original complete SEC responses.
-- Report mechanical validity and independent semantic acceptance separately. No
-  model outputs have yet been collected or reviewed for this cohort.
+- Report mechanical validity and independent semantic acceptance separately.
+  Development run `annual-dev-20261107-2` collected Apple outputs: the complete
+  case mechanically passed with WATCH; the missing-evidence variant failed.
+  Neither has independent semantic approval. See `docs/live-readiness.md`.
 - Two companies and two sufficient cases are a starter cohort, not enough to meet
   the release gate. Expand the declared universe/regimes with independently
   reviewed unseen cases before any promotion; retain the >=90% completion target

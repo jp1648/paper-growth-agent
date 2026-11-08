@@ -629,7 +629,12 @@ class ResearchDesk:
             with self.lock:
                 metadata = self.documents.get(document_id)
                 if metadata is None:
-                    raise ValueError("Unknown document; list filing_documents first")
+                    return {
+                        "available": False,
+                        "error": "unknown_reference",
+                        "requested_id": document_id,
+                        "note": "No listed document has this ID. Use an exact ID from filing_documents; an empty list means no document is available. This response supplies no evidence and cannot be cited.",
+                    }
                 if document_id in self.unavailable_documents:
                     return copy.deepcopy(self.unavailable_documents[document_id])
                 if document_id not in self.texts:
