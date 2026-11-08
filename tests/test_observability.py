@@ -476,3 +476,54 @@ def test_lost_commit_ack_replays_exact_payloads_after_exporter_restart(sink):
         ).fetchall()
     assert len(rows) == 202
     assert dict(rows) == {row["event_id"]: row["payload"] for row in expected}
+
+
+def test_outbox_capacity_loss_preserves_execution_evidence_and_fill_replay(
+    env, decision, sink, monkeypatch, caplog
+):
+    import sqlite3
+    from contextlib import contextmanager
+
+    from trader.models import dec
+
+    service, broker, _ = env
+    database = sink.db
+
+    @contextmanager
+    def capacity_limited():
+        with database() as db:
+            db.execute(f"PRAGMA max_page_count={db.execute('PRAGMA page_count').fetchone()[0]}")
+            yield db
+
+    evidence = {"source": "offline audit fixture", "body": "x" * 100_000}
+    with monkeypatch.context() as patch:
+        patch.setattr(sink, "db", capacity_limited)
+        with pytest.raises(sqlite3.OperationalError) as full:
+            sink.emit("capacity.probe", "event", evidence, {})
+        assert full.value.sqlite_errorcode == sqlite3.SQLITE_FULL
+        result = service.execute(decision, "outbox-full-audit", evidence=evidence)
+        assert result["status"] == "submitted" and broker.submits == 1
+        cid = result["client_order_id"]
+        assert "Telemetry event could not be persisted: decision" in caplog.text
+        assert not any(row["name"] == "decision" for row in events(sink))
+        saved = service.store.get(cid, "intent")
+        assert saved["evidence"] == evidence and saved["risk_context"]
+        receipts = service.store.events("decision")
+        assert len(receipts) == 1 and receipts[0]["body"]["evidence"] == evidence
+        checkpoint = next(service.store.path.parent.glob("backups/intent-*.sqlite"))
+        with sqlite3.connect(f"file:{checkpoint}?mode=ro", uri=True) as copy:
+            assert copy.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            row = copy.execute("SELECT body FROM documents WHERE kind='intent' AND key=?", (cid,)).fetchone()
+            assert json.loads(row[0])["evidence"] == evidence
+            assert copy.execute("SELECT count(*) FROM journal WHERE kind='decision'").fetchone()[0] == 1
+        broker.fixture_fill(cid)
+        for _ in range(2):
+            service.reconcile()
+        assert service.store.get("audit")["cash"] == "99000"
+        assert service.store.get("audit")["shares"]["ACME"] == "10"
+        assert len(service.store.items("activity")) == len(service.store.events("broker_activity")) == 1
+        assert service.reservation_summary() == dec(0)
+        assert broker.submits == 1
+    obs.emit("capacity.recovered", {"body": "y" * 100_000})
+    assert any(row["name"] == "capacity.recovered" for row in events(sink))
+    assert not any(row["name"] == "decision" for row in events(sink))  # Lost traces are not reconstructed.

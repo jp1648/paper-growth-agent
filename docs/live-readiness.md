@@ -1989,3 +1989,21 @@ operator attestation, not independent API verification of delivery.
 - Concrete proposed scope and attribution requirements are documented in
   `docs/infrastructure-cost-plan.md`. Infrastructure cost is still unknown, not
   zero; the prospective cost-adjusted study cannot claim complete reporting yet.
+
+## Execution audit under telemetry capacity failure (2026-11-08 UTC)
+
+- Added an integrated execution test with a real SQLite `SQLITE_FULL` allocation
+  failure limited to the telemetry database. A large decision's trace events are
+  lost, while the separate trading ledger commits the complete evidence, risk
+  context and decision receipt before submission. Its pre-submit SQLite checkpoint
+  contains the same evidence and receipt and passes integrity checking.
+- The isolated broker receives exactly one order. Confirmed fill activity is
+  replayed twice without duplication; exact cash/shares, one activity receipt and
+  zero remaining reservation are verified. Restored outbox capacity accepts new
+  events but does not reconstruct the lost decision trace.
+- This distinguishes durable execution audit from full observability, rather than
+  claiming telemetry loss is harmless or lossless. The fault is an outbox SQLite
+  page limit, not exhaustion of the shared physical filesystem; existing ledger-
+  capacity and checkpoint tests cover separate failure paths. No production code,
+  orders or paid requests were involved. Billing-source and independent-review
+  questions remain pending; the trial is not activated.
