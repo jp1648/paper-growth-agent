@@ -1798,3 +1798,19 @@ operator attestation, not independent API verification of delivery.
   reports retain their explicit price-only benchmark label. Complete allocated
   model/data/infrastructure costs and paired uncertainty analysis remain required
   before activation of the prospective study.
+
+## Valuation-mark validation deployed (2026-11-08 UTC)
+
+- Commit `0f2fa44b4a7fa503739f30595ef2abae5a8bc90f` passed all jobs in CI
+  `42442844914`. Cloud Build `8470b1a0-dc68-4957-820a-0a2b2a4971be` succeeded.
+  All 26 Python source hashes matched before activation and in the running image.
+- Paused rollout activated
+  `us-east1-docker.pkg.dev/trader-observatory-20261105/trader/agent@sha256:f061a00c1097ea60699ec4d9dee3e8b5edf36549d75a60178280b3481814a6db`.
+  Consistent ledger and config/control/environment rollback copies were retained
+  under `state/release-rollback-0f2fa44` on the VM.
+- Fresh reconciliation at 03:32:23 UTC and health passed. Executor, database proxy
+  and independent health timer are active. Before/after assertions preserve original
+  experiment, AAPL one share, trading/activity/adjustment counts, exact spending and
+  config hashes, and the durable pause. No paid model calls or orders in this step.
+  Private evidence: `state/marks-release-0f2fa44/`. No claim of complete total-return
+  reporting, paper-trial activation or live readiness follows from this rollout.
