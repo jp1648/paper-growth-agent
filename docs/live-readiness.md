@@ -2653,3 +2653,24 @@ and unchanged intent/order/activity counts (2/1/3). CI 42453267332 and 424532719
 passed for acceptance-reporting commit 082d6b5. CI 42453447093 passed for the
 combined recovery test commit d0b2cf1; its second workflow was still running when
 this entry was written. No new image was deployed.
+
+#### Fee comparison follow-up
+
+Read-only extraction of the existing fee confirms both records report a CAT fee,
+USD -0.01, executed status and business date November 6. Their IDs differ. The
+stream's settlement date is November 9, while legacy `date` is November 6 and
+matches stream `details.system_date`. These comparisons and source hashes are
+assert-checked in private `fee-comparison.json`; `legacy-fees.json` retains the
+existing ledger record without changing it.
+
+The [migration guide](https://docs.alpaca.markets/us/docs/activity-sse) describes
+legacy identifiers as lacking a common stable ID, but also presents simplified
+ID/date renaming tables. This account's observed fee fields do not support blindly
+applying those tables. Matching amount, type and business date is consistent with
+the same fee, but is not unique identity proof when repeated charges are possible.
+
+Integration constraint: retain stream events as separate evidence until a
+verified cross-feed link exists. Do not combine legacy and stream fee amounts or
+replace the existing activity ID/date. The existing REST ledger remains the
+accounting source; missing-predecessor corrections remain blocked. There is no
+evidence here of an additional fee, and no fee was added, reversed or merged.
