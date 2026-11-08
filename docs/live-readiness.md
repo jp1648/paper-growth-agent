@@ -2138,3 +2138,19 @@ it is not a cloud-host loss or real-broker correction claim.
 
 Validation: 79 process-recovery, backup-recovery and readiness tests passed;
 format, Ruff and diff checks passed. Test-only change; deployed runtime unchanged.
+
+## Cross-response broker order identity collision
+
+HTTP adapter regressions reproduced two previously accepted ambiguous snapshots:
+separate tracked-order lookups sharing a broker order ID, and a tracked lookup
+sharing the ID of a different open order. Each response individually matched its
+requested client ID, so the existing per-lookup checks did not reject the combined
+identity collision. The adapter now checks unique broker order IDs after merging
+open and tracked responses, before fetching positions/account or returning a
+snapshot. A tracked order may still refresh the status of the same open order.
+Both new cases reject the collision and recover with distinct IDs; existing
+status-refresh and missing-order tests continue to pass. These are fixture HTTP
+responses, not an observed incident in the user's paper account.
+
+Validation: 136 adapter/execution/readiness tests and full offline suite 710
+passed, 7 skipped; format, Ruff and diff checks passed. Deployment still pending.

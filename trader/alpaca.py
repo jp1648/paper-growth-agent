@@ -116,11 +116,14 @@ class AlpacaBroker:
                 ):
                     raise ValueError("Tracked broker order identity changed")
                 by_client[cid] = order
+        orders = list(by_client.values())
+        if len({order["id"] for order in orders}) != len(orders):
+            raise ValueError("Duplicate broker order identity across snapshot responses")
         positions = self.request("GET", "/v2/positions")
         return Snapshot(
             account=self.account(),
             positions=positions,
-            orders=list(by_client.values()),
+            orders=orders,
             activities=activities,
             captured_at=now(),
         )

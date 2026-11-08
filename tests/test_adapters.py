@@ -203,6 +203,40 @@ def test_activity_pagination_and_lookup404(keys):
     assert broker.lookup("unknown") is None
 
 
+@pytest.mark.parametrize("open_first", [True, False])
+def test_combined_snapshot_rejects_shared_broker_order_id_and_recovers(keys, open_first):
+    conflicting = True
+
+    def handler(req):
+        path = req.url.path
+        if path.endswith("activities"):
+            return httpx.Response(200, json=[])
+        if path.endswith("by_client_order_id"):
+            cid = req.url.params["client_order_id"]
+            return httpx.Response(200, json={"id": "shared" if conflicting else cid, "client_order_id": cid})
+        if path.endswith("orders"):
+            return httpx.Response(
+                200,
+                json=[{"id": "shared" if conflicting else "first", "client_order_id": "first"}]
+                if open_first
+                else [],
+            )
+        if conflicting:
+            pytest.fail("Ambiguous order IDs must stop before positions/account reads")
+        return httpx.Response(200, json={"id": "fixture"} if path.endswith("account") else [])
+
+    broker = AlpacaBroker(Settings(), httpx.Client(transport=httpx.MockTransport(handler)))
+    tracked = ["second"] if open_first else ["first", "second"]
+    with pytest.raises(ValueError, match="order identity"):
+        broker.snapshot(AT.isoformat(), tracked)
+    conflicting = False
+    snapshot = broker.snapshot(AT.isoformat(), tracked)
+    assert {(o["id"], o["client_order_id"]) for o in snapshot.orders} == {
+        ("first", "first"),
+        ("second", "second"),
+    }
+
+
 @pytest.mark.parametrize("feed,coverage", [("iex", "IEX exchange only"), ("sip", "US consolidated SIP")])
 def test_feed_metadata_and_halt_feed(keys, monkeypatch, feed, coverage):
     monkeypatch.setattr("trader.alpaca.now", lambda: AT)
