@@ -325,3 +325,31 @@ calendar SHA-256 `d92bfbce23eb39b4a3436c7eb2ef93e9eebc69ec74d1868ade3af4148ba076
 The calendar exactly matches the earlier retained broker response. Private evidence
 is `state/benchmark-close-probe-20261108/daily-capture/`. The source was loaded only
 for the isolated capture process; the running executor image was not changed.
+
+## Offline reuse and price-revision review
+
+`validate-daily-prices CAPTURE_DIRECTORY` validates the retained request, calendar
+hash, terminal status, page hashes/sizes, consecutive page names, pagination chain,
+raw/SIP/USD/as-of policy and exact requested symbol/session matrix. Calendar dates
+are checked relative to the capture time, not the date of later analysis. It
+refuses symlinked files, nonlocal page names, changed policies, incomplete captures
+and mismatched counts. Capture and validation share the same field checks.
+
+`compare-daily-prices BEFORE_DIRECTORY AFTER_DIRECTORY` first validates both
+captures, requires identical parameters and calendar hash, and rejects a purported
+replacement captured before the original. It reports changed bars with both
+versions and a separate `close_changed` flag. A volume-only change remains visible
+without pretending it changes closing valuation. No files, observations or ledger
+entries are rewritten, and no revised capture is automatically approved.
+
+Both commands are offline and configuration-free. Their output is printed for
+retention. No-change means only no differences between those two captured versions;
+it does not prove provider finality. Hash validation is not source authentication:
+a party able to replace both receipts and pages can replace the claimed data.
+Both still refuse to claim trial acceptance. Comparing different windows or symbol
+mapping policies requires a separate explicit reconciliation, not this command.
+
+The offline reader was exercised against the retained real November 2–6 capture:
+all 15 marks passed, with the exact original broker-calendar hash. Synthetic tests
+exercise corruption, missing rows with recomputed hashes, unconsumed cursors,
+policy changes, changed prices versus volume, immutable originals and CLI isolation.

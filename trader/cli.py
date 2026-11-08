@@ -82,6 +82,11 @@ def main(argv=None):
     )
     paper_observations.add_argument("--input", required=True)
     paper_observations.add_argument("--output", required=True)
+    validate_prices = sub.add_parser("validate-daily-prices", help="Offline retained price integrity check")
+    validate_prices.add_argument("directory")
+    compare_prices = sub.add_parser("compare-daily-prices", help="Offline retained price revision comparison")
+    compare_prices.add_argument("before")
+    compare_prices.add_argument("after")
     prices = sub.add_parser("capture-daily-prices", help="Retain raw historical SIP marks; no broker")
     prices.add_argument("symbols", nargs="+")
     prices.add_argument("--calendar", required=True, help="Retained broker calendar JSON")
@@ -103,6 +108,16 @@ def main(argv=None):
     entitlement.add_argument("directory")
     entitlement.add_argument("--input", required=True)
     args = parser.parse_args(argv)
+    if args.command in {"validate-daily-prices", "compare-daily-prices"}:
+        from .price_capture import compare_prices, validate_prices
+
+        result = (
+            validate_prices(args.directory)
+            if args.command == "validate-daily-prices"
+            else compare_prices(args.before, args.after)
+        )
+        print(dumps(result))
+        return 0
     if args.command == "build-paper-observations":
         from .paper_observations import build_file
 

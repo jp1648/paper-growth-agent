@@ -175,3 +175,118 @@ def test_invalid_request_never_contacts_provider(calendar, tmp_path, fault):
     with pytest.raises(ValueError):
         capture_prices(p, symbols, calendar, tmp_path / "capture")
     assert not (tmp_path / "capture").exists()
+
+
+@pytest.fixture
+def captured(calendar, tmp_path):
+    from trader.price_capture import validate_prices
+
+    root = tmp_path / "retained"
+    capture_prices(
+        provider(lambda r: httpx.Response(200, json={"bars": {"SPY": bars()}, "next_page_token": None})),
+        ["SPY"],
+        calendar,
+        root,
+    )
+    assert len(validate_prices(root)["marks"]) == 2
+    return root
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "hash",
+        "calendar",
+        "request",
+        "path",
+        "symlink",
+        "failed",
+        "count",
+        "cursor",
+        "coverage",
+        "policy",
+        "time",
+    ],
+)
+def test_offline_reader_rejects_corrupt_or_incomplete_capture(captured, fault):
+    from trader.price_capture import validate_prices
+
+    mpath = captured / "manifest.json"
+    manifest = json.loads(mpath.read_text())
+    page = captured / "page-001.json"
+    if fault == "hash":
+        page.write_text(page.read_text() + " ")
+    elif fault == "calendar":
+        (captured / "calendar.json").write_text("[]")
+    elif fault == "request":
+        (captured / "request.json").write_text("{}")
+    elif fault == "path":
+        manifest["pages"][0]["file"] = "../outside.json"
+    elif fault == "symlink":
+        target = captured / "original.json"
+        page.rename(target)
+        page.symlink_to(target)
+    elif fault == "failed":
+        manifest["status"] = "failed"
+    elif fault == "count":
+        manifest["unique_marks"] = 3
+    elif fault == "time":
+        manifest["finished_at"] = "2020-01-01T00:00:00Z"
+    elif fault == "policy":
+        manifest["params"]["adjustment"] = "split"
+        request = json.loads((captured / "request.json").read_text())
+        request["params"] = manifest["params"]
+        (captured / "request.json").write_text(json.dumps(request))
+    else:
+        body = json.loads(page.read_text())
+        if fault == "cursor":
+            body["next_page_token"] = "remaining"
+        else:
+            body["bars"]["SPY"].pop()
+        page.write_text(json.dumps(body))
+        raw = page.read_bytes()
+        manifest["pages"][0].update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+    mpath.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        validate_prices(captured)
+
+
+def test_revision_comparison_retains_original_and_separates_price_from_volume(captured, calendar, tmp_path):
+    from trader.price_capture import compare_prices
+
+    original = {p.name: p.read_bytes() for p in captured.iterdir()}
+    revised = bars()
+    revised[0]["c"] = "99"
+    revised[1]["v"] = 50
+    new = tmp_path / "new"
+    capture_prices(
+        provider(lambda r: httpx.Response(200, json={"bars": {"SPY": revised}, "next_page_token": None})),
+        ["SPY"],
+        calendar,
+        new,
+    )
+    result = compare_prices(captured, new)
+    assert result["status"] == "revisions_require_review"
+    assert [r["close_changed"] for r in result["changes"]] == [True, False]
+    assert {p.name: p.read_bytes() for p in captured.iterdir()} == original
+    assert compare_prices(captured, captured)["changes"] == []
+    other = tmp_path / "other"
+    capture_prices(
+        provider(lambda r: httpx.Response(200, json={"bars": {"QQQ": bars()}, "next_page_token": None})),
+        ["QQQ"],
+        calendar,
+        other,
+    )
+    with pytest.raises(ValueError, match="identical"):
+        compare_prices(captured, other)
+
+
+def test_offline_price_cli_has_no_configuration_or_provider(captured, monkeypatch, capsys):
+    from trader import cli
+
+    monkeypatch.setattr(cli.Settings, "load", lambda p: pytest.fail("No configuration needed"))
+    monkeypatch.setattr(cli, "AlpacaData", lambda p: pytest.fail("No provider allowed"))
+    assert cli.main(["validate-daily-prices", str(captured)]) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "retained_matrix_validated"
+    assert cli.main(["compare-daily-prices", str(captured), str(captured)]) == 0
+    assert json.loads(capsys.readouterr().out)["changes"] == []

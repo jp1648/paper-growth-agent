@@ -2755,3 +2755,16 @@ subscription change, paid model call or broker order. The running image remains
 the previously verified paused release; this new capture command is not deployed
 there. Source-finality/revision handling, matched portfolio marking, distributions,
 complete cost allocation and independent acceptance still block trial activation.
+
+### Retained price integrity and revision comparison
+
+Offline `validate-daily-prices` now rechecks captures before reuse, including
+request/calendar agreement, bounded local pages, hashes, exhausted pagination,
+raw SIP policy and the full supplied symbol/session matrix. Capture and validation
+share field checks. `compare-daily-prices` preserves both versions and reports
+price and nonprice revisions separately; it never restates returns automatically.
+The real retained 15-mark capture passed this reader. Full local suite: **864
+passed, 7 skipped**; 34 focused price-capture tests passed, Ruff and formatting
+passed. No network request, paid model call, order or deployment occurred in this
+step. Authentication, source finality, economic accounting and trial acceptance
+are explicitly not inferred from file hashes or an unchanged comparison.
