@@ -1555,3 +1555,13 @@ operator attestation, not independent API verification of delivery.
   window shows 47 requests. These are new reconciliation inputs, not an accepted
   per-run allocation or proof that the timed-out request was free. Unknown spend
   remains unchanged and paid research remains blocked. No new orders were sent.
+- Further provider reconciliation: all 47 known responses match the incident's
+  provider request counts and input/output tokens exactly by model (Astra 9,
+  Sol 34, Terra 4). Every full-day billing line-item token quantity also matches
+  the activity export. The day includes default and incentivized usage tiers.
+  Assuming incentivized usage is zero-priced, default-tier line-item rates imply
+  $1.92903470 for the incident; this is a conditional allocation, NOT verified
+  settlement. CSV exports do not independently establish that tier-pricing
+  assumption. Reproducible private comparison with assertions and source hashes:
+  `state/charge-reconciliation/provider-20261108/compare.py` and `comparison.json`.
+  The original unknown charge remains preserved and no paid retry was made.
