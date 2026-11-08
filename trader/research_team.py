@@ -25,9 +25,11 @@ from .alpaca import safe_error
 from .evidence import EvidenceTooLarge
 from .financials import (
     MissingAnnualFact,
+    NormalizationBridge,
     annual_cash_flow,
     cash_flow_diagnostics,
     normalization_supported,
+    normalized_cash_flow,
     valuation_diagnostics,
 )
 from .models import Decision, Model, dec, dt, dumps, now
@@ -143,9 +145,15 @@ ROLES = {
             "justified cash-flow assumptions. Supply financial_source_id and financial_period_end from original "
             "structured facts: matched annual USD operating cash flow, USD capex and diluted weighted-average shares "
             "from one coherent filing accession/date/form. Do not mix amended and older facts. "
-            "cash_flow_per_share must equal (CFO-capex)/shares rounded to six decimals. The historical proxy "
+            "Without normalization_bridge, cash_flow_per_share must equal (CFO-capex)/shares rounded to six decimals. "
+            "For an explicit equity normalization bridge, source SBC is deducted once as cash-equivalent compensation. "
+            "Provide four annual USD adjustments (cash_taxes, working_capital, capital_expenditure, net_borrowing), each with rationale and retained evidence, including justified zeros. "
+            "Tax/working-capital/capex amounts are DELTAS relative to their effects already in historical CFO-capex; net_borrowing is an additional equity financing flow. "
+            "Supply a dated valuation share base, evidence and rationale for constant shares under cash-equivalent compensation; address existing award claims and financing. "
+            "Do not also deduct SBC-offset repurchases or mechanically add excess cash/subtract debt. The tool computes a provisional per-share bridge, not approval of assumptions. "
+            "All bridge evidence must appear in the valuation report. If any material adjustment, reinvestment or share treatment is unsupported, disclose that gap. The historical proxy "
             "does not establish normalized earnings. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Flag unresolved_material_gaps if material adjustments are unavailable; never invent adjustments or treat the historical proxy as normalized cash. A missing or unresolved normalization review blocks BUY/ADD. Return its calculation_id and exact bear/base/bull values. "
-            "Use inspect_cash_flow for available annual SBC, distribution and cash-tax diagnostics; missing inputs are gaps, and these diagnostics do not establish normalization. "
+            "Use inspect_cash_flow for annual accounting diagnostics or pass the proposed normalization_bridge to obtain its exact per-share result before calling value_scenarios with that same bridge. Missing inputs are gaps; arithmetic does not establish economic support. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Explain sensitivity and expectations embedded in today's price. If this simplified "
             "cash-flow model is inappropriate or inputs are insufficient, return null for calculation_id "
@@ -710,6 +718,7 @@ class ResearchDesk:
             discount_rate: str,
             terminal_multiples: list[str],
             years: int,
+            normalization_bridge: NormalizationBridge | None = None,
         ) -> dict:
             """Decimal DCF: annual per-share cash flows plus terminal cash-flow multiple. Three ordered bear/base/bull cases; rates are fractions. Justify inputs using cited evidence."""
             with self.lock:
@@ -727,10 +736,28 @@ class ResearchDesk:
                     "reason": str(exc),
                     "note": "No calculation created. Report the material evidence gap and unsupported valuation; never infer the missing input.",
                 }
-            if dec(cash_flow_per_share) != dec(provenance["cash_flow_per_share"]):
+            bridge_result = None
+            if normalization_bridge is not None:
+                with self.lock:
+                    bridge_sources = copy.deepcopy(self.sources)
+                try:
+                    bridge_result = normalized_cash_flow(
+                        source,
+                        financial_period_end,
+                        self.evaluation_at or now(),
+                        normalization_bridge,
+                        bridge_sources,
+                    )
+                except MissingAnnualFact as exc:
+                    return {
+                        "available": False,
+                        "reason": str(exc),
+                        "note": "No normalized calculation created; source SBC is required, not assumed zero.",
+                    }
+            required_cash = (bridge_result or provenance)["cash_flow_per_share"]
+            if dec(cash_flow_per_share) != dec(required_cash):
                 raise ValueError(
-                    "Cash flow must equal source-derived annual per-share proxy: "
-                    + provenance["cash_flow_per_share"]
+                    "Cash flow must equal source-derived proxy or explicit bridge: " + required_cash
                 )
             cash, discount = dec(cash_flow_per_share), dec(discount_rate)
             growth, multiples = list(map(dec, growth_rates)), list(map(dec, terminal_multiples))
@@ -766,6 +793,9 @@ class ResearchDesk:
                     "years": years,
                 },
             }
+            if bridge_result is not None:
+                result["normalization_bridge"] = bridge_result
+                result["inputs"]["normalization_bridge"] = bridge_result["assumptions"]
             identifier = "calculation-" + hashlib.sha256(dumps(result).encode()).hexdigest()[:20]
             result["calculation_id"] = identifier
             with self.lock:
@@ -773,14 +803,28 @@ class ResearchDesk:
             return result
 
         @tool
-        def inspect_cash_flow(financial_source_id: str, financial_period_end: str) -> dict:
-            """Inspect source-bound annual SBC, distribution and cash-tax arithmetic; not normalized value."""
+        def inspect_cash_flow(
+            financial_source_id: str,
+            financial_period_end: str,
+            normalization_bridge: NormalizationBridge | None = None,
+        ) -> dict:
+            """Historical accounting diagnostics, or exact arithmetic for an explicit provisional normalization bridge."""
             with self.lock:
                 source = copy.deepcopy(self.sources.get(financial_source_id))
                 target_sources = {item["id"] for item in self.companies[self.context["symbol"]]["sources"]}
             if source is None or financial_source_id not in target_sources:
                 raise ValueError("Financial evidence must belong to the company being valued")
             try:
+                if normalization_bridge is not None:
+                    with self.lock:
+                        bridge_sources = copy.deepcopy(self.sources)
+                    return normalized_cash_flow(
+                        source,
+                        financial_period_end,
+                        self.evaluation_at or now(),
+                        normalization_bridge,
+                        bridge_sources,
+                    )
                 return cash_flow_diagnostics(source, financial_period_end, self.evaluation_at or now())
             except MissingAnnualFact as exc:
                 return {
@@ -860,6 +904,14 @@ class ResearchDesk:
             provenance = (calculation or {}).get("financial_provenance")
             if not provenance or provenance["source_id"] not in result["evidence_ids"]:
                 raise ValueError("Valuation must cite its financial input provenance")
+            if (
+                calculation
+                and calculation.get("normalization_bridge")
+                and not set(calculation["normalization_bridge"]["evidence_ids"]).issubset(
+                    result["evidence_ids"]
+                )
+            ):
+                raise ValueError("Valuation must cite all normalization bridge evidence")
             if not calculation or any(
                 result[k] != calculation[k] for k in ("bear_value", "base_value", "bull_value")
             ):

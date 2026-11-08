@@ -10,12 +10,12 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .financials import annual_cash_flow, normalization_supported
+from .financials import annual_cash_flow, normalization_supported, normalized_cash_flow
 from .models import Decision
 from .research_team import Catalysts, Critique, Research, Valuation
 
 SCHEMAS = {"business": Research, "catalysts": Catalysts, "valuation": Valuation, "adversarial": Critique}
-SCORING_CONTRACT = "financial-provenance-v5"
+SCORING_CONTRACT = "financial-provenance-v6"
 
 
 def fingerprint(value):
@@ -111,6 +111,7 @@ def score(case, candidate, review=None):
     if candidate.get("derived_evidence_ids"):
         failures.append("unverified_derived_evidence")
     originals = {s["id"]: s for s in case["inputs"]["sources"]}
+    verified_sources = dict(originals)
     sources = set(originals)
     for source in candidate.get("sources", []):
         if source.get("id") in originals:
@@ -129,6 +130,7 @@ def score(case, candidate, review=None):
             )
             if passage and source.get("content") == passage and source.get("id") == identifier:
                 sources.add(identifier)
+                verified_sources[identifier] = source
                 matched = True
                 break
         if not matched:
@@ -173,9 +175,22 @@ def score(case, candidate, review=None):
                 provenance = annual_cash_flow(
                     originals[source_id], inputs["financial_period_end"], timestamp(case["cutoff"])
                 )
+                bridge = None
+                if inputs.get("normalization_bridge") is not None:
+                    bridge = normalized_cash_flow(
+                        originals[source_id],
+                        inputs["financial_period_end"],
+                        timestamp(case["cutoff"]),
+                        inputs["normalization_bridge"],
+                        verified_sources,
+                    )
+                    if not set(bridge["evidence_ids"]).issubset(valuation["evidence_ids"]):
+                        failures.append("unverified_normalization_evidence")
                 if (
                     calc.get("financial_provenance") != provenance
-                    or Decimal(inputs["cash_flow_per_share"]) != Decimal(provenance["cash_flow_per_share"])
+                    or calc.get("normalization_bridge") != bridge
+                    or Decimal(inputs["cash_flow_per_share"])
+                    != Decimal((bridge or provenance)["cash_flow_per_share"])
                     or source_id not in valuation["evidence_ids"]
                 ):
                     failures.append("unverified_financial_provenance")

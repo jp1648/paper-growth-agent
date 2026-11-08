@@ -350,3 +350,46 @@ mechanically completed sufficient case but zero accepted decisions: completion
 100%, reviewed acceptance 0%. Its $3.8150975 recorded known cost therefore has no
 cost-per-accepted-decision value. This is the original two-case recording, not
 the later missing-evidence reruns or cumulative programme spend.
+
+### Explicit numerical normalization bridge (scoring contract v6)
+
+`inspect_cash_flow` and `value_scenarios` now accept an optional
+`normalization_bridge`. Without it, the historical proxy and calculation identity
+are unchanged. With it, the calculation retains original annual provenance and
+derives:
+
+`(annual CFO - annual capex - source annual SBC + adjustment total) / valuation shares`
+
+SBC must be explicitly present in matching-period/accession/date/form USD facts,
+including an evidenced zero; missing SBC is a material gap. Four adjustments are
+mandatory, one each for `cash_taxes`, `working_capital`, `capital_expenditure` and
+`net_borrowing`. Each has a signed decimal-string `annual_delta_usd`, rationale
+and original `evidence_ids`, even when zero. Tax, working-capital and capex inputs
+are changes from effects already included in the historical proxy. Net borrowing
+is an added financing flow, since it was not included in CFO-minus-capex. The
+calculator cannot infer these adjustments from a narrative or approve them.
+
+The bridge also requires `valuation_shares`, `share_base_date`,
+`share_evidence_ids`, `share_rationale` and `financing_and_claims`. The dated base
+must fall between fiscal period-end and the day before the research cutoff.
+Its actual amount, claim coverage and suitability still require source review.
+This implementation uses a cash-equivalent SBC expense and a constant share base;
+it does not simultaneously charge dilution-offset repurchases. Existing award
+claims, sustainable compensation expense, interest/financing consistency and
+required reinvestment remain explicit economic-review responsibilities. It does
+not add net cash to equity value or subtract enterprise debt mechanically.
+
+Call `inspect_cash_flow` with the proposed bridge first to obtain the exact
+six-decimal per-share amount; pass the same bridge and amount to `value_scenarios`.
+The saved calculation includes the complete bridge and source references, and
+the valuation report must cite all of them. Frozen replay reconstructs the
+bridge from verified original sources/passages and rejects modified results,
+incorrect arithmetic or missing citations. Comparisons require both recordings
+rescored under `financial-provenance-v6`; historical files are never rewritten.
+
+The model's normalization-review flag still represents a structured judgment.
+This new arithmetic path does not authenticate assumption amounts merely because
+their citation IDs exist, calibrate confidence, justify scenario growth/multiples
+or create independent approval. Unsupported choices must retain material gaps;
+mechanical success remains distinct from reviewed acceptance. Apple has not been
+rerun or approved using this bridge. Current deployed code remains unchanged.

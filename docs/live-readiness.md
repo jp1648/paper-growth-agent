@@ -2674,3 +2674,27 @@ verified cross-feed link exists. Do not combine legacy and stream fee amounts or
 replace the existing activity ID/date. The existing REST ledger remains the
 accounting source; missing-predecessor corrections remain blocked. There is no
 evidence here of an additional fee, and no fee was added, reversed or merged.
+
+### Numerical normalization path — local, not yet model-validated
+
+The valuation tool can now retain an explicit equity cash-flow bridge instead of
+being restricted to the historical proxy. It deducts matching source SBC once,
+records four individually cited adjustments, and uses a dated, explained share
+base. `inspect_cash_flow` returns its exact arithmetic before valuation; the
+report must cite every bridge source. Frozen scoring contract v6 reconstructs the
+bridge and rejects tampering or incorrect per-share inputs. Original calculations
+without a bridge keep their original identity and historical-proxy meaning.
+
+Verification: **830 passed, 7 skipped** in the full local Python suite; Ruff
+passed. Fifteen new tests cover independent bridge arithmetic, original source
+immutability, missing/mixed/negative SBC, missing/duplicate categories, future or
+unknown evidence, invalid shares/amounts, tool integration, citation enforcement
+and frozen replay tampering. The synthetic completed result remains pending
+human review, not accepted investment research.
+
+This provides the calculation path described in
+[the normalization contract](evaluation.md#explicit-numerical-normalization-bridge-scoring-contract-v6).
+It does not establish Apple's recurring tax, reinvestment, sustainable SBC or
+share assumptions. Growth/multiple economics, independent review and an unseen
+case cohort remain outstanding. No paid call, deployment, frozen-recording
+rewrite, trial activation or trading-state change occurred.

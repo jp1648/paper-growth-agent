@@ -1,9 +1,95 @@
-"""A narrow, source-bound annual cash-flow proxy; not an assertion of fair value."""
+"""Source-bound cash-flow arithmetic and explicit assumptions; not a fair-value certification."""
 
 import re
 from datetime import date
+from typing import Literal
 
-from .models import dec, dt
+from pydantic import Field
+
+from .models import Model, dec, dt
+
+
+class CashFlowAdjustment(Model):
+    category: Literal["cash_taxes", "working_capital", "capital_expenditure", "net_borrowing"]
+    annual_delta_usd: str
+    rationale: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+
+
+class NormalizationBridge(Model):
+    """Explicit equity cash-flow assumptions; arithmetic does not certify economics."""
+
+    adjustments: list[CashFlowAdjustment] = Field(min_length=4, max_length=4)
+    valuation_shares: str
+    share_base_date: str
+    share_evidence_ids: list[str] = Field(min_length=1)
+    share_rationale: str = Field(min_length=1)
+    financing_and_claims: str = Field(min_length=1)
+
+
+def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
+    """Reproduce an explicit bridge; selected adjustments remain reviewable assumptions."""
+    bridge = NormalizationBridge.model_validate(bridge).model_dump(mode="json")
+    proxy = annual_cash_flow(source, period_end, cutoff)
+    sbc = annual_facts(source, period_end, cutoff, [("StockBasedCompensation", "USD")])[
+        "StockBasedCompensation"
+    ]
+    baseline = next(iter(proxy["facts"].values()))
+    if any(sbc[k] != baseline[k] for k in ("start", "end", "accn", "filed", "form")):
+        raise ValueError("Normalization SBC and cash flows must use the same filing basis")
+    categories = {"cash_taxes", "working_capital", "capital_expenditure", "net_borrowing"}
+    if {row["category"] for row in bridge["adjustments"]} != categories:
+        raise ValueError("Require each of the four normalization categories exactly once, including zeros")
+    refs = set(bridge["share_evidence_ids"])
+    for row in bridge["adjustments"]:
+        if not row["rationale"].strip():
+            raise ValueError("Normalization adjustments require a rationale")
+        refs.update(row["evidence_ids"])
+    if not refs or any(not ref.strip() or ref not in sources for ref in refs):
+        raise ValueError("Normalization assumptions require retained original evidence")
+    for ref in refs:
+        original = sources[ref]
+        for key in ("available_at", "published_at"):
+            if original.get(key) and dt(original[key]) > cutoff:
+                raise ValueError("Normalization cites future evidence")
+        if original.get("source") == "SEC EDGAR filing passage" and not original.get("content", "").strip():
+            raise ValueError("Normalization cites an empty filing passage")
+    share_date = date.fromisoformat(bridge["share_base_date"])
+    if (
+        share_date.isoformat() != bridge["share_base_date"]
+        or not date.fromisoformat(period_end) <= share_date < cutoff.date()
+        or not bridge["share_rationale"].strip()
+        or not bridge["financing_and_claims"].strip()
+    ):
+        raise ValueError("Require dated share-base evidence and explicit financing/claim treatment")
+    shares, compensation = dec(bridge["valuation_shares"]), dec(sbc["val"])
+    if shares <= 0 or compensation < 0:
+        raise ValueError("Require positive shares and nonnegative source SBC")
+    cash = dec(proxy["facts"]["NetCashProvidedByUsedInOperatingActivities"]["val"])
+    capex = dec(proxy["facts"]["PaymentsToAcquirePropertyPlantAndEquipment"]["val"])
+    adjustment = sum((dec(row["annual_delta_usd"]) for row in bridge["adjustments"]), dec(0))
+    normalized = cash - capex - compensation + adjustment
+    if normalized <= 0:
+        raise ValueError("Positive bridged equity cash flow unavailable; do not fabricate a valuation")
+    return {
+        "bridge_version": 1,
+        "historical_provenance": proxy,
+        "sbc_fact": sbc,
+        "historical_cfo_less_capex_usd": str(cash - capex),
+        "sbc_expense_equivalent_usd": str(compensation),
+        "adjustments_total_usd": str(adjustment),
+        "bridged_equity_cash_flow_usd": str(normalized),
+        "cash_flow_per_share": str((normalized / shares).quantize(dec("0.000001"))),
+        "assumptions": bridge,
+        "evidence_ids": sorted(refs | {source["id"]}),
+        "limitations": [
+            "Source SBC is deducted once as cash-equivalent compensation; no additional dilution-offset repurchases.",
+            "Constant valuation share base assumes cash-equivalent future compensation, not funded future buybacks.",
+            "Tax/working-capital/capex deltas replace effects already in CFO-capex; borrowing adds a net financing flow.",
+            "Equity basis retains historical interest in CFO; no enterprise-value debt subtraction or automatic net-cash addition.",
+            "Adjustment amounts, share base, existing award claims and forecasts require independent source/economic review.",
+        ],
+    }
 
 
 class MissingAnnualFact(ValueError):
@@ -176,5 +262,5 @@ def valuation_diagnostics(inputs, target_price):
         "target_price": str(target),
         "rows": rows,
         "required_multiple_formula": "(target price - PV of annual cash flows) / discounted final-year cash flow",
-        "limitation": "Sensitivity of historical-proxy assumptions, not supported forecasts or normalized fair value. A negative required multiple means interim cash flows alone exceed the target.",
+        "limitation": "Sensitivity of supplied cash-flow assumptions, not approval of forecasts or normalized fair value. A negative required multiple means interim cash flows alone exceed the target.",
     }
