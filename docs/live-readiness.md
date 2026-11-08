@@ -2615,3 +2615,41 @@ or replacement-host recovery after loss of the original disk. Broker state and
 account/activity responses are fixtures; only process death, SQLite restoration
 and the failed loopback transport are real. No provider requests, paid calls,
 deployment or trading-state changes occurred.
+
+### Paper activity-stream contract probe (November 8)
+
+A bounded read-only GET to the documented paper
+`/v2beta1/events/activities` endpoint returned HTTP 200 and ended for the requested
+November 1–November 8 06:00 UTC historical interval. The 1,073-byte raw SSE response,
+request manifest and hash are retained privately in
+`state/activity-contract-probe-20261108/`. No retry, ledger mutation or order was
+made. The capture is not certified complete history.
+
+It returned two events: the existing one-share AAPL fill at $344.33 and a $0.01
+fee. The trade `ref_id` matches the saved legacy fill's ID suffix; order, symbol,
+side, quantity, price and signed cash amount also match. The fee's `ref_id` does
+**not** match any of the three retained legacy activity IDs by that rule. Do not
+silently alias it or add its amount to the ledger again. The comparison result is
+retained separately; it does not establish a universal identity mapping.
+
+The [paper API reference](https://docs.alpaca.markets/us/reference/subscribetoactivitiessse)
+documents bounded historical queries and correction links through `previous_id`.
+The [activity integration guide](https://docs.alpaca.markets/us/docs/activity-sse)
+distinguishes replay cursors from activity identities and describes reversal of a
+linked predecessor before applying a correction. Its partner-oriented migration
+discussion is not proof that this account's legacy REST IDs are interchangeable.
+
+No correction or bust occurred in the capture. Remaining work: establish fee and
+legacy-ID mapping, retain predecessor-linked correction chains, handle missing
+predecessors and duplicate/reordered delivery, prove atomic cash/share reversal
+and reopened-order reservations, and verify against account/broker evidence.
+The current zero-quantity bust gate stays blocked; the beta endpoint is not wired
+into production accounting on the strength of this probe.
+
+The same read-only check confirmed deployed image 156277c remains running,
+executor/proxy/health timer active, healthy reconciliation at
+2026-11-08T06:07:38.752286Z, original experiment/config/pause, one AAPL share,
+and unchanged intent/order/activity counts (2/1/3). CI 42453267332 and 42453271915
+passed for acceptance-reporting commit 082d6b5. CI 42453447093 passed for the
+combined recovery test commit d0b2cf1; its second workflow was still running when
+this entry was written. No new image was deployed.
