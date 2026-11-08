@@ -2768,3 +2768,14 @@ passed, 7 skipped**; 34 focused price-capture tests passed, Ruff and formatting
 passed. No network request, paid model call, order or deployment occurred in this
 step. Authentication, source finality, economic accounting and trial acceptance
 are explicitly not inferred from file hashes or an unchanged comparison.
+
+### Common-mark inventory reconciliation
+
+The offline `reconcile-paper-marks` command now verifies retained price integrity
+and exactly reconciles supplied cash/holdings to reported equity before applying
+one common raw marking basis to portfolio and benchmark. Original equity and the
+mark adjustment are retained separately; broker state is untouched. Thirteen new
+checks and related observation/capture tests passed (**64 focused tests**); Ruff
+passed. Closing inventory truth, corporate-action reconciliation and cost evidence
+are still external requirements, not inferred from an input completeness flag.
+No real portfolio close, total-return series or prospective trial was certified.

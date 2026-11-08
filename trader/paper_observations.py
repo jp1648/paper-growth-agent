@@ -117,3 +117,84 @@ def build_file(source, output):
     with Path(output).open("x") as stream:
         stream.write(json.dumps(result, indent=2, allow_nan=False) + "\n")
     return result
+
+
+def reconcile_marks(capture, document):
+    """Reprice supplied closing inventory without replacing broker accounting."""
+    from .price_capture import validate_prices
+
+    prices = validate_prices(capture)
+    if document.get("version") != 1 or document.get("currency") != "USD":
+        raise ValueError("Require inventory version 1 in USD")
+    if document.get("price_manifest_sha256") != prices["manifest_sha256"]:
+        raise ValueError("Inventory must bind the exact retained price manifest")
+    marks = {(r["date"], r["symbol"]): dec(r["bar"]["c"]) for r in prices["marks"]}
+    sessions = sorted({day for day, _ in marks})
+    rows = document["observations"]
+    if [r["date"] for r in rows] != sessions:
+        raise ValueError("Inventory must cover every captured session in order")
+
+    def amount(value):
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise TypeError("Inventory amounts must be explicit decimal strings or integers")
+        result = dec(value)
+        if result < ZERO:
+            raise ValueError("Negative cash, short inventory or corrections require separate review")
+        return result
+
+    result = []
+    for row in rows:
+        observation = {"date": row["date"]}
+        for side in ("portfolio", "benchmark"):
+            inventory = row[side]
+            if inventory.get("basis") != "regular_session_close" or inventory.get("complete") is not True:
+                raise ValueError("Require complete closing inventory, not a later snapshot")
+            if not isinstance(inventory.get("evidence"), str) or not inventory["evidence"].strip():
+                raise ValueError("Missing inventory reconciliation evidence")
+            cash, equity = amount(inventory["cash"]), amount(inventory["reported_equity"])
+            reported_value, marked_value, seen, positions = ZERO, ZERO, set(), []
+            for position in inventory["positions"]:
+                symbol = position["symbol"]
+                if symbol in seen or (row["date"], symbol) not in marks:
+                    raise ValueError("Duplicate position or missing same-session raw mark")
+                seen.add(symbol)
+                quantity = amount(position["quantity"])
+                if quantity == ZERO:
+                    raise ValueError("Zero positions must be omitted")
+                reported = amount(position["reported_market_value"])
+                marked = quantity * marks[row["date"], symbol]
+                reported_value += reported
+                marked_value += marked
+                positions.append(
+                    {
+                        "symbol": symbol,
+                        "quantity": str(quantity),
+                        "raw_close": str(marks[row["date"], symbol]),
+                        "marked_value": str(marked),
+                        "reported_market_value": str(reported),
+                    }
+                )
+            # Do not hide unexplained components in a balancing residual or tolerance.
+            if cash + reported_value != equity:
+                raise ValueError("Reported cash plus holdings do not exactly reconcile to reported equity")
+            observation[side] = {
+                "reported_equity": str(equity),
+                "cash": str(cash),
+                "marked_equity": str(cash + marked_value),
+                "mark_adjustment": str(marked_value - reported_value),
+                "positions": positions,
+                "inventory_evidence": inventory["evidence"],
+            }
+        result.append(observation)
+    return {
+        "version": 1,
+        "status": "diagnostic_only",
+        "price_manifest_sha256": prices["manifest_sha256"],
+        "observations": result,
+        "limitations": [
+            "Closing inventory and its completeness are supplied claims, not verified by this calculation.",
+            "Raw prices require quantities after same-session splits; inventory must reconcile fills and corporate actions.",
+            "Cash already includes booked fees and distributions; unpaid net entitlements and external expenses remain separate.",
+            "Marked equity is a measurement overlay, not a broker ledger update or trial acceptance.",
+        ],
+    }

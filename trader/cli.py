@@ -82,6 +82,9 @@ def main(argv=None):
     )
     paper_observations.add_argument("--input", required=True)
     paper_observations.add_argument("--output", required=True)
+    inventory = sub.add_parser("reconcile-paper-marks", help="Offline inventory to common raw marks")
+    inventory.add_argument("capture")
+    inventory.add_argument("--input", required=True)
     validate_prices = sub.add_parser("validate-daily-prices", help="Offline retained price integrity check")
     validate_prices.add_argument("directory")
     compare_prices = sub.add_parser("compare-daily-prices", help="Offline retained price revision comparison")
@@ -108,6 +111,11 @@ def main(argv=None):
     entitlement.add_argument("directory")
     entitlement.add_argument("--input", required=True)
     args = parser.parse_args(argv)
+    if args.command == "reconcile-paper-marks":
+        from .paper_observations import reconcile_marks
+
+        print(dumps(reconcile_marks(args.capture, json.loads(Path(args.input).read_text()))))
+        return 0
     if args.command in {"validate-daily-prices", "compare-daily-prices"}:
         from .price_capture import compare_prices, validate_prices
 

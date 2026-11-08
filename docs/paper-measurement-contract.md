@@ -353,3 +353,43 @@ The offline reader was exercised against the retained real November 2–6 captur
 all 15 marks passed, with the exact original broker-calendar hash. Synthetic tests
 exercise corruption, missing rows with recomputed hashes, unconsumed cursors,
 policy changes, changed prices versus volume, immutable originals and CLI isolation.
+
+## Closing inventory to a common marking basis
+
+`reconcile-paper-marks CAPTURE_DIRECTORY --input inventory.json` validates the
+retained price capture, then reprices explicitly supplied closing holdings for
+both the portfolio and benchmark. It is offline and does not update the broker
+ledger, original daily reports or price evidence.
+
+Input version 1 requires `currency: "USD"`, the exact
+`price_manifest_sha256`, and ordered `observations` for every captured session.
+Each row contains `date`, `portfolio` and `benchmark`. Each side supplies
+`basis: "regular_session_close"`, `complete: true`, a nonempty `evidence`
+reference, `cash`, `reported_equity` and `positions`. Each position has `symbol`,
+positive `quantity` and `reported_market_value`. Monetary/quantity values must
+be decimal strings or integers; missing, negative and nonfinite values fail.
+Cash-only inventory uses an empty positions list. Duplicate symbols or a missing
+same-session raw mark fail; there is no fallback to another feed or session.
+
+Cash plus the supplied reported market values must equal reported equity exactly.
+An unexplained residual, including a rounding difference, requires explicit
+source reconciliation; the helper does not silently balance it. For each side
+it reports original equity, cash, position details, `marked_equity` (cash plus
+quantity times raw close), and `mark_adjustment` (new minus original holding
+value). This isolates price-method differences without counting them as a trade
+or changing cash. Cash must already reflect booked trading fees/distributions;
+unpaid net entitlements and external operating expenses remain separate inputs
+to the economic NAV builder. When using marked equity as that builder's equity
+component, retain this reconciliation and its source hash as the evidence.
+
+The supplied inventory must already reflect closing fills, splits and other
+corporate actions. A raw price halving with a doubled quantity preserves value;
+no extra split factor is applied to the price. This arithmetic does not verify
+that an actual split occurred or that the quantity was entitled to change.
+Reinvestment requires its own hypothetical fills/cash record; the helper creates
+none. A later broker snapshot cannot simply be relabeled closing inventory.
+
+Thirteen tests cover independent arithmetic, distinct portfolio/benchmark marks,
+explicit post-split quantities, cash-only holdings, immutable input, missing marks,
+unknown cash, residuals, duplicates, shorts, wrong snapshot basis and offline CLI
+isolation. No real closing inventory was certified by these synthetic tests.
