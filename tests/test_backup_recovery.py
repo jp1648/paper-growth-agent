@@ -259,3 +259,43 @@ def test_existing_checkpoint_with_changed_intent_blocks_post(env, decision, monk
     result = service.execute(decision, "tampered-checkpoint")
     assert result["status"] == "rejected" and broker.submits == 0
     assert "does not match" in result["error"]
+
+
+def test_full_ledger_after_broker_acceptance_recovers_without_resubmit(env, decision, monkeypatch):
+    service, broker, data = env
+    submit = broker.submit
+
+    def accepted_then_capacity(payload, *, before_send=None):
+        order = submit(payload, before_send=before_send)
+        pages = service.store.db.execute("PRAGMA page_count").fetchone()[0]
+        service.store.db.execute(f"PRAGMA max_page_count={pages}")
+        # Additional broker response metadata forces allocation at the save boundary.
+        order["fixture_metadata"] = "x" * 100_000
+        return order
+
+    monkeypatch.setattr(broker, "submit", accepted_then_capacity)
+    with pytest.raises(sqlite3.OperationalError) as failure:
+        service.execute(decision, "accepted-ledger-full")
+    assert failure.value.sqlite_errorcode == sqlite3.SQLITE_FULL
+    assert broker.submits == 1
+    assert service.store.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    assert len(service.store.items("intent")) == 1
+    assert service.store.items("order") == []
+    assert service.reservation_summary() == dec("1001")
+    service.store.db.close()
+    restored = Store(service.cfg.database)
+    try:
+        recovered = Service(service.cfg, restored, broker, data)
+        for _ in range(2):
+            recovered.execute(decision, "accepted-ledger-full")
+        assert broker.submits == 1
+        assert len(restored.items("order")) == 1
+        cid = next(iter(broker.orders))
+        broker.fixture_fill(cid)
+        recovered.reconcile()
+        assert restored.get("audit")["cash"] == "99000"
+        assert restored.get("audit")["shares"]["ACME"] == "10"
+        assert len(restored.items("activity")) == 1
+        assert recovered.reservation_summary() == 0
+    finally:
+        restored.db.close()

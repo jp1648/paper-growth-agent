@@ -17,12 +17,12 @@ not deployment evidence. Do not claim an investment edge from operational tests.
 | 6 | Independently reviewed research cohort | Not achieved. Deterministic fixture validity is not accepted model research; sufficient-evidence completion and separate semantic reviews still need proof. Preserve holdouts and spending limits. |
 | 7 | Execution economics/account restrictions | Deployed spread/depth/participation/notional controls and non-marginable balance checks. Actual settlement/account eligibility, early-close baseline semantics and adverse execution evidence remain open. |
 | 8 | Isolated live release boundary | Paper-only enforcement and negative endpoint/credential tests pass. Draft live contract exists; no live adapter, account-specific release or user approval exists. |
-| 9 | Crash consistency | Seven subprocess SIGKILL boundaries, atomic adjustments, disk/flush faults and checkpoint-restore regressions pass. Deployed mandatory pre-POST local checkpoint and configured verified off-host replication. Full service/infrastructure combined-failure proof remains open. |
+| 9 | Crash consistency | Eight subprocess SIGKILL scenarios, atomic adjustments, disk/flush faults and checkpoint-restore regressions pass. Deployed mandatory pre-POST local checkpoint and configured verified off-host replication. Full service/infrastructure combined-failure proof remains open. |
 | 10 | Single executor and recovery | Actual two-VM owner transfer/restart and storage IAM-loss drill passed. Saved cloud ledger reconciled against paper broker; off-host generation/hash restored. Deployed owner admission guard enabled. Full restored-service failover, in-flight requests and network partition remain open. |
 | 11 | Provider/evidence/stream failure matrix | Future evidence, bounded retrieval, stream failure/backoff and duplicate-hint tests pass. Broader reconnect/backfill, schema drift, throttling, hostile-content and combined-failure matrix remains open. |
 | 12 | Complete authenticated traces | Deployed and verified on production: 557 unique events across six pages, full-event authentication, logout, malformed cursor rejection and mobile rendering. Real Postgres equal-timestamp fixture passes. Broader outage/load scenarios remain open under 11/14. |
 | 13 | Notifications/independent alerts | Deployed bounded Telegram retries, audited uncertain-delivery resolution and correction notices. Actual health/spend emails previously verified against cloud incidents. Actual metric-publisher outage opened a missing-heartbeat incident and delivered an authenticated email; publishing recovered. Automatic incident closure and matching recovery email verified. Whole-host stop/restart and independent alert delivery are now verified below; replacement-host in-flight recovery remains separate. |
-| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; latest local suite has 646 passes with six opt-in skips. Sixteen safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
+| 14 | CI/security/infrastructure gates | Release CI passes backend/Postgres/browser/secrets checks; full offline suite last passed 647 tests with six opt-in skips; subsequent targeted capacity tests also pass. Sixteen safety mutations caught. Executor/dashboard base images pinned and artifacts verified. Broader security/permissions/load/fault coverage remains open; 80% coverage floor is not certification. |
 | 15 | Accounting/performance | Independent lifecycle balances cover distributions, withholding, fees, flows, splits, sales and audited return of capital. Unknown actions fail closed. Full broker cost-basis/correction cases, comparable total-return benchmarks and all operating costs remain open. |
 | 16 | Investment effectiveness | Not achieved. Predeclared unseen cohorts and forward paper observations after costs, independent review and uncertainty reporting remain required. No demonstrated investment edge. |
 
@@ -1340,3 +1340,17 @@ operator attestation, not independent API verification of delivery.
   filesystem ENOSPC, multi-hour outage, or alert-response drill. Lossless traces
   under disk exhaustion are NOT established; capacity monitoring and broader
   recovery acceptance remain open. No trading state or credentials changed.
+
+- Execution storage-capacity drill: after the offline broker accepts an order,
+  restrict the real ledger's SQLite page allocation and supply a large response
+  metadata field so saving the response raises SQLITE_FULL. The durable intent
+  and full cash reservation remain, the failed order write rolls back, and
+  integrity_check passes. Reopening the original ledger and repeating the same
+  execution key twice recovers by broker lookup with exactly one submission.
+  A subsequent confirmed fixture fill reconciles once to ten shares/cash 99000
+  and releases the reservation. Nineteen backup/recovery tests pass.
+- This tests real SQLite capacity failure after acceptance, not physical disk
+  exhaustion, an unavailable lookup endpoint or independent-host recovery. The
+  existing implementation passed; no production change or deployment required.
+  Live launch remains separately gated by the account-specific contract in
+  live-pilot-release.md; none of its missing approvals is inferred from this test.
