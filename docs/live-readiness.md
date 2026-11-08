@@ -1712,3 +1712,24 @@ operator attestation, not independent API verification of delivery.
 
 - Full offline validation after the lookup fix: **658 passed, six opt-in external
   tests skipped**; Ruff lint/format passed. No paid retry after diagnosis.
+
+## Unknown-document recovery deployed (2026-11-08 UTC)
+
+- Release `fde5acb0ab336de73689155ebbc69de691e98014` passed backend,
+  dashboard and secrets CI run `42442048866`. Cloud Build
+  `71bbd7cc-3984-48df-b42c-2340172bc95e` succeeded; all 26 installed Python
+  source hashes matched the release before activation and in the running executor.
+- Deployed immutable image
+  `us-east1-docker.pkg.dev/trader-observatory-20261105/trader/agent@sha256:af422cd8f1c96626152fb3beccad7e695be858b04e9393c1dc316994ddaeb973`.
+  Paused rollout retained a consistent SQLite backup and rollback environment,
+  config and control-marker copies under `state/release-rollback-fde5acb` on the VM.
+- Fresh reconciliation at 03:20:07 UTC and runtime health passed. Executor,
+  Cloud SQL proxy and independent health timer are active. Explicit before/after
+  assertions preserved the original experiment, AAPL one share, trading/activity/
+  adjustment counts, exact spending/config hashes and durable pause. No paid
+  research calls or orders were made in this rollout. Private release evidence:
+  `state/lookup-release-fde5acb/`.
+- Deployment proves availability of the lookup fix, not successful model recovery
+  on the missing-evidence case. The failed recording remains unchanged. Independent
+  review, unseen cases, broader failure/recovery gates and the prospective paper
+  trial remain open; live status remains NO-GO.
