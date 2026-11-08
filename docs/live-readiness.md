@@ -1652,3 +1652,25 @@ operator attestation, not independent API verification of delivery.
   Receipt `provider-reconciliation-20261108-baseline-dev-2`, evidence under
   `state/charge-reconciliation/baseline-20261108/`. Two October 29 bounded unknown
   holds remain ($0.41388 and $0.02); they were not cleared or discarded.
+
+## Remaining October model holds reconciled (2026-11-08 UTC)
+
+- Authenticated October 29 exports were downloaded with all projects/API keys:
+  daily costs grouped by line item and minute-level Responses/Chat activity.
+  All fifteen cost rows are zero USD; no usage appears in the two incident windows.
+  The entire day's zero model bill supports zero allocation to both October holds,
+  rather than relying only on missing request usage or assuming failed calls free.
+- Reconciled the $0.41388 research hold and $0.02 diagnostic hold at $0 each.
+  Original unknown records and prior reservation-review history remain in atomic
+  before/after audits with separate backups. Both self-checks passed; production
+  readback reports **no unresolved model spending records** and integrity `ok`.
+  Pause remained set; no new model requests or broker orders were made.
+- Private CSVs, hashes, receipts and application output are under
+  `state/charge-reconciliation/october-20261108/`. Audit IDs end in `october-1`
+  and `october-2`. Reconciliation is as of the provider export and may require
+  a later adjustment if the provider revises billing. It does not prove a request
+  never executed, clear unknown legacy data-provider operations, establish current
+  available credit, accept research quality or start the forward paper trial.
+- The original uncapped-charge blocker is now resolved. Next paid evaluation still
+  requires current credit/daily allowance verification, stable run ID and the
+  existing research-only cohort controls. Trading remains paused; live NO-GO.
