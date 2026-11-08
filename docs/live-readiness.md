@@ -2977,3 +2977,26 @@ This safety fix is not deployed yet; no production state or broker call changed.
 Validation: **917 passed, 7 skipped** in the full local suite; Ruff and formatting
 passed. Six new regressions cover rejected subtypes without persisted mutations
 and accepted partial fills. This does not close the full-bust acceptance gate.
+
+### Fill/source safety release verified — November 8, 07:22 UTC
+
+Deployed `f0e10109940c45596b9ae456265da7222d98c998`: unsupported fill-subtype
+rejection, archived corporate-action request-policy validation and dividend
+revision comparison. Cloud Build `4c8f9587-3cb8-4d71-8f08-ca7366337779` succeeded
+with the scoped builder. Image:
+`us-east1-docker.pkg.dev/trader-observatory-20261105/trader/agent@sha256:6f0529fd79952edefa3ff56489c3aed9b49366b64c646327d01a95c6a852aa4c`.
+All 31 Python files matched committed hashes in the isolated and running images.
+
+CI `42458268099` passed all jobs: **923 passed, 1 skipped, 86% branch coverage**,
+dependency/security checks and safety mutations. Local mutation checks also passed.
+The actual retained production fill passed the new subtype requirement before
+release. Fresh post-release reconciliation at `2026-11-08T07:22:55.324703+00:00`
+is healthy. Experiment, every document-kind count, the one AAPL share, pause,
+spending and config hashes are unchanged. Executor/proxy/health timer are active.
+Rollback is retained at executor `state/release-rollback-f0e1010`; local private
+receipt/evidence is `state/release-f0e1010/`.
+
+This supersedes preceding not-deployed notes for these fixes. No model calls,
+new orders, liquidation, experiment reset or trading resume occurred. Full-bust
+support, independent research approval and prospective trial acceptance remain
+unproved; neither deployment nor test count changes those gates.
