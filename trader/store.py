@@ -87,6 +87,21 @@ class Store:
             emit("document.adjustment", {"key": item["id"], "value": item}, experiment_id=self.scope)
             emit("explicit_adjustment", item, experiment_id=self.scope)
 
+    def approve_revision(self, identifier, revision):
+        """Commit the accounting correction and its approval receipt together."""
+        receipt = {"id": identifier, **revision}
+        with self.db:
+            self.db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?)",
+                (self.scope, "broker_revision", identifier, dumps(revision)),
+            )
+            self.db.execute(
+                "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+                (self.scope, now().isoformat(), "broker_revision_approved", dumps(receipt)),
+            )
+        emit("document.broker_revision", {"key": identifier, "value": revision}, experiment_id=self.scope)
+        emit("broker_revision_approved", receipt, experiment_id=self.scope)
+
     def save_daily_report(self, sample, report):
         """Publish the measurement, report and audit receipt together."""
         date = sample["date"]

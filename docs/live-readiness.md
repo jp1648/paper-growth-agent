@@ -2082,3 +2082,25 @@ Validation: full offline suite 704 passed, 7 skipped; Ruff and diff checks passe
 - No model requests or orders were submitted. This deployment closes the
   correction-approval ordering defect, not the broader research, normalization,
   operational recovery, forward-trial or live-release gates.
+
+## Atomic broker correction approvals
+
+A SQLite trigger fault reproduced a second correction-path defect: failure of
+`broker_revision_approved` insertion left the already-committed revision document
+active without its receipt. Retrying that revision returned through reconciliation
+and did not repair the missing receipt. This is distinct from inconsistent
+snapshot validation.
+
+`Store.approve_revision` now inserts the immutable revision and receipt in one
+SQLite transaction and emits telemetry only after commit. Service validation,
+sequence numbering, exact before/after evidence and retry handling are unchanged.
+Fault regressions at both document and receipt insertion verify complete rollback,
+unchanged original/effective activity, then one approval and one receipt on retry
+after the fault clears. Correction-notification tests also pass. This guarantees
+local ledger atomicity, not lossless external telemetry delivery.
+
+Validation: 88 focused accounting/revision/notification tests and full offline
+suite 706 passed, 7 skipped; Ruff and diff checks passed. The preceding production
+snapshot (2026-11-08T04:16:34Z) contained zero revision documents, so it provides no
+evidence of an existing orphaned revision requiring repair. No historical records
+were changed. Deployment remains to be verified.

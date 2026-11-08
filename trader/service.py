@@ -698,8 +698,7 @@ class Service:
                 "sequence": 1
                 + max((r.get("sequence", 0) for r in self.store.items("broker_revision")), default=0),
             }
-            self.store.put(identifier, approved, "broker_revision")
-            self.store.log("broker_revision_approved", {"id": identifier, **approved})
+            self.store.approve_revision(identifier, approved)
             return self.reconcile()
 
     def reservation_summary(self):

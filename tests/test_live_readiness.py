@@ -123,6 +123,41 @@ def test_revision_conflicting_snapshot_cannot_persist_approval(env, fault):
     assert service.store.get("fee-1", "activity") == original
 
 
+@pytest.mark.parametrize("table,kind", [("documents", "broker_revision"), ("journal", "broker_revision_approved")])
+def test_revision_storage_failure_rolls_back_approval_and_receipt(env, table, kind):
+    import sqlite3
+
+    service, broker, _ = env
+    original = {"id": "fee-1", "activity_type": "FEE", "net_amount": "-1", "date": "2026-10-21"}
+    broker.activities = [original.copy()]
+    broker.raw_account.update(cash="99999", equity="99999")
+    service.reconcile()
+    corrected = {**original, "net_amount": "-2"}
+    broker.activities = [corrected.copy()]
+    broker.raw_account.update(cash="99998", equity="99998")
+    service.kill_path.write_text("operator review")
+    revision = {"before": original, "after": corrected, "reason": "Verified fee correction"}
+    service.store.db.execute(
+        f"CREATE TEMP TRIGGER fail_revision BEFORE INSERT ON {table} "
+        f"WHEN NEW.kind='{kind}' BEGIN SELECT RAISE(ABORT, 'revision write fault'); END"
+    )
+    with pytest.raises(sqlite3.IntegrityError, match="revision write fault"):
+        service.acknowledge_revision(revision)
+    assert not service.store.items("broker_revision")
+    assert not service.store.events("broker_revision_approved")
+    assert service.store.activities() == [original]
+    service.store.db.execute("DROP TRIGGER fail_revision")
+    service.acknowledge_revision(revision)
+    service.acknowledge_revision(revision)
+    assert service.store.activities() == [corrected]
+    assert len(service.store.items("broker_revision")) == 1
+    assert len(service.store.events("broker_revision_approved")) == 1
+    assert service.store.get("audit")["fees"] == "2"
+    assert service.store.get("fee-1", "activity") == original
+    assert service.kill_path.exists()
+    assert broker.submits == 0
+
+
 @pytest.mark.parametrize("failure", ["unpaused", "wrong_account", "fabricated", "wrong_before"])
 def test_revision_rejects_unverified_evidence(env, failure):
     service, broker, _ = env
