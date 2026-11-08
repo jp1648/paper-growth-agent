@@ -56,19 +56,57 @@ Results distinguish:
 - `mechanical_pass`: includes correct rejection of a fault case; a rejected case is not a completed decision.
 - `acceptance`: pending human review, passed, or failed. Citation existence alone never certifies factual support.
 
-A human reviewer must inspect the exact cited passages against business claims, valuation assumptions and contrary evidence. For abstention, check the explanation against the rubric's expected reason, not just the WATCH action. Spot-check every BUY/ADD and every adequate-evidence case, plus examples of each gap type. Record the reviewer, timestamp and concrete claim/passage notes in a **copy** of the recording, then replay to a new result path:
+A human reviewer must inspect the exact cited passages against business claims,
+valuation assumptions and contrary evidence. For abstention, check the explanation
+against the rubric's expected reason, not just the WATCH action. Review every
+BUY/ADD and every sufficient-evidence case, plus examples of each gap type.
+
+Keep the recording unchanged. Supply a **separate review JSON file** with this
+structure (placeholders must be replaced with actual hashes and review findings):
 
 ```json
-"human_review": {
-  "reviewer": "reviewer name",
-  "reviewed_at": "2026-11-06T18:00:00Z",
-  "claims_supported": true,
-  "abstention_reason_correct": true,
-  "notes": "Identify the checked claims, exact evidence IDs/passages and any assumptions. Explain why the abstention reason is correct or not applicable."
+{
+  "version": 1,
+  "suite_hash": "fingerprint of the parsed suite",
+  "recording_hash": "fingerprint of the parsed recording",
+  "cases": {
+    "actual-case-id": {
+      "case_hash": "fingerprint of this suite case",
+      "candidate_hash": "fingerprint of recording.cases[actual-case-id]",
+      "reviewer": "independent reviewer name",
+      "reviewed_at": "2026-11-06T18:00:00Z",
+      "independent": false,
+      "claims_supported": false,
+      "abstention_reason_correct": false,
+      "notes": "Record actual claim/passage checks, assumptions and contrary evidence. These false values are placeholders, not a completed review."
+    }
+  }
 }
 ```
 
-These are explicit human attestations, not automatically verified identities. Never have the evaluated model certify its own review. Missing reviews remain pending; a negative review fails acceptance even if mechanics pass. Preserve the original recording and its hash.
+Calculate hashes with `trader.evaluation.fingerprint` on parsed JSON values, not
+file bytes. Set each boolean only to the reviewer's actual finding. Include only
+reviewed cases; missing reviews remain pending. Replay without model calls into a
+new output path:
+
+```sh
+uv run paper-agent evaluate \
+  --suite evaluations/annual-filings-v2.json \
+  --responses state/evaluations/candidate/recording.json \
+  --reviews state/evaluations/candidate/reviews.json \
+  --output state/evaluations/candidate/reviewed-results.json \
+  --run-id candidate-reviewed-001
+```
+
+Use the exact suite used to produce the recording, including a development-only
+suite if applicable. Suite, recording, case and candidate hashes must all match.
+The evaluator rejects embedded `human_review`; do not edit a recording to add
+approval. A negative review fails acceptance even if mechanics pass.
+
+These are explicit human attestations, not authenticated identities. Before
+promotion the operator must verify the reviewer's identity and independence.
+Never have the evaluated model certify its own review. Retain the original
+recording and separate review file; results retain the review-file content hash.
 
 Summaries include median/p95 known cost and latency, repeated tools, peak context and timing by stage, unknown-cost calls, and total known cost per valid completed decision. All failed attempts stay in the numerator. Costs are token-rate estimates, not invoices; unknown charges mean the total is incomplete. Stage model seconds can overlap because specialists may run concurrently. Repeated calls count identical tool name/argument pairs actually entering the guarded tool path; blocked/cached delegations are excluded.
 

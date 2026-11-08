@@ -80,5 +80,5 @@ an accepted result. Results retain the review-file content hash for audit.
 Hash binding prevents stale approvals from being silently reused; it does not
 authenticate the named reviewer. Before promotion, the operator must verify the
 reviewer's identity and independence and retain the original review file. No
-review has been supplied or claimed by this implementation. Prior v2 results
-must be rescored before comparison under v3; old results are not rewritten.
+review has been supplied or claimed by this implementation. Results from earlier scoring contracts must be rescored into new output files
+before comparison under the current contract; old results are not rewritten.
