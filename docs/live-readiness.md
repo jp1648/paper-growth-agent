@@ -2154,3 +2154,16 @@ responses, not an observed incident in the user's paper account.
 
 Validation: 136 adapter/execution/readiness tests and full offline suite 710
 passed, 7 skipped; format, Ruff and diff checks passed. Deployment still pending.
+
+## Cross-response order identity rollout — source df2b72d
+
+CI 42446854393 passed all jobs. Cloud Build abcc14a8-e875-4715-a032-b136dc8f43df
+succeeded; deployed digest
+`sha256:7616afa9e2e4ed9e5933f4ace64d082d5adb366d38ed4591f9f60aa99d3cb1f4`.
+All 27 source hashes matched before and after rollout. Fresh reconciliation passed
+at 2026-11-08T04:30:22.636359+00:00; application health, executor, proxy and health
+timer passed. Original experiment, pause, AAPL quantity one, configuration and
+spending hashes were unchanged; intent/order/activity/acceptance/adjustment/revision
+counts remained 2/1/3/8/1/0. Rollback bundle: VM `state/release-rollback-df2b72d`;
+private receipts: local `state/order-identity-release-df2b72d/`. No orders or model
+calls were submitted. Broader readiness and prospective-trial gates remain open.
