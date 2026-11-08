@@ -1448,3 +1448,30 @@ operator attestation, not independent API verification of delivery.
   were made. Least-privilege cleanup remains an open security item, and the
   archive must remain private. Verified archive retrieval does not establish
   that a replacement executor can boot, reconcile or recover an in-flight order.
+
+- Actual replacement-host restoration (2026-11-08): created fresh state-disk
+  snapshot `trader-recovery-20261108` (5799521895028254043), restored it to
+  `trader-recovery-state-20261108`, and attached it to a clean Debian VM
+  `trader-recovery-20261108` (3255415141277262561). Installed the verified host
+  configuration with destination-specific mounts, keeping executor and health
+  timer persistently masked. The original absolute ledger/control paths and
+  original experiment were preserved; no initialization or history reset.
+- All 22 restored SQLite databases passed integrity checks with their WAL files.
+  The deployed safety image digest 39402d84f91d3cb54aa72e3c7c08da6e2858e989569490ec8f0bfdf829e879d9
+  ran reconciliation on the new host with an HTTP hook rejecting non-GET requests.
+  At 02:21:56 UTC it matched actual Alpaca paper cash/positions/activity history:
+  one AAPL share; counts remained three activities, two intents, one order and
+  eight acceptance records. Pause remained set. Only five paper broker GETs were
+  made; production telemetry was disabled for this clone verification.
+- IAP initially failed; its diagnostic found the project IAP API disabled.
+  Enabled IAP (the diagnostic also enabled Network Management), then the same
+  existing VM connected successfully without adding public SSH ingress. Private
+  scripts, snapshot/instance identities, integrity and broker receipts are under
+  `state/replacement-host-20261108/`. Original owner ID and its active executor,
+  proxy, health timer and pause were independently rechecked unchanged.
+- This is real restoration and read-only broker reconciliation on a replacement
+  host, not full service takeover. No ownership transfer or in-flight order was
+  exercised. The original executor remains authoritative; do not start the
+  clone listener or overwrite current state from this now-aging snapshot. A
+  coordinated stopped-source cutover, telemetry continuation and in-flight
+  recovery acceptance remain open. No paid research or broker mutation occurred.
