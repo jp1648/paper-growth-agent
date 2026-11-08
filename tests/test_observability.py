@@ -383,3 +383,96 @@ def test_sqlite_full_preserves_queued_events_and_recovers(sink, monkeypatch, cap
     recovered = events(restarted)
     assert recovered[:1] == original
     assert [row["name"] for row in recovered] == ["before.capacity", "after.capacity"]
+
+
+@pytest.mark.skipif(
+    not os.environ.get("TEST_OBSERVABILITY_DATABASE_URL"), reason="Opt-in local Postgres test"
+)
+def test_lost_commit_ack_replays_exact_payloads_after_exporter_restart(sink):
+    import select
+    import socket
+    import time
+
+    from psycopg.conninfo import conninfo_to_dict, make_conninfo
+
+    direct = os.environ["TEST_OBSERVABILITY_DATABASE_URL"]
+    config = conninfo_to_dict(direct)
+    assert config.get("host") in {"localhost", "127.0.0.1"}, "Only isolated loopback Postgres allowed"
+    with psycopg.connect(direct) as pg:
+        pg.execute(obs.SCHEMA)
+    for index in range(201):
+        obs.emit("lost-ack.fixture", {"index": index, "text": "exact payload " + str(index)})
+    originals = events(sink)
+    ids = [row["event_id"] for row in originals]
+
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        listener.settimeout(10)
+        sink.dsn = make_conninfo(
+            direct,
+            host="127.0.0.1",
+            hostaddr="127.0.0.1",
+            port=listener.getsockname()[1],
+            sslmode="disable",
+            gssencmode="disable",
+        )
+
+        def drop_commit_ack():
+            client, _ = listener.accept()
+            with (
+                client,
+                socket.create_connection(
+                    (config["host"], int(config.get("port", 5432))), timeout=5
+                ) as server,
+            ):
+                client.settimeout(5)
+                pending = b""
+                deadline = time.monotonic() + 15
+                while time.monotonic() < deadline:
+                    readable, _, _ = select.select([client, server], [], [], 1)
+                    for source in readable:
+                        data = source.recv(65536)
+                        if not data:
+                            raise AssertionError("Connection closed before the COMMIT acknowledgement")
+                        if source is client:
+                            server.sendall(data)
+                            continue
+                        pending += data
+                        # PostgreSQL backend messages: type byte, four-byte length, payload.
+                        while len(pending) >= 5:
+                            length = int.from_bytes(pending[1:5], "big")
+                            assert 4 <= length <= 8_000_000
+                            if len(pending) < length + 1:
+                                break
+                            message, pending = pending[: length + 1], pending[length + 1 :]
+                            if message[:1] == b"C" and message[5:] == b"COMMIT\x00":
+                                return "commit_ack_dropped"
+                            client.sendall(message)
+                raise AssertionError("Postgres did not commit within the fixture deadline")
+
+        with ThreadPoolExecutor(1) as pool:
+            fault = pool.submit(drop_commit_ack)
+            with pytest.raises(psycopg.OperationalError):
+                sink.flush()
+            assert fault.result(timeout=20) == "commit_ack_dropped"
+    assert events(sink) == originals
+    with psycopg.connect(direct) as pg:
+        rows = pg.execute(
+            "SELECT event_id::text,payload FROM telemetry_events WHERE event_id::text = ANY(%s)", (ids,)
+        ).fetchall()
+    assert dict(rows) == {row["event_id"]: row["payload"] for row in originals[:200]}
+    # New events still queue while the old committed batch is locally unacknowledged.
+    obs.emit("lost-ack.fixture", {"index": 201})
+    expected = events(sink)
+    restarted = obs.Sink(sink.path, direct, start=False)
+    assert restarted.flush() == 200
+    assert restarted.flush() == 2
+    assert restarted.flush() == 0 and events(sink) == []
+    with psycopg.connect(direct) as pg:
+        rows = pg.execute(
+            "SELECT event_id::text,payload FROM telemetry_events WHERE event_id::text = ANY(%s)",
+            ([row["event_id"] for row in expected],),
+        ).fetchall()
+    assert len(rows) == 202
+    assert dict(rows) == {row["event_id"]: row["payload"] for row in expected}

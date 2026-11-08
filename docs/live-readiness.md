@@ -1755,3 +1755,22 @@ operator attestation, not independent API verification of delivery.
   instances are not additional SIGKILL or replacement-VM evidence; the existing
   subprocess tests remain separate. In-flight replacement-host and real network
   partition proof remain open. Tests: `tests/test_backup_recovery.py`.
+
+## Actual PostgreSQL commit-acknowledgement loss (2026-11-08 UTC)
+
+- A disposable loopback Postgres instance and TCP fault proxy exercised a network
+  failure after the server committed 200 events but before its COMMIT
+  acknowledgement reached psycopg. The exporter raised an OperationalError and
+  retained all 201 queued events; a separate direct database read verified the
+  committed 200 IDs and exact payloads. No connect/commit function was mocked.
+- A new event was queued during uncertainty. A reconstructed exporter replayed
+  the batch and delivered the remainder: 202 unique IDs with exact payload equality,
+  empty local outbox and no duplicates. This complements the separate SIGKILL tests.
+- Full suite with real isolated Postgres: **666 passed, one opt-in paper-order test
+  skipped**. Disposable database/container removed; production was not accessed.
+  Private receipt: `state/telemetry-commit-ack-20261108/receipt.json`. This is a
+  loopback plaintext wire-fault test, not a Cloud SQL/TLS or regional outage drill.
+- User requested the Apple review packet for their own assessment. Prepared a
+  readable local HTML packet with original reports, scenario inputs, cited saved
+  passages, hashes, unresolved questions and failure/cost disclosures. No review
+  approval was inferred; semantic review and live activation remain pending.
