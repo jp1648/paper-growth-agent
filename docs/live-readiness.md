@@ -1434,3 +1434,17 @@ operator attestation, not independent API verification of delivery.
   blindly. It is on the same state disk, not yet a verified off-host copy, and is
   not a consistent ledger checkpoint or a completed replacement-host drill.
   No service restart, ownership transfer, model call or order was performed.
+
+- The host configuration bundle now has a verified off-host copy in the private
+  recovery bucket, `host-config/3629391648980512917/20261108T021524Z.tar.gz`,
+  generation 1794104183140479. Upload required generation zero (no overwrite).
+  Downloading that exact generation reproduced all 17,578,706 archive bytes;
+  all seven file hashes and sizes also matched the enclosed source manifest.
+  Archive SHA-256: c3ca992c3dee1da4e8d8080bffafd6a19a3e018595ef304bdb0cc58cfe39539c.
+  Private receipt: `state/host-recovery-20261108/receipt.json`.
+- Bucket public-access prevention is enforced and uniform access enabled. IAM
+  review also found inherited legacy project owner/editor/viewer access; the
+  project's default Compute service account still has Editor. No IAM changes
+  were made. Least-privilege cleanup remains an open security item, and the
+  archive must remain private. Verified archive retrieval does not establish
+  that a replacement executor can boot, reconcile or recover an in-flight order.
