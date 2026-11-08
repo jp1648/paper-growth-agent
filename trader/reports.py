@@ -1,7 +1,7 @@
 from zoneinfo import ZoneInfo
 
 from .accounting import recent_turnover
-from .models import ZERO, dec, now
+from .models import ZERO, dec, dt, now
 from .observability import traced
 from .spending import spend_breakdown, spending_status
 
@@ -247,7 +247,8 @@ def daily_report(service, date=None):
     benchmarks = {
         symbol: dec(sample["marks"][symbol]) / baseline_marks[symbol] - 1 for symbol in ("SPY", "QQQ")
     }
-    calendar_dates = {d["date"] for d in service.broker.calendar(baseline["date"], date)}
+    experiment_start = dt(store.experiment["started_at"]).astimezone(ZoneInfo("America/New_York"))
+    calendar_dates = {d["date"] for d in service.broker.calendar(experiment_start.date().isoformat(), date)}
     missing = sorted(calendar_dates - {s["date"] for s in samples})
     report.update(
         daily_equity=returns,
@@ -258,9 +259,10 @@ def daily_report(service, date=None):
         else None,
         experiment_price_return=indexed - 1 if indexed is not None else None,
         experiment_total_return=total_index - 1 if total_index is not None else None,
-        total_return_max_drawdown=total_drawdown,
+        total_return_max_drawdown=total_drawdown if total_index is not None and not missing else None,
         total_return_method="Flow-adjusted close equity including net distributions and broker fees; model/data costs excluded. Benchmarks below are price-only, not comparable total returns.",
-        max_drawdown=max_drawdown,
+        max_drawdown=max_drawdown if indexed is not None and not missing else None,
+        drawdown_note="Close-to-close drawdown is unavailable when sessions are missing or its return chain is undefined; intraday drawdown is not measured.",
         benchmarks=benchmarks,
         marks=marks,
         missing_sessions=missing,

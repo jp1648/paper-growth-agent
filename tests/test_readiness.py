@@ -145,6 +145,30 @@ def test_zero_comparison_equity_does_not_break_reporting(env, monkeypatch):
     assert result["experiment_total_return"] is None
     assert result["daily_equity"][-1]["return"] is None
     assert result["daily_equity"][-1]["total_return"] is None
+    assert result["max_drawdown"] is None
+    assert result["total_return_max_drawdown"] is None
+
+
+def test_missing_session_cannot_certify_drawdown(env, monkeypatch):
+    service, _, _ = env
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(hours=6))
+    daily_report(service)
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=2, hours=6))
+    result = daily_report(service)
+    assert result["missing_sessions"] == ["2026-10-22"]
+    assert result["experiment_total_return"] == 0
+    assert result["max_drawdown"] is None
+    assert result["total_return_max_drawdown"] is None
+
+
+def test_first_report_does_not_hide_missed_opening_sessions(env, monkeypatch):
+    service, _, _ = env
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=2, hours=6))
+    result = daily_report(service)
+    assert result["missing_sessions"] == ["2026-10-21", "2026-10-22"]
+    assert result["matching_dates"]["start"] == "2026-10-23"
+    assert result["max_drawdown"] is None
+    assert result["total_return_max_drawdown"] is None
 
 
 @pytest.mark.parametrize(

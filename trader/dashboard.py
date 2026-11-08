@@ -80,6 +80,7 @@ def publish_snapshot(service):
                     "benchmarks",
                     "matching_period_return",
                     "max_drawdown",
+                    "drawdown_note",
                     "missing_sessions",
                     "benchmark_method",
                 )

@@ -1509,3 +1509,14 @@ operator attestation, not independent API verification of delivery.
   remain. Deleted the temporary VM/boot disk and detached restored clone disk;
   retained the recovery snapshot and private receipts. Snapshot/object storage
   charges remain, but temporary VM/disk charges no longer accrue.
+
+- Reporting correction (local, not yet deployed): reproduced two misleading
+  drawdown outputs. A zero-equity return chain became undefined while drawdown
+  remained numeric, and missing sessions could leave a zero drawdown. Missing
+  opening sessions were also omitted when coverage started at the first saved
+  close. New reports now count missing broker sessions from experiment start
+  and return null drawdown for missing observations or an undefined return chain.
+  Dashboard snapshots include the drawdown limitation note; saved historical
+  reports remain immutable. The new regressions failed before the fix; all 59
+  readiness/reporting/dashboard tests and Ruff checks pass. This does not supply
+  total-return benchmarks, complete operating-cost allocation or trial acceptance.
