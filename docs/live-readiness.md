@@ -1590,3 +1590,28 @@ operator attestation, not independent API verification of delivery.
   correct the input-price estimate: its current base-rate calculation ignores
   higher-priced cache writes, so it is not necessarily conservative even though
   it ignores cache-read savings. Research acceptance and the paper trial remain open.
+
+## Cache-write budget ceilings corrected (2026-11-08 UTC)
+
+- Reproduced the missing pre-call rejection with the shipped base input rates.
+  The existing shared reservation/usage calculation accepts configured price
+  ceilings, so no new pricing subsystem is required. Example and local configs
+  now budget input at the highest Standard short-context cache-write price (12h):
+  Astra $25/M, Sol $5/M, Terra $2.50/M. Output rates remain $50/$10/$5 per million.
+  Estimates intentionally ignore cache-read and incentive savings; actual spend
+  still requires provider reconciliation. These settings must be revisited for
+  pricing changes, different models/context lengths, tiers or regional endpoints.
+- The regression checks rejection before any call for all five role routes.
+  Routed offline graph tests check costs and totals using the revised ceilings.
+  Full offline suite: 657 passed, six opt-in external tests skipped; Ruff passed.
+- Applied only the three input-price changes and an explanatory comment to the
+  paused VM config, with a private rollback copy. Existing image already consumes
+  these fields for both reservations and usage estimates. The new source-only
+  telemetry wording is not yet in the deployed image. Daily $6 and run $5 caps,
+  model routing and all other settings remain unchanged. Config SHA-256:
+  `514f8509e1b9ac4f8e56986ae9fda5e5b262bd3e21338e75c56f37ecdfdd9e96`.
+- Fresh reconciliation at 02:55:14 UTC, runtime health and executor/proxy/timer
+  checks passed. Original experiment, AAPL one share and trading counts remain
+  unchanged; pause remains set. No paid calls or orders. Private receipts:
+  `state/cache-budget-20261108/`. Higher conservative estimates can exhaust a run
+  sooner; no successful research acceptance is implied.

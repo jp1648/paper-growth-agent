@@ -396,7 +396,7 @@ class Guard(AgentMiddleware):
                         "output_cost_per_million": route.output_cost_per_million,
                         "usage": {"input_tokens": tokens_in, "output_tokens": tokens_out} if usage else {},
                         "estimated_usd": cost,
-                        "note": "Configured rates; cached-input savings not assumed"
+                        "note": "Configured budget ceilings; no cache-read or incentive discounts assumed"
                         if usage
                         else "Failed call; billed cost unknown",
                     },

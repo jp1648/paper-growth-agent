@@ -318,7 +318,7 @@ def test_role_models_route_and_charge_actual_roles(env, decision, monkeypatch):
         assert model.calls and {expected[schema] for schema in model.calls} == {options["model"]}
         assert options["service_tier"] == "default"
         assert options["base_url"] == "https://api.openai.com/v1"
-    expected_cost = {"gpt-6-astra": dec(".006"), "gpt-6.1-sol": dec(".0012"), "gpt-6.1-terra": dec(".0006")}
+    expected_cost = {"gpt-6-astra": dec(".0075"), "gpt-6.1-sol": dec(".0015"), "gpt-6.1-terra": dec(".00075")}
     costs = [event["body"] for event in service.store.events("model_cost")]
     assert {event["model"] for event in costs} == set(expected_cost)
     for event in costs:
@@ -1402,3 +1402,20 @@ def test_final_lead_cannot_override_normalization_gap(env, decision, monkeypatch
     assert result["decision"]["action"] == "WATCH"
     assert result["execution"]["status"] == "no_order"
     assert broker.submits == 0
+
+
+def test_configured_budget_covers_most_expensive_cache_write():
+    cfg = Settings.load("config.example.toml")
+    # Standard short-context 12h write rates, verified against provider pricing 2026-11-08.
+    write_rates = {"gpt-6-astra": dec(25), "gpt-6.1-sol": dec(5), "gpt-6.1-terra": dec("2.5")}
+    for role in ["research_lead", "business", "catalysts", "valuation", "adversarial"]:
+        route = cfg.research_model(role)
+        size = 10000
+        write_cost = (
+            dec(size + 2048) * write_rates[route.model]
+            + dec(cfg.research_max_output_tokens) * route.output_cost_per_million
+        ) / dec(1000000)
+        budget = Budget(cfg, limit=write_cost - dec("0.000001"))
+        with pytest.raises(ResearchLimit, match="estimated cost"):
+            budget.model(size, role)
+        assert budget.models == 0

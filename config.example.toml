@@ -45,20 +45,21 @@ research_max_output_tokens = 3000
 research_max_cost_usd = "5" # Estimated ceiling, not a spending target or billing guarantee.
 research_daily_cost_usd = "10" # Shared across runs/restarts; New York date when each run starts.
 sec_user_agent = "" # Your application name and contact email, as required by SEC.
-# Standard short-context USD / million tokens, checked 2026-10-28; verify before running.
-input_cost_per_million = "2"
+# Budget ceilings in USD / million tokens, verified 2026-11-08.
+# Input uses the highest Standard short-context cache-write rate (12h); not actual billed usage.
+input_cost_per_million = "5"
 output_cost_per_million = "10"
 
 [role_models.research_lead]
 model = "gpt-6-astra" # Planning, delegation, and final synthesis.
 reasoning_effort = "high"
-input_cost_per_million = "10"
+input_cost_per_million = "25"
 output_cost_per_million = "50"
 
 [role_models.catalysts]
 model = "gpt-6.1-terra" # Focused news/event review; deeper analysis remains with Sol/Astra.
 reasoning_effort = "low"
-input_cost_per_million = "1"
+input_cost_per_million = "2.5"
 output_cost_per_million = "5"
 
 # Operator-verified stock universe and sectors. Research ranks this list; these are examples,
