@@ -1290,3 +1290,23 @@ operator attestation, not independent API verification of delivery.
   reservations, paper position and pause were preserved. Private preflight plan is
   marked not_started_credit_uncertain to prevent treating its arithmetic as credit
   confirmation. Live readiness remains NO-GO; offline work can continue.
+
+- Safety release `50e103c` deployed after CI `42353582863` and `42353577819`
+  passed. Cloud Build `78e3cad7-024d-4ddb-86bf-fe9f737006fd` succeeded; image
+  digest `39402d84f91d3cb54aa72e3c7c08da6e2858e989569490ec8f0bfdf829e879d9`
+  contains all 26 Python source files matching the release manifest. This deploys
+  both the broker snapshot identity checks and cross-day unknown-spend guard.
+- Initial registry pull failed with expired cached authentication before any
+  runtime change. Retried using the VM service-account token in a temporary
+  Docker credential directory, removed afterward. Image verification ran with
+  networking disabled. Preserved configuration, pause and original ledger;
+  backup retained without restoring history.
+- New container started `2026-11-08T00:00:04Z`; successful reconciliation followed
+  at `00:00:28Z`. Trading remained paused, zero working orders, AAPL one share.
+  Acceptance/activity/intent/order counts remained 8/3/2/1 across deployment.
+  Installed spending code reports November 7 spend zero but one older unresolved
+  unbounded run, correctly retaining the research block despite a new daily
+  allowance. No new paid research or order submission was initiated.
+- Private deployment receipts: `state/safety-release-50e103c/`. Research-quality,
+  provider-charge reconciliation, recovery and forward-paper gates remain open;
+  this release does not establish live readiness.
