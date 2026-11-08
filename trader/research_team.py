@@ -33,7 +33,7 @@ from .financials import (
     valuation_diagnostics,
 )
 from .models import Decision, Model, dec, dt, dumps, now
-from .observability import emit, traced
+from .observability import TracePersistenceError, emit, traced
 from .spending import DailyReservation
 from .x_api import XDiscovery
 
@@ -263,6 +263,14 @@ class Guard(AgentMiddleware):
             0, budget.cfg.research_max_tool_calls - len(ROLES) * (1 + self.specialist_allowance)
         )
 
+    def trace(self, name, payload):
+        try:
+            emit(name, payload, required=True)
+        except TracePersistenceError:
+            with self.budget.lock:
+                self.budget.failed = True
+            raise
+
     @staticmethod
     def bounded_messages(messages):
         # Originals remain in graph state and the evidence ledger; no paid summarizer.
@@ -343,7 +351,7 @@ class Guard(AgentMiddleware):
                     },
                 )
             )
-        emit("model.request", {"role": self.role, "payload": payload})
+        self.trace("model.request", {"role": self.role, "payload": payload})
         reserved = self.budget.model(len(dumps(payload).encode()), self.role)
         started = time.monotonic()
         try:
@@ -375,9 +383,9 @@ class Guard(AgentMiddleware):
                         },
                     )
                 )
-        emit("model.response", {"role": self.role, "response": response})
         usage = [m.usage_metadata for m in response.result if isinstance(m, AIMessage) and m.usage_metadata]
         self.record_usage(usage, reserved)
+        self.trace("model.response", {"role": self.role, "response": response})
         if any(
             m.response_metadata.get("status", "completed") != "completed"
             or m.response_metadata.get("incomplete_details")
@@ -474,8 +482,10 @@ class Guard(AgentMiddleware):
         started = time.monotonic()
         succeeded = False
         try:
+            self.trace("tool.request", {"role": self.role, "tool": request.tool_call})
             self.budget.tool()
             result = handler(request)
+            self.trace("tool.response", {"role": self.role, "result": result})
             succeeded = True
             return result
         finally:

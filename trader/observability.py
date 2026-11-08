@@ -167,7 +167,7 @@ class Sink:
                 if failed:
                     LOG.warning("Telemetry Postgres export recovered")
                 failed = False
-            except Exception:  # noqa: BLE001 - telemetry must not change trading behavior
+            except Exception:  # noqa: BLE001 - only research opts into fail-closed persistence
                 if not failed:
                     LOG.warning("Telemetry export unavailable; events retained in local outbox")
                 failed, count = True, 0
@@ -201,11 +201,15 @@ def configure(ledger):
             _sink = Sink(
                 Path(ledger).parent / "telemetry-outbox.sqlite", os.environ["OBSERVABILITY_DATABASE_URL"]
             )
-        except Exception:  # noqa: BLE001 - telemetry must not change trading behavior
+        except Exception:  # noqa: BLE001 - only research opts into fail-closed persistence
             LOG.error("Telemetry local outbox unavailable; trading ledger remains authoritative")
 
 
-def emit(name, payload, phase="event", **context):
+class TracePersistenceError(RuntimeError):
+    pass
+
+
+def emit(name, payload, phase="event", *, required=False, **context):
     if _sink is not None:
         try:
             _sink.emit(
@@ -214,8 +218,12 @@ def emit(name, payload, phase="event", **context):
                 payload,
                 {**(CONTEXT.get() or {}), **{k: v for k, v in context.items() if v is not None}},
             )
-        except Exception:  # noqa: BLE001 - telemetry must not change trading behavior
+        except Exception:  # noqa: BLE001 - only research opts into fail-closed persistence
             LOG.error("Telemetry event could not be persisted: %s", name)
+            if required:
+                raise TracePersistenceError("Required research trace could not be persisted") from None
+    elif required and os.environ.get("OBSERVABILITY_DATABASE_URL"):
+        raise TracePersistenceError("Configured research trace outbox is unavailable")
 
 
 @contextmanager

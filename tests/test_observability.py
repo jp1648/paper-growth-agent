@@ -527,3 +527,126 @@ def test_outbox_capacity_loss_preserves_execution_evidence_and_fill_replay(
     obs.emit("capacity.recovered", {"body": "y" * 100_000})
     assert any(row["name"] == "capacity.recovered" for row in events(sink))
     assert not any(row["name"] == "decision" for row in events(sink))  # Lost traces are not reconstructed.
+
+
+def research_request():
+    from types import SimpleNamespace
+
+    request = SimpleNamespace(
+        messages=[],
+        tools=[],
+        system_message=None,
+        response_format=SimpleNamespace(schema_spec=SimpleNamespace(json_schema={})),
+    )
+    request.override = lambda **kwargs: request
+    return request
+
+
+def test_required_model_request_disk_full_prevents_paid_call(sink, monkeypatch):
+    from contextlib import contextmanager
+
+    from langchain_core.messages import HumanMessage
+
+    from trader.config import Settings
+    from trader.research_team import Budget, Guard
+
+    database = sink.db
+
+    @contextmanager
+    def limited():
+        with database() as db:
+            db.execute(f"PRAGMA max_page_count={db.execute('PRAGMA page_count').fetchone()[0]}")
+            yield db
+
+    monkeypatch.setattr(sink, "db", limited)
+    request = research_request()
+    request.messages = [HumanMessage(content="x" * 100_000)]
+    budget = Budget(Settings())
+    with pytest.raises(obs.TracePersistenceError):
+        Guard(budget, "business", set()).wrap_model_call(request, lambda r: pytest.fail("Paid call"))
+    assert budget.failed and budget.models == 0 and budget.reserved == 0
+
+
+def test_response_trace_failure_keeps_usage_and_stops_research(sink, monkeypatch):
+    from types import SimpleNamespace
+
+    from trader.config import Settings
+    from trader.research_team import Budget, Guard
+
+    budget = Budget(Settings(input_cost_per_million="1", output_cost_per_million="2"))
+    persist = sink.emit
+
+    def failing(name, *args):
+        if name == "model.response":
+            raise OSError("disk full")
+        return persist(name, *args)
+
+    monkeypatch.setattr(sink, "emit", failing)
+    response = SimpleNamespace(
+        result=[
+            AIMessage(
+                content="report",
+                usage_metadata={
+                    "input_tokens": 100,
+                    "output_tokens": 10,
+                    "total_tokens": 110,
+                },
+            )
+        ]
+    )
+    guard = Guard(budget, "business", set())
+    with pytest.raises(obs.TracePersistenceError):
+        guard.wrap_model_call(research_request(), lambda r: response)
+    costs = [payload for name, payload in budget.events if name == "model_cost"]
+    assert len(costs) == 1 and costs[0]["estimated_usd"] > 0
+    assert budget.reserved == costs[0]["estimated_usd"] and budget.failed
+    from trader.research_team import ResearchLimit
+
+    with pytest.raises(ResearchLimit):
+        guard.wrap_model_call(research_request(), lambda r: pytest.fail("Second paid call"))
+
+
+def test_required_tool_trace_failure_clears_delegation(monkeypatch):
+    from types import SimpleNamespace
+
+    from trader.config import Settings
+    from trader.research_team import Budget, Guard
+
+    monkeypatch.setattr(obs, "_sink", None)
+    monkeypatch.setenv("OBSERVABILITY_DATABASE_URL", "configured-but-unavailable")
+    budget = Budget(Settings())
+    guard = Guard(budget, "research_lead", {"task"})
+    request = SimpleNamespace(tool_call={"name": "task", "id": "one", "args": {"subagent_type": "business"}})
+    with pytest.raises(obs.TracePersistenceError):
+        guard.wrap_tool_call(request, lambda r: pytest.fail("Tool invoked"))
+    assert budget.failed and budget.tools == 0 and not guard.running_tasks
+
+
+def test_required_trace_only_needs_local_durability(sink, monkeypatch):
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: (_ for _ in ()).throw(OSError("offline")))
+    obs.emit("required.fixture", {"value": 1}, required=True)
+    assert events(sink)[0]["name"] == "required.fixture"
+
+
+def test_tool_response_trace_failure_stops_run_and_releases_task(sink, monkeypatch):
+    from types import SimpleNamespace
+
+    from trader.config import Settings
+    from trader.research_team import Budget, Guard
+
+    persist = sink.emit
+
+    def failing(name, *args):
+        if name == "tool.response":
+            raise OSError("disk full")
+        return persist(name, *args)
+
+    monkeypatch.setattr(sink, "emit", failing)
+    budget = Budget(Settings())
+    guard = Guard(budget, "research_lead", {"task"})
+    request = SimpleNamespace(tool_call={"name": "task", "id": "one", "args": {"subagent_type": "business"}})
+    calls = []
+    with pytest.raises(obs.TracePersistenceError):
+        guard.wrap_tool_call(request, lambda r: calls.append(r) or "report")
+    assert len(calls) == 1 and budget.failed and not guard.running_tasks
+    assert budget.events[-1][1]["succeeded"] is False

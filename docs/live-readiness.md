@@ -2869,3 +2869,11 @@ kind count, one AAPL share, pause and config/spending hashes; reconciliation was
 healthy. No Alpaca order or paid model call occurred. Cloud storage/access costs
 remain part of infrastructure allocation, not asserted zero. Separately, CI
 42456156892 passed for the liability-input change; this drill did not deploy it.
+
+### Research trace persistence gate — November 8
+
+Research now requires local outbox persistence for model/tool requests and successful responses when telemetry is configured. A configured but unavailable outbox or a failed write stops the shared research budget. Model usage is recorded before response persistence, preserving known charges if that write fails. Delegation cleanup still runs. A remote Postgres outage alone does not block a healthy local outbox. Generic telemetry remains best effort so protective broker reconciliation can continue.
+
+Offline regression evidence: actual SQLite capacity exhaustion prevents a model call before reservation; injected response-write failure retains model usage and blocks a subsequent call; unavailable configured outbox prevents delegation; tool response-write failure releases delegation and stops the run. The existing execution/fill-replay disk-full regression remains passing. Full suite: 887 passed, 7 skipped before the final additional tool-response regression; the final observability suite is 17 passed, 5 skipped. Ruff passed.
+
+Not deployed or exercised with paid calls. This prevents continued acceptance/spending after detected trace loss; it cannot recover an in-flight response lost when the disk fills, stop already-running concurrent calls, or guarantee durability if the main ledger itself also becomes unwritable. Independent research approval and live-launch gates remain open; trading remains paused.
