@@ -3000,3 +3000,46 @@ This supersedes preceding not-deployed notes for these fixes. No model calls,
 new orders, liquidation, experiment reset or trading resume occurred. Full-bust
 support, independent research approval and prospective trial acceptance remain
 unproved; neither deployment nor test count changes those gates.
+
+### Checkpoint recovery with the source VM stopped — November 8
+
+Extended the retained cross-host fixture drill by actually stopping source VM
+`trader-executor` (ID `3629391648980512917`) during replacement recovery. This
+reuses the original fixture's pre-POST checkpoint and SIGKILL evidence; it does
+not claim a new source submission or an actual Alpaca order. GCS generation
+`1794120803735663`, SHA-256
+`de62890016b8a89c71bdbb7d616b3e8d566552a759ad30e92ddccadca2e6b213`, was fetched
+again by exact generation while the source was unavailable. No source ledger
+or disk was used by the replacement; broker truth was the retained offline fixture.
+
+First attempt failed because the local fixture bundle omitted `account.json`.
+The `finally` restart restored the VM; production state was verified unchanged.
+The error was reproduced without another stop, the full bundle was repaired, and
+the complete recovery was run successfully offline before one corrected attempt.
+Both attempts and the failure diagnosis remain retained; there was no blind retry.
+
+In the corrected attempt, GCE confirmed TERMINATED at
+`2026-11-08T07:28:57.970430+00:00` and again after recovery at
+`2026-11-08T07:29:01.615875+00:00`. A new local macOS directory restored the exact
+checkpoint and original fixture identity. Three connection-failure/reopen cycles
+and missing fill activity blocked execution. Partial recovery yielded four shares,
+$99,600 cash and $601 reserved. Subsequent full-fill replay yielded ten shares,
+$99,000 cash and zero reserved. Exactly one original fixture submission, one intent,
+one order and two activities remained; pause was preserved throughout.
+
+The VM restarted at `07:29:14 UTC`. Its first ledger read still carried the earlier
+reconciliation, so recovery was not declared from service status alone. Fresh
+reconciliation at `2026-11-08T07:30:19.133028+00:00` is healthy. Every production
+document-kind count, experiment, one AAPL share, pause, config and spending hash
+matches the pre-drill state. Executor/proxy/health timer are active on the same
+verified image. Production orders and paid model calls were unchanged.
+
+Private evidence: `state/crosshost-stopped-source-20261108/` (failed attempt) and
+`state/crosshost-stopped-source-20261108-2/` (offline preflight, corrected run,
+GCE status receipts, exact checkpoint, balances and source-hash manifest). Timed
+restart protection and `finally` restoration bounded the stop.
+
+Scope: actual VM unavailability plus checkpoint recovery is now demonstrated for
+this fixture. The disk was retained, not destroyed. This is not a simultaneous
+live-executor partition/fencing test, actual broker cancel/fill timing, or proof
+that every complete host-loss scenario passes. Those acceptance limits remain.
