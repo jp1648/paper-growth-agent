@@ -18,7 +18,7 @@ failure, not an accepted abstention.
 | Requirement | Concrete completion check | Current state |
 |---|---|---|
 | Arithmetic | Required terminal multiple includes all five annual cash flows; independently reproduce value, inverse value and separate sensitivity axes | Corrected arithmetic artifact and deterministic inspection tool tested; revised model report not yet collected |
-| Business analysis | Cite available product/category revenue and growth, Services/Products margins, China, receivables concentration and App Store regulation; distinguish available-but-unread from unavailable evidence | Reviewer identified omissions, including numbers already in saved passage-2821c133eaaca3113da5; revised analysis pending |
+| Business analysis | Cite available product/category revenue and growth, Services/Products margins, China, receivables concentration and App Store regulation; distinguish available-but-unread from unavailable evidence | Filing-based analyst follow-up completed in [apple-filing-followup.md](apple-filing-followup.md), including the omitted saved evidence; revised model report and independent approval remain pending |
 | Normalization | Source-bound numerical bridge with explicit equity/enterprise basis, SBC/share treatment, taxes/escrow, reinvestment and financing; no unsupported zero adjustments or double deductions | Not implemented/accepted; narrative declarations remain insufficient |
 | Scenarios | Connect business drivers to growth/margins/reinvestment; identify 10% as a chosen hurdle unless cost of equity is established; explain post-year-five economics and show separate growth/multiple sensitivities | Arithmetic sensitivity implemented; economic rationale still pending |
 | Decision/review | Measurable triggers, review periods and valuation effects; reconcile holding/valuation horizons; distinguish confidence in abstention from value/performance confidence | Revised report and independent review pending |
@@ -65,3 +65,20 @@ Changes are developed on Apple. Preserve Microsoft as the unseen annual holdout;
 never tune on its candidate outputs. A new development run requires the existing
 spending preflight, a fresh stable ID and preserved original artifacts. No paid
 rerun has been performed for this remediation yet.
+
+## Accounting diagnostic implementation
+
+`inspect_cash_flow` now exposes deterministic historical SBC-cost sensitivity,
+repurchases plus common dividends above CFO-minus-capex, and net cash taxes paid.
+It retains selected original facts and requires the same annual period, accession,
+filing date and form as the proxy. Missing eligible facts return explicit gaps and
+null diagnostics, never zero; conflicts or negative amounts require separate
+review. The SEC collector includes the corresponding distribution and tax tags.
+Older caches and frozen suites are not rewritten to invent these inputs.
+
+This is a step toward the numerical bridge, not its completion. It does not change
+the valuation cash-flow input, establish recurring tax adjustments, reconcile all
+financing flows, select future shares or justify forecast growth. SBC deduction is
+explicitly a sensitivity; cash taxes already included in CFO are not deducted
+again. The valuation instructions request the diagnostic and preserve material-gap
+reporting. A full normalized model and independent acceptance remain outstanding.

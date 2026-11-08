@@ -23,7 +23,12 @@ from pydantic import Field
 
 from .alpaca import safe_error
 from .evidence import EvidenceTooLarge
-from .financials import annual_cash_flow, normalization_supported, valuation_diagnostics
+from .financials import (
+    annual_cash_flow,
+    cash_flow_diagnostics,
+    normalization_supported,
+    valuation_diagnostics,
+)
 from .models import Decision, Model, dec, dt, dumps, now
 from .observability import emit, traced
 from .spending import DailyReservation
@@ -139,6 +144,7 @@ ROLES = {
             "from one coherent filing accession/date/form. Do not mix amended and older facts. "
             "cash_flow_per_share must equal (CFO-capex)/shares rounded to six decimals. The historical proxy "
             "does not establish normalized earnings. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Flag unresolved_material_gaps if material adjustments are unavailable; never invent adjustments or treat the historical proxy as normalized cash. A missing or unresolved normalization review blocks BUY/ADD. Return its calculation_id and exact bear/base/bull values. "
+            "Use inspect_cash_flow for available annual SBC, distribution and cash-tax diagnostics; missing inputs are gaps, and these diagnostics do not establish normalization. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Explain sensitivity and expectations embedded in today's price. If this simplified "
             "cash-flow model is inappropriate or inputs are insufficient, return null for calculation_id "
@@ -759,6 +765,16 @@ class ResearchDesk:
             return result
 
         @tool
+        def inspect_cash_flow(financial_source_id: str, financial_period_end: str) -> dict:
+            """Inspect source-bound annual SBC, distribution and cash-tax arithmetic; not normalized value."""
+            with self.lock:
+                source = copy.deepcopy(self.sources.get(financial_source_id))
+                target_sources = {item["id"] for item in self.companies[self.context["symbol"]]["sources"]}
+            if source is None or financial_source_id not in target_sources:
+                raise ValueError("Financial evidence must belong to the company being valued")
+            return cash_flow_diagnostics(source, financial_period_end, self.evaluation_at or now())
+
+        @tool
         def inspect_valuation(calculation_id: str, target_price: str) -> dict:
             """Compute sensitivity and implied terminal multiples from a saved validated calculation."""
             with self.lock:
@@ -776,6 +792,7 @@ class ResearchDesk:
             read_document,
             value_scenarios,
             inspect_valuation,
+            inspect_cash_flow,
             read_source,
         ]
 

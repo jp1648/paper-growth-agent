@@ -11,7 +11,15 @@ def provider(env, monkeypatch, facts_cik=1, filings_cik="0000000001"):
         "cik": facts_cik,
         "entityName": "ACME",
         "facts": {
-            "us-gaap": {"NetIncomeLoss": {"units": {"USD": [{"val": 10, "filed": "2026-01-01"}]}}},
+            "us-gaap": {
+                tag: {"units": {"USD": [{"val": 10, "filed": "2026-01-01"}]}}
+                for tag in (
+                    "NetIncomeLoss",
+                    "PaymentsForRepurchaseOfCommonStock",
+                    "PaymentsOfDividendsCommonStock",
+                    "IncomeTaxesPaidNet",
+                )
+            },
             "custom": {"NetIncomeLoss": {"units": {"USD": [{"val": 99999, "filed": "2026-01-01"}]}}},
             "dei": {
                 "EntityCommonStockSharesOutstanding": {
@@ -36,6 +44,9 @@ def test_sec_taxonomy_collision_cannot_replace_standard_fact(env, monkeypatch):
     assert content["fact_taxonomies"]["NetIncomeLoss"] == "us-gaap"
     assert content["fact_taxonomies"]["EntityCommonStockSharesOutstanding"] == "dei"
     assert content["cik"] == "0000000001"
+    for tag in ("PaymentsForRepurchaseOfCommonStock", "PaymentsOfDividendsCommonStock", "IncomeTaxesPaidNet"):
+        assert content["facts"][tag]["USD"][0]["val"] == 10
+        assert content["fact_taxonomies"][tag] == "us-gaap"
 
 
 @pytest.mark.parametrize("field", ["facts_cik", "filings_cik"])

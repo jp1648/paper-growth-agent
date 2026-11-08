@@ -326,3 +326,77 @@ def test_valuation_inspection_requires_saved_calculation():
             tools["inspect_valuation"].invoke(
                 {"calculation_id": calculation["calculation_id"], "target_price": target}
             )
+
+
+def test_accounting_diagnostics_keep_cash_tax_and_sbc_distinctions():
+    from trader.financials import cash_flow_diagnostics
+
+    source = {"id": "original", "content": {"facts": financial_facts()}}
+    tags = {
+        "StockBasedCompensation": 50,
+        "PaymentsForRepurchaseOfCommonStock": 480,
+        "PaymentsOfDividendsCommonStock": 40,
+        "IncomeTaxesPaidNet": 80,
+    }
+    for tag, value in tags.items():
+        source["content"]["facts"][tag] = {
+            "USD": [{**source["content"]["facts"][CFO]["USD"][0], "val": value}]
+        }
+    original = copy.deepcopy(source)
+    result = cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
+    assert result["cfo_less_capex_usd"] == "500"
+    assert result["sbc_deduction_sensitivity_usd"] == "450"
+    assert result["distributions_above_proxy_usd"] == "20"
+    assert result["cash_taxes_paid_net_usd"] == "80"
+    assert result["missing_facts"] == []
+    assert source == original
+    source["content"]["facts"]["StockBasedCompensation"]["USD"][0]["accn"] = "0000000001-26-000009"
+    with pytest.raises(ValueError, match="filing basis"):
+        cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
+
+
+def test_accounting_tool_reports_missing_inputs_without_assuming_zero():
+    cfg = Settings(input_cost_per_million="1", output_cost_per_million="1")
+    desk = ResearchDesk(
+        cfg,
+        Evidence(),
+        {"symbol": "ACME", "portfolio": {}},
+        Evidence().get("ACME"),
+        Budget(cfg),
+        None,
+        evaluation_at=CUTOFF.isoformat(),
+    )
+    tool = next(t for t in desk.tools() if t.name == "inspect_cash_flow")
+    result = tool.invoke({"financial_source_id": "fixture-sec", "financial_period_end": "2025-12-31"})
+    assert len(result["missing_facts"]) == 4
+    assert result["sbc_deduction_sensitivity_usd"] is None
+    assert result["distributions_above_proxy_usd"] is None
+    assert result["cash_taxes_paid_net_usd"] is None
+    with pytest.raises(ValueError, match="company being valued"):
+        tool.invoke({"financial_source_id": "invented", "financial_period_end": "2025-12-31"})
+
+
+@pytest.mark.parametrize("fault", ["negative", "conflict", "future", "currency", "quarter"])
+def test_accounting_diagnostic_optional_input_is_not_silently_trusted(fault):
+    from trader.financials import cash_flow_diagnostics
+
+    source = {"id": "original", "content": {"facts": financial_facts()}}
+    record = {**source["content"]["facts"][CFO]["USD"][0], "val": 50}
+    source["content"]["facts"]["StockBasedCompensation"] = {"USD": [record]}
+    if fault == "negative":
+        record["val"] = -50
+    elif fault == "conflict":
+        source["content"]["facts"]["StockBasedCompensation"]["USD"].append({**record, "val": 60})
+    elif fault == "future":
+        record["filed"] = "2026-10-21"
+    elif fault == "currency":
+        source["content"]["facts"]["StockBasedCompensation"] = {"EUR": [record]}
+    else:
+        record["start"] = "2025-10-01"
+    if fault in {"negative", "conflict"}:
+        with pytest.raises(ValueError):
+            cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
+    else:
+        result = cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
+        assert "StockBasedCompensation" in result["missing_facts"]
+        assert result["sbc_deduction_sensitivity_usd"] is None

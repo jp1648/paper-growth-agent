@@ -6,7 +6,7 @@ from datetime import date
 from .models import dec, dt
 
 
-def annual_cash_flow(source, period_end, cutoff):
+def annual_facts(source, period_end, cutoff, fields, *, optional=False):
     content = source.get("content")
     if not isinstance(content, dict) or not isinstance(content.get("facts"), dict):
         raise TypeError("Valuation requires structured original financial facts")
@@ -17,11 +17,7 @@ def annual_cash_flow(source, period_end, cutoff):
         if source.get(key) and dt(source[key]) > cutoff:
             raise ValueError("Financial source is future-dated")
     selections = {}
-    for tag, unit in (
-        ("NetCashProvidedByUsedInOperatingActivities", "USD"),
-        ("PaymentsToAcquirePropertyPlantAndEquipment", "USD"),
-        ("WeightedAverageNumberOfDilutedSharesOutstanding", "shares"),
-    ):
+    for tag, unit in fields:
         records = content["facts"].get(tag, {}).get(unit, [])
         eligible = []
         for record in records:
@@ -38,6 +34,8 @@ def annual_cash_flow(source, period_end, cutoff):
                     raise ValueError("Financial fact lacks original accession")
                 eligible.append(record)
         if not eligible:
+            if optional:
+                continue
             raise ValueError(f"Missing matching annual {tag} in {unit}; do not infer units or annualize YTD")
         latest = max(r["filed"] for r in eligible)
         latest_records = [r for r in eligible if r["filed"] == latest]
@@ -45,10 +43,24 @@ def annual_cash_flow(source, period_end, cutoff):
             raise ValueError("Conflicting financial facts require review")
         selected = max(latest_records, key=lambda r: r["accn"])
         selections[tag] = {**selected, "unit": unit}
-    if len({r["start"] for r in selections.values()}) != 1:
+    if len({r["start"] for r in selections.values()}) > 1:
         raise ValueError("Financial inputs have mismatched annual periods")
-    if len({(r["accn"], r["filed"], r["form"]) for r in selections.values()}) != 1:
+    if len({(r["accn"], r["filed"], r["form"]) for r in selections.values()}) > 1:
         raise ValueError("Financial inputs have mixed filing basis; review amendments before valuation")
+    return selections
+
+
+def annual_cash_flow(source, period_end, cutoff):
+    selections = annual_facts(
+        source,
+        period_end,
+        cutoff,
+        (
+            ("NetCashProvidedByUsedInOperatingActivities", "USD"),
+            ("PaymentsToAcquirePropertyPlantAndEquipment", "USD"),
+            ("WeightedAverageNumberOfDilutedSharesOutstanding", "shares"),
+        ),
+    )
     cash, capex, shares = [dec(r["val"]) for r in selections.values()]
     if capex < 0 or shares <= 0 or cash - capex <= 0:
         raise ValueError("Positive annual cash-flow proxy unavailable; use unsupported valuation")
@@ -64,6 +76,52 @@ def annual_cash_flow(source, period_end, cutoff):
             "Debt changes, dilution, stock compensation and nonrecurring items require independent review.",
         ],
     }
+
+
+def cash_flow_diagnostics(source, period_end, cutoff):
+    """Historical accounting arithmetic, never a normalized forecast or approval."""
+    proxy = annual_cash_flow(source, period_end, cutoff)
+    tags = (
+        "StockBasedCompensation",
+        "PaymentsForRepurchaseOfCommonStock",
+        "PaymentsOfDividendsCommonStock",
+        "IncomeTaxesPaidNet",
+    )
+    extra = annual_facts(source, period_end, cutoff, [(t, "USD") for t in tags], optional=True)
+    baseline = next(iter(proxy["facts"].values()))
+    for record in extra.values():
+        if any(record[k] != baseline[k] for k in ("start", "end", "accn", "filed", "form")):
+            raise ValueError("Accounting bridge has mixed filing basis")
+        if dec(record["val"]) < 0:
+            raise ValueError("Negative accounting diagnostic input requires separate review")
+    cash = dec(proxy["facts"]["NetCashProvidedByUsedInOperatingActivities"]["val"])
+    capex = dec(proxy["facts"]["PaymentsToAcquirePropertyPlantAndEquipment"]["val"])
+    result = {
+        "source_id": source["id"],
+        "period_end": period_end,
+        "facts": {**proxy["facts"], **extra},
+        "missing_facts": [t for t in tags if t not in extra],
+        "cfo_less_capex_usd": str(cash - capex),
+        "sbc_deduction_sensitivity_usd": None,
+        "distributions_above_proxy_usd": None,
+        "cash_taxes_paid_net_usd": None,
+        "limitations": [
+            "Historical arithmetic only; no normalization or forecast approval.",
+            "SBC deduction is one sensitivity; do not also charge dilution or offsetting repurchases for the same cost.",
+            "Distributions above the proxy require a full funding reconciliation, not a distress conclusion.",
+            "Cash taxes are already in CFO; do not subtract them again or assume they are nonrecurring.",
+            "Weighted-average shares are not a valuation-date or future diluted share base.",
+        ],
+    }
+    if tags[0] in extra:
+        result["sbc_deduction_sensitivity_usd"] = str(cash - capex - dec(extra[tags[0]]["val"]))
+    if tags[1] in extra and tags[2] in extra:
+        result["distributions_above_proxy_usd"] = str(
+            dec(extra[tags[1]]["val"]) + dec(extra[tags[2]]["val"]) - (cash - capex)
+        )
+    if tags[3] in extra:
+        result["cash_taxes_paid_net_usd"] = str(dec(extra[tags[3]]["val"]))
+    return result
 
 
 def normalization_supported(valuation):

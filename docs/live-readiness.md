@@ -2455,3 +2455,19 @@ Validation: 106 focused research/financial tests passed, Ruff/format/diff checks
 passed, and the private source/arithmetic script verified the nine excerpts and
 both cash/share reconciliations. This is implementation-agent analysis awaiting
 independent review, not acceptance of the model's original or future research.
+
+### Source-bound accounting diagnostics (November 8)
+
+Added `inspect_cash_flow` to the research tool set, using the existing source and
+trace path. Shared annual fact selection preserves cutoff, unit, duration,
+conflict and filing-coherence checks. It reports the historical SBC deduction
+sensitivity, distributions above the proxy and cash taxes separately. Missing
+eligible facts remain null with explicit missing tags; mixed filings and negative
+amounts fail closed. SEC collection now retains common-share repurchases, common
+dividends and net cash taxes. No frozen evidence is changed.
+
+Validation: full suite 789 passed, seven opt-in checks skipped; five subsequently
+added optional-input fault cases passed in a 90-test financial/SEC focused run.
+Ruff and diff checks passed. No paid research, production deployment or trading
+state change occurred. This does not implement or certify a complete normalized
+valuation; see the Apple remediation checklist for remaining requirements.
