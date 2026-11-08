@@ -142,7 +142,7 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(norm
     case = json.loads(Path("evaluations/baseline-v1.json").read_text())["cases"][0]
     candidate = json.loads(Path("tests/fixtures/evaluation/recording.json").read_text())["cases"][case["id"]]
     case["inputs"]["sources"] = list(desk.sources.values())
-    case["expected"].update(required_evidence_ids=[source["id"]], cash_flow_per_share="5.562500")
+    case["expected"].update(required_evidence_ids=[source["id"]], cash_flow_per_share="5.000000")
     candidate["sources"] = []
     for report in [candidate["decision"], *candidate["reports"].values()]:
         report["evidence_ids"] = [source["id"], "assumptions"]
@@ -150,6 +150,13 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(norm
     valuation.update({key: calc[key] for key in ("calculation_id", "bear_value", "base_value", "bull_value")})
     candidate["calculations"] = {calc["calculation_id"]: calc}
     assert score(case, candidate)["acceptance"] == "pending_human_review"
+    # The baseline stays frozen even when a supported bridge changes forecast input.
+    case["expected"]["cash_flow_per_share"] = "5.562500"
+    assert "unsupported_cash_flow_input" in score(case, candidate)["failures"]
+    case["expected"]["cash_flow_per_share"] = "5.000000"
+    calc["inputs"]["cash_flow_per_share"] = "5"
+    assert "unverified_financial_provenance" in score(case, candidate)["failures"]
+    calc["inputs"]["cash_flow_per_share"] = "5.562500"
     assert desk.validate(Valuation, valuation)["base_value"] == "5.06"
     valuation["evidence_ids"] = [source["id"]]
     with pytest.raises(ValueError, match="bridge evidence"):

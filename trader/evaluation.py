@@ -15,7 +15,7 @@ from .models import Decision
 from .research_team import Catalysts, Critique, Research, Valuation
 
 SCHEMAS = {"business": Research, "catalysts": Catalysts, "valuation": Valuation, "adversarial": Critique}
-SCORING_CONTRACT = "financial-provenance-v6"
+SCORING_CONTRACT = "financial-provenance-v7"
 
 
 def fingerprint(value):
@@ -136,6 +136,7 @@ def score(case, candidate, review=None):
         if not matched:
             failures.append("unverified_derived_evidence")
     cited = set()
+    provenance = None
     complete = isinstance(decision, dict) and isinstance(reports, dict) and set(reports) == set(SCHEMAS)
     if complete:
         try:
@@ -212,7 +213,10 @@ def score(case, candidate, review=None):
             failures.append("required_valuation_missing")
         else:
             try:
-                if Decimal(calc["inputs"]["cash_flow_per_share"]) != Decimal(expected["cash_flow_per_share"]):
+                # The frozen expectation is historical; normalized input is checked above.
+                if provenance is not None and Decimal(provenance["cash_flow_per_share"]) != Decimal(
+                    expected["cash_flow_per_share"]
+                ):
                     failures.append("unsupported_cash_flow_input")
             except (KeyError, TypeError, ValueError, ArithmeticError):
                 failures.append("missing_or_invalid_calculation")

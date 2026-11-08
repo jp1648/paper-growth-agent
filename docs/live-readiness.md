@@ -3072,3 +3072,19 @@ This is AI review, not a human attestation or claim of freedom from model bias.
 No paid research, broker orders, pause changes, trial activation or deployment in
 this task. Existing research budget and the prospective observation requirements
 remain unchanged. Agent review findings must not be stored as human attestation.
+
+### Scoring conflict corrected — financial-provenance-v7
+
+The Microsoft review's raw-versus-normalized conflict was reproduced with the
+existing normalization fixture before changing code. The evaluator now checks
+the frozen expected historical proxy against independently reconstructed filing
+provenance; the forecast calculation remains checked against its reconstructed
+normalization bridge and exact source citations. Wrong historical expectations,
+altered forecast input and fabricated bridge output remain failures. No source,
+old result or holdout candidate was rewritten.
+
+The independent reviewer approved this fix and independently reran the two
+affected modules (55 passing tests). Exact code/test/suite hashes and review scope
+are retained in `state/independent-review-20261108/scoring-fix-review.json`. This
+versions scoring, not research economic approval; old scoring results cannot be
+compared without explicit replay. No paid model calls or broker actions occurred.
