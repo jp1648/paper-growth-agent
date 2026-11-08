@@ -2698,3 +2698,29 @@ It does not establish Apple's recurring tax, reinvestment, sustainable SBC or
 share assumptions. Growth/multiple economics, independent review and an unseen
 case cohort remain outstanding. No paid call, deployment, frozen-recording
 rewrite, trial activation or trading-state change occurred.
+
+### Paused normalization release — November 8
+
+Runtime source `2ea0ff5` is deployed as immutable image
+`sha256:1659652022db516001ff859e79a53b2e6eccc64af65cfdf3a48a6ac916dc5d64`.
+Cloud Build `849d3190-a99f-4054-bd2f-2051950747c7` used the scoped builder and
+only the tracked agent build inputs. All 30 Python files matched their source
+hashes both in an isolated image and in the restarted executor.
+
+CI first identified a stale mutation-harness reference to the historical-only
+cash-flow guard. Validation commit `30c481f` updates that reference and includes
+normalization tests plus their frozen baseline fixture; runtime build inputs are
+identical to `2ea0ff5`. CI runs 42454901215 and 42454905238 passed: **836 tests
+passed, one paper smoke test skipped, 86% branch coverage**, all 16 disabled
+safety guards detected, and dashboard, dependency and secret checks passed.
+Disabling the financial-basis guard fails both historical and normalized-input
+tests. The earlier failed CI is not treated as release evidence.
+
+After the paused restart, reconciliation was healthy at
+2026-11-08T06:33:01.788063Z. The original experiment, all document-kind counts,
+one AAPL share, pause, configuration and spending hash match the immediate
+pre-release snapshot. Executor, proxy and health timer are active. A private
+rollback backup and release receipt are retained under `state/`. No paid research,
+order submission, trial activation or independent research approval occurred.
+The numerical bridge still needs economically justified Apple inputs and a new
+model result reviewed independently; the rejected original report remains rejected.
