@@ -2379,3 +2379,31 @@ Microsoft annual-filings-v2 case. Only its suite/manifest metadata were inspecte
 not candidate outputs. No new model request, broker order or billing change was
 made. The available daily budget does not establish independent sufficiency or
 semantic approval, and the prior credit balance was not refreshed here.
+
+## Build service-account privilege reduction
+
+Removed the project-level `roles/editor` grant from default Compute account
+`629753278561-compute@developer.gserviceaccount.com`. The project's trader VM
+uses `trader-agent`; the dashboard uses `dashboard`. No active/queued regional
+Cloud Builds, regional Cloud Run jobs or regional build triggers were present
+at removal. These are project/regional observations, not an organization-wide
+inventory or inherited-policy audit.
+
+Created dedicated keyless `trader-builder` with source-bucket Object Viewer,
+`trader` Artifact Registry repository Writer, and project Logs Writer. It has no
+project Editor grant. Real build `e0a80282-1385-439e-b060-8899e7c37fb0` succeeded
+under this explicit account using the retained tracked context for `76ec9eb`,
+including source retrieval, image publication and Cloud Logging. Verification
+image digest `sha256:ec73922f543ae4e61887b291daf946f85380ddf9c515afa81a55abc7592e00e3`
+was not deployed. Added `deploy/cloudbuild-agent.yaml` with explicit account/log
+settings and the exact observed builder-image digest, plus `deploy/build-images.md`.
+Future builds must select this config rather than rely on the former Editor role.
+
+Read-back IAM confirms no project binding for the default Compute account and
+only Logs Writer at project scope for the builder; repository and bucket grants
+are separate. Existing executor experiment, pause, one AAPL share, ledger counts,
+configuration and spending hashes remained unchanged; reconciliation was healthy.
+Private IAM/build evidence is in `state/build-iam-20261108/`. No service restart,
+order, paid model call, secret creation or billing-setting change occurred.
+This reduces build privileges; it does not certify all IAM, inherited permissions,
+artifact supply-chain controls or hostile build-source isolation.
