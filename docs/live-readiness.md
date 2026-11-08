@@ -1615,3 +1615,15 @@ operator attestation, not independent API verification of delivery.
   unchanged; pause remains set. No paid calls or orders. Private receipts:
   `state/cache-budget-20261108/`. Higher conservative estimates can exhaust a run
   sooner; no successful research acceptance is implied.
+
+- November 6 baseline charge investigation: evaluation costs live in saved
+  `evaluation_case` events, not the top-level journal. Recovered 62 known responses
+  and one unknown call from the original evaluation ledger. The candidate evaluation
+  overlaps the baseline from 19:00:31 through 19:01:24 UTC, preventing attribution
+  from the whole minute-window total alone. Read-only Cloud SQL retrieval recovered
+  61 response traces matching baseline role/input/output tuples exactly, including
+  cache-read/cache-creation counts. One known Astra response (6484 input, 3000
+  output) lacks a matching response trace in the selected window. This may be an
+  error/incomplete-response path; it is not proof of telemetry loss or zero billing.
+  Original $5 hold remains unknown. Private data and asserted comparison:
+  `state/charge-reconciliation/baseline-20261108/`. No new model calls or trades.
