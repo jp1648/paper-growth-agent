@@ -459,3 +459,11 @@ wrong windows, reversed retrieval order, corrupted pages, unsupported records an
 CLI isolation from configuration, network clients and the ledger. This closes the
 ordinary-dividend revision-reporting gap; benchmark holdings and reinvestment
 accounting still require implementation and frozen-policy review.
+
+The archived corporate-action reader now reconstructs the exact capture request
+policy with the same helper as the collector. Matching request/manifest files
+alone are insufficient: extra filters or a starting pagination token, changed
+sort/page size/quality policy, noncanonical dates, or an interval over 366 days
+are rejected before interpreting records. This prevents a narrowed or partially
+traversed request from being mistaken for the declared capture method. It still
+does not authenticate rewritten evidence or certify provider completeness.

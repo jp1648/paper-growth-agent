@@ -15,15 +15,13 @@ MAX_TOTAL_BYTES = 10 * MAX_PAGE_BYTES
 MAX_PAGES = 100
 
 
-def capture_actions(provider, symbol, start, end, output):
+def action_parameters(symbol, start, end):
     if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", symbol):
         raise ValueError("Require one canonical stock symbol")
     first, last = date.fromisoformat(start), date.fromisoformat(end)
     if first.isoformat() != start or last.isoformat() != end or not 0 <= (last - first).days <= 366:
         raise ValueError("Require an ordered canonical processing-date range of at most 366 days")
-    root = Path(output)
-    root.mkdir(mode=0o700, parents=True, exist_ok=False)
-    params = {
+    return {
         "symbols": symbol,
         "start": start,
         "end": end,
@@ -31,6 +29,12 @@ def capture_actions(provider, symbol, start, end, output):
         "limit": 1000,
         "sort": "asc",
     }
+
+
+def capture_actions(provider, symbol, start, end, output):
+    params = action_parameters(symbol, start, end)
+    root = Path(output)
+    root.mkdir(mode=0o700, parents=True, exist_ok=False)
     request = {"endpoint": ENDPOINT, "params": params.copy(), "started_at": now().isoformat()}
     (root / "request.json").write_text(json.dumps(request, indent=2) + "\n")
     pages, identities, tokens = [], {}, set()
@@ -128,11 +132,9 @@ def validate_cash_dividends(directory):
         raise ValueError("Capture is incomplete or its request does not match")
     params = manifest["params"]
     symbol = params["symbols"]
-    if params["data_quality"] != "all" or not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", symbol):
-        raise ValueError("Invalid capture symbol or quality filter")
+    if params != action_parameters(symbol, params["start"], params["end"]):
+        raise ValueError("Capture request differs from the complete corporate-action capture policy")
     start, end = date.fromisoformat(params["start"]), date.fromisoformat(params["end"])
-    if start > end:
-        raise ValueError("Invalid capture processing-date interval")
     pages = manifest["pages"]
     if not isinstance(pages, list) or not 1 <= len(pages) <= MAX_PAGES:
         raise ValueError("Invalid capture page count")

@@ -361,3 +361,27 @@ def test_dividend_comparison_cli_is_offline(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "Store", lambda *a: pytest.fail("Ledger opened"))
     assert cli.main(["compare-cash-dividends", str(before), str(after)]) == 0
     assert json.loads(capsys.readouterr().out)["status"] == "revision_review_required"
+
+
+@pytest.mark.parametrize(
+    "changed_params",
+    [
+        {"types": "cash_dividends"},
+        {"page_token": "skip-earlier-records"},
+        {"sort": "desc"},
+        {"limit": 1},
+        {"data_quality": "processed"},
+        {"start": "20261001"},
+        {"start": "2020-01-01"},
+    ],
+)
+def test_validator_rejects_changed_capture_policy_even_with_matching_receipts(tmp_path, changed_params):
+    root, _ = ordinary_capture(tmp_path)
+    request = json.loads((root / "request.json").read_text())
+    manifest = json.loads((root / "manifest.json").read_text())
+    request["params"].update(changed_params)
+    manifest["params"] = request["params"]
+    (root / "request.json").write_text(json.dumps(request))
+    (root / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        validate_cash_dividends(root)

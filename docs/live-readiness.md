@@ -2942,3 +2942,18 @@ only, not activation or orders. Fee/interest evidence, benchmark ledger/collecto
 infrastructure allocation, independent research review and final frozen manifest
 still precede activation. Existing 60-session AND 12-week requirements are intact.
 No production changes, source requests, paid model calls or trades in this step.
+
+### Corporate-action archived-request policy gap fixed
+
+Before the fix, six of seven adversarial same-request/manifest cases passed the
+reader despite differing from the collector's policy: an extra action filter,
+initial page token, reversed sort, changed page limit, noncanonical date and
+oversized interval. The existing quality-filter check rejected the seventh.
+Capture and offline validation now share exact request construction, so all seven
+are rejected. Valid ordinary capture, entitlement and revision-comparison paths
+remain passing (78 focused cases). No evidence was overwritten or source queried;
+this is validation hardening, not proof of complete dividend history.
+
+Full local validation: **911 passed, 7 skipped**; Ruff checks/formatting passed.
+The archived-request fix is not yet deployed; production remains paused on the
+previous verified image. Independent policy/research approvals remain pending.
