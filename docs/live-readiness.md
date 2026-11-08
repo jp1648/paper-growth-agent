@@ -1417,3 +1417,20 @@ operator attestation, not independent API verification of delivery.
   read-back rejects success without retrying or overwriting that later owner.
   All sixteen transfer tests and Ruff pass. These are deterministic cloud-command
   fixtures, not a replacement-host service recovery or real network partition.
+
+- Replacement-host preparation (2026-11-08 02:15 UTC): read-only GCE inspection
+  confirmed the original executor ID 3629391648980512917 remains RUNNING, with
+  the 20 GiB `trader-state` disk retained on VM deletion. Executor, proxy and
+  health timer are active, and the original pause marker exists. Actual mounts
+  use `/mnt/trader-state`, with `repo` and `control` bound to the original paths;
+  the generic runbook's `/srv/trader` is not the installed mount point.
+- Preserved seven host configuration/runtime files in root-only
+  `/mnt/trader-state/recovery-host/20261108T021524Z`: fstab, service environment,
+  executor/proxy/health units and timer, and the installed Cloud SQL proxy binary.
+  Each copy's SHA-256 matches its source; the private manifest records original
+  modes and sizes. This closes the missing boot-disk configuration copy in the
+  recovery material. The bundle contains private configuration: never publish it.
+  Destination root-disk identifiers in fstab must be regenerated, not copied
+  blindly. It is on the same state disk, not yet a verified off-host copy, and is
+  not a consistent ledger checkpoint or a completed replacement-host drill.
+  No service restart, ownership transfer, model call or order was performed.
