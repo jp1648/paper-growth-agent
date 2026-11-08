@@ -2332,3 +2332,18 @@ replacement-host test. Focused recovery/execution tests: 45 passed.
 Full offline validation passed: 783 tests, 7 skipped; Ruff, formatting and diff
 checks passed. This follow-up fix is not yet deployed. No provider/model calls or
 real orders were made; the executor remains paused on release `87afdb8`.
+
+## Retained-order recovery release verified
+
+Source `76ec9eb76466c382c447ad1bc2bbb137cb7332b1` is deployed on the paused
+executor. CI `42449050871` passed all jobs, including safety mutations.
+Cloud Build `ee1be5fe-b59a-4d72-9476-eca9155b08b5` succeeded; deployed digest:
+`sha256:acfaedccd3fe885bd9d50b23e808335a4ab1cfd1ae6eebc7f965c3b4ac9adab2`.
+All 29 source hashes matched in the image and running container. Fresh successful
+reconciliation is `2026-11-08T05:04:50.376657+00:00`; application health, executor,
+proxy and health timer passed. Original experiment, pause, one AAPL share,
+configuration/spending hashes and intent/order/activity/acceptance/adjustment/
+revision counts were unchanged. Private receipt: `state/release-76ec9eb/`;
+consistent VM rollback backup: `state/release-rollback-76ec9eb`. No orders or paid
+research were issued. Investment review, normalization and prospective trial
+acceptance remain unproven.
