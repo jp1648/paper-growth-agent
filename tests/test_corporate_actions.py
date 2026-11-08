@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from trader.corporate_actions import capture_actions
+from trader.corporate_actions import capture_actions, validate_cash_dividends
 
 
 def provider(handler):
@@ -173,3 +173,111 @@ def test_cli_capture_does_not_construct_broker_or_ledger(tmp_path, monkeypatch):
         == 0
     )
     assert p.client.is_closed
+
+
+def ordinary_capture(tmp_path, **changes):
+    action = {
+        "id": "a",
+        "symbol": "SPY",
+        "rate": "1.888834",
+        "foreign": False,
+        "special": False,
+        "ex_date": "2026-09-18",
+        "record_date": "2026-09-18",
+        "payable_date": "2026-10-30",
+        "process_date": "2026-10-30",
+        **changes,
+    }
+    p = provider(
+        lambda _: httpx.Response(
+            200, json={"corporate_actions": {"cash_dividends": [action]}, "next_page_token": None}
+        )
+    )
+    root = tmp_path / "capture"
+    capture_actions(p, "SPY", "2026-10-01", "2026-10-31", root)
+    p.client.close()
+    return root, action
+
+
+def test_validate_capture_preserves_ex_date_outside_processing_window(tmp_path):
+    root, action = ordinary_capture(tmp_path)
+    before = {p.name: p.read_bytes() for p in root.iterdir()}
+    result = validate_cash_dividends(root)
+    assert result["dividends"] == [action]
+    assert result["manifest_sha256"] == hashlib.sha256(before["manifest.json"]).hexdigest()
+    assert result["history_completeness_verified"] is False
+    assert result["entitlements_verified"] is False
+    assert result["net_withholding_verified"] is False
+    assert before == {p.name: p.read_bytes() for p in root.iterdir()}
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("rate", "NaN"),
+        ("rate", "Infinity"),
+        ("rate", "0"),
+        ("rate", "-1"),
+        ("rate", True),
+        ("symbol", "QQQ"),
+        ("foreign", True),
+        ("special", True),
+        ("special", None),
+        ("ex_date", "2026-11-01"),
+        ("record_date", "2026-09-01"),
+        ("process_date", "2026-11-01"),
+        ("payable_date", None),
+        ("ex_date", "20260918"),
+    ],
+)
+def test_unusable_cash_fields_are_not_silently_normalized(tmp_path, field, value):
+    root, _ = ordinary_capture(tmp_path, **{field: value})
+    with pytest.raises((ValueError, TypeError)):
+        validate_cash_dividends(root)
+
+
+@pytest.mark.parametrize(
+    "fault", ["bytes", "hash", "status", "path", "symlink", "count", "request", "continuation", "noncash"]
+)
+def test_capture_integrity_failures_prevent_dividend_conversion(tmp_path, fault):
+    root, _ = ordinary_capture(tmp_path)
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    page_path = root / "page-001.json"
+    if fault == "bytes":
+        page_path.write_bytes(page_path.read_bytes() + b" ")
+    elif fault == "hash":
+        manifest["pages"][0]["sha256"] = "0" * 64
+    elif fault == "status":
+        manifest["status"] = "failed"
+    elif fault == "path":
+        manifest["pages"][0]["file"] = "../outside.json"
+    elif fault == "symlink":
+        page_path.rename(tmp_path / "outside.json")
+        page_path.symlink_to(tmp_path / "outside.json")
+    elif fault == "count":
+        manifest["unique_actions"] = 0
+    elif fault == "request":
+        manifest["params"]["symbols"] = "QQQ"
+    else:
+        page = json.loads(page_path.read_text())
+        if fault == "continuation":
+            page["next_page_token"] = "missing-page"
+        else:
+            page["corporate_actions"] = {"forward_splits": [{"id": "split"}]}
+        raw = json.dumps(page).encode()
+        page_path.write_bytes(raw)
+        manifest["pages"][0].update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        validate_cash_dividends(root)
+
+
+def test_validation_cli_needs_no_config_credentials_or_broker(tmp_path, monkeypatch):
+    from trader import cli
+
+    root, _ = ordinary_capture(tmp_path)
+    monkeypatch.setattr(cli.Settings, "load", lambda _: pytest.fail("No config expected"))
+    monkeypatch.setattr(cli, "AlpacaData", lambda _: pytest.fail("No provider expected"))
+    monkeypatch.setattr(cli, "Store", lambda _: pytest.fail("No ledger expected"))
+    assert cli.main(["validate-cash-dividends", str(root)]) == 0

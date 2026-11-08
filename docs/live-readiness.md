@@ -2225,3 +2225,21 @@ manifest plus exact 300-byte source page. The retrieved local copy matched SHA-2
 VM evidence directory: `state/corporate-actions/spy-20260901-20261031-capture1`.
 The result explicitly does not certify history completeness or economic fields.
 No recurring collection, orders, model requests or trial activation occurred.
+
+## Offline cash-distribution evidence validation
+
+Added `validate-cash-dividends`, an offline CLI before configuration/provider/
+ledger construction. It verifies capture integrity and pagination, then validates
+ordinary cash-dividend identity, symbol, rates and economic dates without confusing
+ex-date with processing-date filters. Special/foreign/non-cash actions fail for
+separate review. Original records remain unchanged; history completeness,
+entitlement and withholding verification remain false. This supplies a checked
+input boundary for future accounting, not a finished return pipeline.
+
+Validation: 43 capture/validation tests, full offline suite 753 passed and 7
+skipped; repository Ruff/format and diff checks passed. The offline command also
+validated the retained SPY capture (one ordinary cash distribution), preserving
+its explicit unverified coverage/entitlement/withholding flags. Private output:
+`state/capture-validation-5fab33c/validation.json`. Only the existing request file
+was retrieved from the VM; no new market-data/model requests or orders occurred.
+This local command update is not yet deployed to the executor.

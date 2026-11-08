@@ -112,3 +112,25 @@ explicit null continuation token. Every manifest keeps
 Incomplete economic records and unknown action groups are retained for review,
 not interpreted or silently discarded. This implements source capture only;
 entitlement accounting, return construction and trial activation remain pending.
+
+## Offline validation of ordinary cash records
+
+`paper-agent validate-cash-dividends CAPTURE_DIRECTORY` needs no configuration,
+credentials, broker or network. It verifies the request/manifest agreement,
+completed pagination, bounded local page paths and sizes, SHA-256 values and
+unique-action count. It rejects symlinked files and preserves all source files.
+
+For ordinary, non-foreign, non-special cash dividends it checks source identity,
+requested symbol, finite positive rate, canonical ex/record/payment/processing
+dates, date ordering and the requested processing-date interval. Ex-dates may
+legitimately precede the processing window. Nonempty unsupported action groups
+block this conversion; no split or special distribution is silently discarded.
+The output retains the original records and manifest hash for downstream use.
+
+This is structural integrity and ordinary-field validation, not signed source
+authentication. A person able to replace both manifest and pages can replace the
+claimed evidence. Successful validation still sets history completeness,
+entitlement and net withholding verification to false. It does not establish
+currency treatment, quantities owned at ex-date, actual settlement, reinvestment,
+returns, source sufficiency or trial acceptance. Missing/canceled/revised economic
+facts require separate review; no amounts or dates are invented.

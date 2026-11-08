@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 
 from .alpaca import safe_error
-from .models import now
+from .models import dec, dt, now
 
 ENDPOINT = "https://data.alpaca.markets/v1/corporate-actions"
 MAX_PAGE_BYTES = 1024 * 1024
@@ -52,7 +52,7 @@ def capture_actions(provider, symbol, start, end, output):
             name = f"page-{index + 1:03d}.json"
             (root / name).write_bytes(raw)
             pages.append({"file": name, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)})
-            page = json.loads(raw)
+            page = json.loads(raw, parse_float=dec)
             if not isinstance(page, dict) or not isinstance(page.get("corporate_actions"), dict):
                 raise TypeError("Malformed corporate-action page")
             for kind, records in page["corporate_actions"].items():
@@ -99,3 +99,100 @@ def capture_actions(provider, symbol, start, end, output):
         with (root / "manifest.json").open("x") as stream:
             stream.write(json.dumps(manifest, indent=2) + "\n")
     return manifest
+
+
+def validate_cash_dividends(directory):
+    """Validate retained ordinary cash events, without asserting entitlements or coverage."""
+    root = Path(directory)
+
+    def read(name):
+        path = root / name
+        if path.is_symlink():
+            raise ValueError("Capture files must not be symlinks")
+        with path.open("rb") as stream:
+            raw = stream.read(MAX_PAGE_BYTES + 1)
+        if len(raw) > MAX_PAGE_BYTES:
+            raise ValueError("Capture file byte bound exceeded")
+        return raw
+
+    manifest_raw = read("manifest.json")
+    manifest = json.loads(manifest_raw)
+    request = json.loads(read("request.json"))
+    if (
+        manifest["status"] != "pagination_exhausted"
+        or manifest["error"] is not None
+        or manifest["endpoint"] != ENDPOINT
+        or request != {k: manifest[k] for k in ("endpoint", "params", "started_at")}
+        or dt(manifest["finished_at"]) < dt(manifest["started_at"])
+    ):
+        raise ValueError("Capture is incomplete or its request does not match")
+    params = manifest["params"]
+    symbol = params["symbols"]
+    if params["data_quality"] != "all" or not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,14}", symbol):
+        raise ValueError("Invalid capture symbol or quality filter")
+    start, end = date.fromisoformat(params["start"]), date.fromisoformat(params["end"])
+    if start > end:
+        raise ValueError("Invalid capture processing-date interval")
+    pages = manifest["pages"]
+    if not isinstance(pages, list) or not 1 <= len(pages) <= MAX_PAGES:
+        raise ValueError("Invalid capture page count")
+    records, tokens, total = {}, set(), 0
+    for index, receipt in enumerate(pages, 1):
+        name = f"page-{index:03d}.json"
+        if receipt["file"] != name:
+            raise ValueError("Capture pages must be consecutive local files")
+        raw = read(name)
+        total += len(raw)
+        if (
+            total > MAX_TOTAL_BYTES
+            or len(raw) != receipt["bytes"]
+            or hashlib.sha256(raw).hexdigest() != receipt["sha256"]
+        ):
+            raise ValueError("Capture page size or hash mismatch")
+        page = json.loads(raw, parse_float=dec)
+        token = page["next_page_token"]
+        if index == len(pages):
+            if token is not None:
+                raise ValueError("Capture has an unconsumed continuation token")
+        elif not isinstance(token, str) or not token.strip() or token in tokens:
+            raise ValueError("Capture pagination is incomplete or cyclic")
+        else:
+            tokens.add(token)
+        for kind, actions in page["corporate_actions"].items():
+            if not isinstance(actions, list):
+                raise TypeError("Invalid corporate-action group")
+            if actions and kind != "cash_dividends":
+                raise ValueError("Non-cash action requires separate accounting")
+            for action in actions:
+                identifier = action["id"]
+                if not isinstance(identifier, str) or not identifier.strip() or action["symbol"] != symbol:
+                    raise ValueError("Invalid cash-dividend identity or symbol")
+                if identifier in records and records[identifier] != action:
+                    raise ValueError("Conflicting cash-dividend identity")
+                if action.get("foreign") is not False or action.get("special") is not False:
+                    raise ValueError("Foreign or special distributions require separate review")
+                dates = {
+                    k: date.fromisoformat(action[k])
+                    for k in ("ex_date", "record_date", "payable_date", "process_date")
+                }
+                if any(v.isoformat() != action[k] for k, v in dates.items()):
+                    raise ValueError("Dividend dates must be canonical")
+                if (
+                    not dates["ex_date"] <= dates["record_date"] <= dates["payable_date"]
+                    or not start <= dates["process_date"] <= end
+                ):
+                    raise ValueError("Unsupported dividend dates or processing interval")
+                if isinstance(action["rate"], bool) or dec(action["rate"]) <= 0:
+                    raise ValueError("Dividend rate must be finite and positive")
+                records[identifier] = action
+    if len(records) != manifest["unique_actions"]:
+        raise ValueError("Capture action count mismatch")
+    return {
+        "status": "ordinary_cash_fields_validated",
+        "symbol": symbol,
+        "manifest_sha256": hashlib.sha256(manifest_raw).hexdigest(),
+        "dividends": list(records.values()),
+        "history_completeness_verified": False,
+        "entitlements_verified": False,
+        "net_withholding_verified": False,
+    }

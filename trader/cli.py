@@ -84,7 +84,16 @@ def main(argv=None):
     actions.add_argument("--start", required=True, help="Inclusive processing date")
     actions.add_argument("--end", required=True, help="Inclusive processing date")
     actions.add_argument("--output-dir", required=True, help="New evidence directory; never overwritten")
+    validate_actions = sub.add_parser(
+        "validate-cash-dividends", help="Offline capture integrity and cash-field checks; no broker"
+    )
+    validate_actions.add_argument("directory")
     args = parser.parse_args(argv)
+    if args.command == "validate-cash-dividends":
+        from .corporate_actions import validate_cash_dividends
+
+        print(dumps(validate_cash_dividends(args.directory)))
+        return 0
     if args.command == "capture-corporate-actions":
         from .corporate_actions import capture_actions
 
