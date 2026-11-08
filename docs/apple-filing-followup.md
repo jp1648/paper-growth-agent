@@ -206,3 +206,75 @@ metadata; raw original HTML bytes/hash have not been captured. No original
 frozen case or model output was modified. A future expanded development case
 must explicitly version any added source. This follow-up remains implementation-
 agent analysis requiring independent review, not a replacement accepted valuation.
+
+## SBC, issuance and the cost of a flat share count
+
+The frozen filing supports two different roll-forwards. Do not merge them into
+one employee-issuance figure (all counts below are millions):
+
+| Common shares | FY2025 |
+|---|---:|
+| Opening outstanding | 15,116.786 |
+| Repurchased | -401.672 |
+| Issued, **net** of employee-tax withholding | +58.146 |
+| Closing outstanding | 14,773.260 |
+| Net reduction | 343.526 |
+
+| RSU awards | FY2025 |
+|---|---:|
+| Opening unvested awards | 163.326 |
+| Granted | +73.466 |
+| Vested | -76.845 |
+| Forfeited | -8.373 |
+| Closing unvested awards | 151.574 |
+
+The 18.699m difference between vested RSUs and net shares issued is not a verified
+withholding count. Net issuance is broader than the RSU roll-forward, and the
+filing excerpt does not supply a complete gross issuance/withholding reconciliation.
+Likewise, 58.146/401.672 = 14.48% describes the **net issuance share-count offset**,
+not a proven fraction of actual repurchase cash spent offsetting compensation.
+
+As a deliberately conditional illustration at the exercise's $200 price,
+offsetting 58.146m net shares would cost $11.6292bn. Buying the additional
+343.526m shares to reproduce the historical net reduction would cost $68.7052bn.
+The $80.3344bn total is not Apple's actual repurchase cash or a forecast: future
+issuance, settlement dates and purchase prices must be modeled independently.
+A stable-share forecast requires funding the offset; simply assuming a declining
+denominator creates an unsupported valuation benefit.
+
+Tax and compensation measurements also must remain distinct:
+
+- SBC expense was $12.863bn; its related accounting tax benefit was $3.602bn.
+  Their $9.261bn difference is an after-tax expense measure, not necessarily
+  current cash tax savings or a new amount to add to CFO.
+- The RSUs' vesting-date fair value was $17.1bn. Grant-date expense, vesting-date
+  value and repurchase cost measure different things and periods.
+- Note 11 reports approximately $6.1bn employee-tax payments; the cash-flow
+  financing line is $5.960bn. Do not silently equate them or claim an exact
+  withholding reconciliation from the rounded note.
+- Unrecognized RSU compensation was $21.8bn, expected to be recognized over a
+  weighted-average 2.5 years. Dividing that stock of expense by 2.5 does not
+  forecast future annual compensation: it omits future grants and vesting patterns.
+
+Two internally consistent valuation approaches remain possible, but must not be
+combined indiscriminately. A cash-equivalent compensation approach retains an
+explicit economic SBC cost and separately addresses existing award claims. An
+actual dilution approach models gross vesting/issuance, tax withholding cash,
+forfeitures and funded repurchases over time. Neither permits adding back SBC,
+assuming a flat share count and omitting the offset cost. Subtracting full SBC
+expense and then charging the same compensation again through dilution/offset
+repurchases would also be inconsistent.
+
+The October 17 cover-page basic share count is 14,776.353m, versus the historical
+annual diluted weighted average of 15,004.697m. Applying the same unnormalized
+$98.767bn proxy to the former produces $6.684126, versus $6.582405 using the
+latter. This is a denominator sensitivity, not a forward valuation. The 151.574m
+unvested RSUs are about 1.026% of September-end common shares; that is neither
+immediate dilution nor the treasury-stock-method diluted share count. Future
+awards, vesting, withholding, forfeitures and buybacks remain explicit forecast
+inputs rather than hidden inside historical weighted averages.
+
+Seven exact source passages, both checked roll-forwards and the conditional
+arithmetic are retained in `share-bridge.json`, reproduced by `shares.py` in the
+private filing-follow-up directory. This resolves the historical count identities
+while preserving the gross issuance and forward-policy gaps for independent review.

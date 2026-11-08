@@ -2548,3 +2548,18 @@ This narrows the tax evidence gap, but does not establish recurring taxes, forwa
 shares/reinvestment, or an approved normalized valuation. The new source is
 separate from the original frozen cases; no paid call, production change or
 trade occurred. The missing-evidence independent review remains pending.
+
+### Historical share and award reconciliation (November 8)
+
+Reconciled common shares and RSU awards separately from seven exact frozen-filing
+passages. Repurchases of 401.672m and net issuance of 58.146m explain the 343.526m
+common-share reduction. RSU grants/vesting/forfeitures reconcile to 151.574m
+unvested awards; vested-minus-net-issued is explicitly not called a withholding
+count. Added a conditional $200 offset-cost sensitivity and distinguished SBC
+expense/tax benefit, vesting value, withholding cash and forward shares in the
+[Apple follow-up](apple-filing-followup.md#sbc-issuance-and-the-cost-of-a-flat-share-count).
+
+Both source/count identities and sensitivity sums passed assert checks against
+retained source offsets. No paid calls, changes to frozen cases, model claims of
+completion, deployment or trading changes. Forward compensation/share policy and
+independent investment approval remain open; the goal is not complete.
