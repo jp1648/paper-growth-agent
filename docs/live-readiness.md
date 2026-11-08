@@ -2104,3 +2104,18 @@ suite 706 passed, 7 skipped; Ruff and diff checks passed. The preceding producti
 snapshot (2026-11-08T04:16:34Z) contained zero revision documents, so it provides no
 evidence of an existing orphaned revision requiring repair. No historical records
 were changed. Deployment remains to be verified.
+
+## Atomic correction rollout — source 3e6610d
+
+- First CI failed test formatting; corrected in 92eced6. CI 42446404605 passed
+  all jobs. Every build input matched between those commits, so the successful
+  Cloud Build 3ca0cf2d-4611-4c40-847a-0a887383d2d2 image was reused without rebuilding.
+- Deployed digest `sha256:8880b903312c428acc6b1c1ff01df9b54794923232808de050fec44b34743b11`.
+  All 27 Python source hashes matched in the downloaded and running image.
+  Reconciliation succeeded at 2026-11-08T04:23:46.124713+00:00; executor,
+  database proxy, health timer and application health passed.
+- Experiment, pause, AAPL quantity one, configuration and spending hashes were
+  unchanged. Intent/order/activity/acceptance/adjustment/revision counts remained
+  2/1/3/8/1/0. No history repair was needed or performed. VM rollback bundle:
+  `state/release-rollback-3e6610d`; local evidence:
+  `state/revision-atomic-release-3e6610d/`. No orders or paid research calls.
