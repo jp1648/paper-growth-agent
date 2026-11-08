@@ -2407,3 +2407,26 @@ Private IAM/build evidence is in `state/build-iam-20261108/`. No service restart
 order, paid model call, secret creation or billing-setting change occurred.
 This reduces build privileges; it does not certify all IAM, inherited permissions,
 artifact supply-chain controls or hostile build-source isolation.
+
+## Independent Apple verdict: changes required
+
+Jay supplied a substantive independent review: temporary WATCH/zero shares is
+acceptable, completed investment research is not. Recorded a separate transcribed
+review bound to the original case/recording; replay yields `human_review_failed`
+and acceptance `failed`. Original suite/recording/results hashes are unchanged.
+Jay did not independently attest artifact hashes or mechanical results from HTML;
+that limitation is retained in the review. Private review/correction artifacts:
+`state/evaluations/annual-dev-20261107-2-jay-review/`.
+
+Confirmed required terminal multiple 29.6007677855x, not approximately 31x. Added
+`inspect_valuation` using an existing validated calculation to compute implied
+terminal multiples, terminal fractions and separate growth/multiple sensitivities.
+The valuation prompt requests this tool rather than mental arithmetic. Original
+calculation schema/identities remain unchanged. Tests independently reproduce the
+Apple correction and reverse-solve the reference price, test a simple one-year
+case, unknown calculations and invalid targets, and preserve source calculations.
+Full offline suite: 787 passed, 7 skipped; Ruff and formatting passed. These local
+changes are not deployed and no paid rerun occurred. The numerical normalization
+bridge, available-filing business analysis, economically grounded assumptions,
+measurable triggers/confidence and missing-evidence rerun remain open; see
+`docs/apple-review-remediation.md`. This arithmetic fix is not research approval.

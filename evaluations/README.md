@@ -52,7 +52,9 @@ to pass the cohort; separately test bounded document access or honest abstention
 - Report mechanical validity and independent semantic acceptance separately.
   Development run `annual-dev-20261107-2` collected Apple outputs: the complete
   case mechanically passed with WATCH; the missing-evidence variant failed.
-  Neither has independent semantic approval. See `docs/live-readiness.md`.
+  Jay's independent Apple review requires changes and rejects completed-research
+  acceptance while retaining temporary WATCH. The missing-evidence case remains
+  failed. See `docs/apple-review-remediation.md` and `docs/live-readiness.md`.
 - Two companies and two sufficient cases are a starter cohort, not enough to meet
   the release gate. Expand the declared universe/regimes with independently
   reviewed unseen cases before any promotion; retain the >=90% completion target
@@ -81,8 +83,10 @@ an accepted result. Results retain the review-file content hash for audit.
 
 Hash binding prevents stale approvals from being silently reused; it does not
 authenticate the named reviewer. Before promotion, the operator must verify the
-reviewer's identity and independence and retain the original review file. No
-review has been supplied or claimed by this implementation. Results from earlier scoring contracts must be rescored into new output files
+reviewer's identity and independence and retain the original review file. Jay's
+direct user-message Apple review is transcribed separately with a negative verdict;
+the implementation bound it to retained hashes, which Jay did not independently
+attest from the HTML. No semantic approval is claimed. Results from earlier scoring contracts must be rescored into new output files
 before comparison under the current contract; old results are not rewritten.
 
 ## Prospective paper diagnostics

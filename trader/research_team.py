@@ -23,7 +23,7 @@ from pydantic import Field
 
 from .alpaca import safe_error
 from .evidence import EvidenceTooLarge
-from .financials import annual_cash_flow, normalization_supported
+from .financials import annual_cash_flow, normalization_supported, valuation_diagnostics
 from .models import Decision, Model, dec, dt, dumps, now
 from .observability import emit, traced
 from .spending import DailyReservation
@@ -130,6 +130,7 @@ ROLES = {
             "from one coherent filing accession/date/form. Do not mix amended and older facts. "
             "cash_flow_per_share must equal (CFO-capex)/shares rounded to six decimals. The historical proxy "
             "does not establish normalized earnings. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Flag unresolved_material_gaps if material adjustments are unavailable; never invent adjustments or treat the historical proxy as normalized cash. A missing or unresolved normalization review blocks BUY/ADD. Return its calculation_id and exact bear/base/bull values. "
+            "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Explain sensitivity and expectations embedded in today's price. If this simplified "
             "cash-flow model is inappropriate or inputs are insufficient, return null for calculation_id "
             "and all three values and explain the limitation in method. Never manufacture value."
@@ -748,7 +749,26 @@ class ResearchDesk:
                 self.calculations[identifier] = result
             return result
 
-        return [company_evidence, filing_documents, read_document, value_scenarios, read_source]
+        @tool
+        def inspect_valuation(calculation_id: str, target_price: str) -> dict:
+            """Compute sensitivity and implied terminal multiples from a saved validated calculation."""
+            with self.lock:
+                calculation = copy.deepcopy(self.calculations.get(calculation_id))
+            if calculation is None:
+                raise ValueError("Unknown valuation calculation")
+            return {
+                "calculation_id": calculation_id,
+                **valuation_diagnostics(calculation["inputs"], target_price),
+            }
+
+        return [
+            company_evidence,
+            filing_documents,
+            read_document,
+            value_scenarios,
+            inspect_valuation,
+            read_source,
+        ]
 
     @traced(
         "research.validate", inputs=lambda self, schema, output: {"schema": schema.__name__, "output": output}

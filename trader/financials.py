@@ -81,3 +81,36 @@ def normalization_supported(valuation):
         and bool(refs)
         and all(isinstance(ref, str) and ref in valuation.get("evidence_ids", []) for ref in refs)
     )
+
+
+def valuation_diagnostics(inputs, target_price):
+    """Sensitivity of already validated scenario inputs; no normalized-value claim."""
+    cash, discount = dec(inputs["cash_flow_per_share"]), dec(inputs["discount_rate"])
+    target = dec(target_price)
+    if target <= 0:
+        raise ValueError("Target price must be positive")
+    years = inputs["years"]
+    rows = []
+    for growth, multiple in zip(inputs["growth_rates"], inputs["terminal_multiples"], strict=True):
+        g = dec(growth)
+        annual = sum((cash * (1 + g) ** y / (1 + discount) ** y for y in range(1, years + 1)), dec(0))
+        terminal_unit = cash * (1 + g) ** years / (1 + discount) ** years
+        terminal = terminal_unit * dec(multiple)
+        rows.append(
+            {
+                "growth_rate": growth,
+                "annual_cash_flows_pv": str(annual),
+                "terminal_value_fraction": str(terminal / (annual + terminal)),
+                "required_terminal_multiple": str((target - annual) / terminal_unit),
+                "values_by_terminal_multiple": {
+                    m: str((annual + terminal_unit * dec(m)).quantize(dec(".01")))
+                    for m in inputs["terminal_multiples"]
+                },
+            }
+        )
+    return {
+        "target_price": str(target),
+        "rows": rows,
+        "required_multiple_formula": "(target price - PV of annual cash flows) / discounted final-year cash flow",
+        "limitation": "Sensitivity of historical-proxy assumptions, not supported forecasts or normalized fair value. A negative required multiple means interim cash flows alone exceed the target.",
+    }

@@ -6,6 +6,7 @@ from test_research_team import Evidence, financial_facts
 
 from trader.config import Settings
 from trader.financials import annual_cash_flow
+from trader.models import dec
 from trader.research_team import Budget, ResearchDesk
 
 CUTOFF = datetime(2026, 10, 21, tzinfo=UTC)
@@ -260,3 +261,68 @@ def test_valuation_matches_exact_rational_oracle(years, discount, growth):
     assert [result[key] for key in ("bear_value", "base_value", "bull_value")] == expected
     assert scenario_values(assumptions) == expected
     assert result["financial_provenance"]["cash_flow_per_share"] == "5.000000"
+
+
+def test_reviewed_apple_sensitivity_and_implied_multiple():
+    from trader.financials import valuation_diagnostics
+
+    inputs = {
+        "cash_flow_per_share": "6.582405",
+        "growth_rates": ["0.02", "0.07", "0.12"],
+        "discount_rate": "0.10",
+        "terminal_multiples": ["18", "24", "30"],
+        "years": 5,
+    }
+    result = valuation_diagnostics(inputs, "200")
+    base = result["rows"][1]
+    assert dec(base["required_terminal_multiple"]).quantize(dec(".01")) == dec("29.60")
+    assert base["values_by_terminal_multiple"] == {"18": "133.50", "24": "167.89", "30": "202.29"}
+    assert [dec(r["terminal_value_fraction"]).quantize(dec(".001")) for r in result["rows"]] == [
+        dec(".755"),
+        dec(".819"),
+        dec(".861"),
+    ]
+    for row in result["rows"]:
+        final_cash = dec("6.582405") * (1 + dec(row["growth_rate"])) ** 5
+        required = dec(row["required_terminal_multiple"])
+        recovered = dec(row["annual_cash_flows_pv"]) + final_cash * required / dec("1.1") ** 5
+        assert abs(recovered - 200) < dec("1e-20")
+
+
+def test_valuation_inspection_requires_saved_calculation():
+    cfg = Settings(input_cost_per_million="1", output_cost_per_million="1")
+    desk = ResearchDesk(
+        cfg,
+        Evidence(),
+        {"symbol": "ACME", "portfolio": {}},
+        Evidence().get("ACME"),
+        Budget(cfg),
+        None,
+        evaluation_at=CUTOFF.isoformat(),
+    )
+    tools = {t.name: t for t in desk.tools()}
+    with pytest.raises(ValueError, match="Unknown"):
+        tools["inspect_valuation"].invoke({"calculation_id": "invented", "target_price": "200"})
+    calculation = tools["value_scenarios"].invoke(
+        {
+            "cash_flow_per_share": "5.000000",
+            "financial_source_id": "fixture-sec",
+            "financial_period_end": "2025-12-31",
+            "growth_rates": ["0", "0", "0"],
+            "discount_rate": ".1",
+            "terminal_multiples": ["0", "1", "2"],
+            "years": 1,
+        }
+    )
+    original = copy.deepcopy(desk.calculations)
+    result = tools["inspect_valuation"].invoke(
+        {"calculation_id": calculation["calculation_id"], "target_price": "10"}
+    )
+    assert dec(result["rows"][0]["required_terminal_multiple"]) == dec("1.2")
+    assert result["rows"][0]["terminal_value_fraction"] == "0"
+    assert desk.calculations == original
+    for target in ["0", "-1", "NaN", "Infinity"]:
+        with pytest.raises(ValueError):
+            tools["inspect_valuation"].invoke(
+                {"calculation_id": calculation["calculation_id"], "target_price": target}
+            )
