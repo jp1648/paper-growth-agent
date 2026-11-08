@@ -2205,3 +2205,23 @@ exactly two requests without retrying. Failure receipts exclude hostile response
 bodies and credential-like transport text. A new-directory attempt succeeds
 without changing the failed capture. All 18 capture tests and Ruff/format checks
 passed; no provider request or runtime change was made by these tests.
+
+## Corporate-action capture rollout and read-only acceptance
+
+CI 42447518730 and Cloud Build 6783af47-4865-4694-a2b2-3afa68bc7a4d passed.
+Deployed source 5fab33c, image
+`sha256:4da80de2ba98bf324601c2a648a6aa56642b1dac2829d2f1ec3222a52fdb0173`.
+All 28 Python hashes matched the downloaded and running image. Fresh reconciliation
+passed at 2026-11-08T04:42:14.727424+00:00, with healthy application, executor,
+proxy and health timer. Experiment, pause, AAPL quantity one, config/spending
+hashes and intent/order/activity/acceptance/adjustment/revision counts were unchanged.
+Rollback: VM `state/release-rollback-5fab33c`; receipts: local
+`state/capture-release-5fab33c/`.
+
+The deployed CLI explicitly captured SPY processing dates September 1–October 31
+at 2026-11-08T04:42:23Z. It exhausted one page, retained one action, and wrote the
+manifest plus exact 300-byte source page. The retrieved local copy matched SHA-256
+`8f1012b074cd58c38a0542cb7d87e38e47186fb1115860520a97de2f6fb71ad1`.
+VM evidence directory: `state/corporate-actions/spy-20260901-20261031-capture1`.
+The result explicitly does not certify history completeness or economic fields.
+No recurring collection, orders, model requests or trial activation occurred.
