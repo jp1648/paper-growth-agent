@@ -1886,3 +1886,19 @@ operator attestation, not independent API verification of delivery.
   skipped**. Ruff and diff checks pass. Source awaits CI/deployment; total-return
   benchmark comparability, complete allocated costs and uncertainty analysis
   remain separate open requirements. No paid research or orders were run.
+
+## Atomic daily reporting deployed (2026-11-08 UTC)
+
+- Commit `cc25b5962ea75d37c1e2bbab02df305b2ec14334` passed CI `42444123167`.
+  Build `f36abb44-425f-470e-a4b6-847b24921600` succeeded; deployed agent digest
+  `sha256:533d92bc004a4089b4a14695400b6e5247fd22d32c67d18b98bff0345b470410`.
+  All 26 installed Python file hashes matched before and after rollout.
+- Read-only production history check found six samples and six matching reports,
+  no unmatched records, and no saved equity/mark discrepancies. The full saved
+  daily-history hash is unchanged after rollout; no historical repair was made.
+- Fresh reconciliation at 03:50:06 UTC, health and executor/proxy/health-timer
+  checks passed. Original experiment, document counts, AAPL one share, exact
+  spending/config hashes and durable pause remain unchanged. Rollback copies
+  retained on the VM; private receipts in `state/atomic-report-cc25b59/`.
+  No daily market session was fabricated to exercise the new path in production;
+  fault/recovery behavior is established by offline tests, not a new live close.
