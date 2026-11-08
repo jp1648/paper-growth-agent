@@ -2957,3 +2957,23 @@ this is validation hardening, not proof of complete dividend history.
 Full local validation: **911 passed, 7 skipped**; Ruff checks/formatting passed.
 The archived-request fix is not yet deployed; production remains paused on the
 previous verified image. Independent policy/research approvals remain pending.
+
+### Unsupported fill subtypes now fail before ledger writes
+
+A documentation/code audit reproduced five unsafe ordinary-replay acceptances:
+positive-quantity `FILL` records with `trade_bust`, `trade_correct`, an unknown or
+empty subtype, or no subtype. These synthetic variants are schema-drift probes,
+not claims about actual Alpaca REST bust encoding. Shared subtype validation now
+requires the documented `fill`/`partial_fill` values. Snapshot validation rejects
+before order/activity mutation, latches pause and preserves unresolved reservation;
+standalone replay also rejects. Documented partial fills remain valid. Normal
+fixtures now include the documented field rather than relying on omission.
+
+See `docs/broker-correction-contract.md` for official source links, account/API
+scope and evidence still required for actual full-bust support. No accounting
+reversal was invented. The retained real production fill has the supported subtype.
+This safety fix is not deployed yet; no production state or broker call changed.
+
+Validation: **917 passed, 7 skipped** in the full local suite; Ruff and formatting
+passed. Six new regressions cover rejected subtypes without persisted mutations
+and accepted partial fills. This does not close the full-bust acceptance gate.

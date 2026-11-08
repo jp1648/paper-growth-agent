@@ -94,6 +94,7 @@ def test_ledger_sorts_absolute_times_not_timestamp_strings():
     buy = {
         "id": "buy",
         "activity_type": "FILL",
+        "type": "fill",
         "side": "buy",
         "symbol": "ACME",
         "qty": "1",

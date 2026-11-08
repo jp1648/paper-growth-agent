@@ -10,6 +10,7 @@ def fill(identifier, side, quantity, price, day):
     return {
         "id": identifier,
         "activity_type": "FILL",
+        "type": "fill",
         "symbol": "ACME",
         "qty": str(quantity),
         "price": str(price),

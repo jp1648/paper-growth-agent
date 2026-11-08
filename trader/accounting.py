@@ -8,6 +8,11 @@ class LedgerError(RuntimeError):
     pass
 
 
+def validate_fill_type(activity):
+    if activity.get("type") not in ("fill", "partial_fill"):
+        raise LedgerError("Unsupported or missing fill subtype; broker contract review required")
+
+
 def replay(initial, activities, adjustments):
     """Audit confirmed executions only. Broker snapshots remain authoritative holdings."""
     cash, realized, flows, fees, dividends = dec(initial), ZERO, ZERO, ZERO, ZERO
@@ -25,6 +30,7 @@ def replay(initial, activities, adjustments):
     for a in sorted(activities, key=lambda a: (activity_time(a), a["id"])):
         kind = a["activity_type"]
         if kind == "FILL":
+            validate_fill_type(a)
             symbol, qty, price = a["symbol"], dec(a["qty"]), dec(a["price"])
             if qty <= 0 or price <= 0 or a["side"] not in {"buy", "sell"}:
                 raise LedgerError("Invalid fill activity")

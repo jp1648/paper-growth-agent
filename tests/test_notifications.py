@@ -20,6 +20,7 @@ def test_confirmed_fills_once_and_no_secret_in_events(env, monkeypatch, outcome)
     fill = {
         "id": "fill-1",
         "activity_type": "FILL",
+        "type": "fill",
         "transaction_time": now(),
         "side": "buy",
         "qty": "1",
@@ -95,6 +96,7 @@ def test_confirmed_rate_limit_retries_with_delay_and_bound(env, monkeypatch):
         {
             "id": "fill-retry",
             "activity_type": "FILL",
+            "type": "fill",
             "transaction_time": AT.isoformat(),
             "side": "buy",
             "qty": "1",
@@ -131,6 +133,7 @@ def test_server_failure_is_ambiguous_not_retried(env, monkeypatch):
         {
             "id": "fill-server",
             "activity_type": "FILL",
+            "type": "fill",
             "transaction_time": now(),
             "side": "buy",
             "qty": "1",
@@ -179,6 +182,7 @@ def test_malformed_provider_reply_stays_unknown_and_does_not_block_other_fills(
             {
                 "id": identifier,
                 "activity_type": "FILL",
+                "type": "fill",
                 "transaction_time": now(),
                 "side": "buy",
                 "qty": "1",

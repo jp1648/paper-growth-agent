@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import httpx
 
-from .accounting import LedgerError, replay, reserved
+from .accounting import LedgerError, replay, reserved, validate_fill_type
 from .alpaca import safe_error
 from .evidence import EvidenceProvider
 from .executor_owner import ExecutionFenceError
@@ -114,6 +114,11 @@ class Service:
             raise LedgerError("Duplicate broker position rows require a consistent snapshot")
         incoming = {}
         for activity in snap.activities:
+            if activity["activity_type"] == "FILL":
+                try:
+                    validate_fill_type(activity)
+                except LedgerError as error:
+                    raise BrokerHistoryError(str(error)) from error
             identifier = activity["id"]
             if identifier in incoming and incoming[identifier] != activity:
                 raise BrokerHistoryError(f"Conflicting broker activities share ID {identifier}")

@@ -451,3 +451,44 @@ def test_duplicate_position_rows_cannot_be_collapsed(env, decision, quantity):
     assert not service.store.activities()
     assert service.store.get("reconciliation")["ok"] is False
     assert broker.submits == 1
+
+
+@pytest.mark.parametrize("subtype", ["trade_bust", "trade_correct", "unknown", "", None])
+def test_unsupported_fill_subtype_cannot_be_booked_as_ordinary_execution(env, decision, subtype):
+    from trader.accounting import replay
+
+    service, broker, _ = env
+    cid = service.execute(decision, "unsupported-fill-type")["client_order_id"]
+    activity = broker.fixture_fill(cid)
+    ordinary = copy.deepcopy(activity)
+    if subtype is None:
+        activity.pop("type")
+    else:
+        activity["type"] = subtype
+    with pytest.raises(LedgerError, match="fill subtype"):
+        replay("100000", [activity], {})
+    before_order = service.store.get(cid, "order")
+    with pytest.raises(LedgerError, match="fill subtype"):
+        service.reconcile()
+    assert service.store.activities() == []
+    assert service.store.events("broker_activity") == []
+    assert service.store.get(cid, "order") == before_order
+    assert service.kill_path.exists() and not service.store.get("reconciliation")["ok"]
+    assert service.reservation_summary() == D("1001")
+    broker.activities = [ordinary]
+    service.reconcile()
+    assert service.store.get("audit")["cash"] == "99000"
+    assert len(service.store.activities()) == 1
+    assert broker.submits == 1 and service.kill_path.exists()
+
+
+def test_documented_partial_fill_subtype_is_accepted(env, decision):
+    service, broker, _ = env
+    cid = service.execute(decision, "documented-partial-fill")["client_order_id"]
+    activity = broker.fixture_fill(cid, "4", status="partially_filled")
+    activity["type"] = "partial_fill"
+    service.reconcile()
+    assert service.store.get("audit")["cash"] == "99600"
+    assert service.store.get("audit")["shares"]["ACME"] == "4"
+    assert service.reservation_summary() == D("601")
+    assert not service.kill_path.exists()
