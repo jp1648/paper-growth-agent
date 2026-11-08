@@ -2924,3 +2924,21 @@ paid research call or pause change occurred.
 
 Validation: all **42 process-recovery/backup-recovery cases passed**, including six
 new sell-side cases; targeted Ruff checks passed. Production code is unchanged.
+
+### Concrete measurement policy submitted for review
+
+`docs/paper-trial-policy-proposal.md` now supplies a reviewable proposal for the
+future opening boundary, whole-share SPY/QQQ hypothetical holdings, confirmed-net
+payment reinvestment, decimal/cent rounding, 5-basis-point modeled slippage with
+0/10-basis-point sensitivities, no-flow comparison, cost and correction treatment.
+A synthetic accounting example was independently recalculated with Decimal:
+$1,000 opening capital → $999.55 marked NAV after modeled purchase → unchanged
+NAV on dividend accrual/payment → $999.50 after reinvestment friction. No actual
+zero-fee/interest claim is inferred from that example.
+
+Operator policy review was requested under the existing forward-paper manifest
+requirement. Approval has not been received and would approve measurement policy
+only, not activation or orders. Fee/interest evidence, benchmark ledger/collector,
+infrastructure allocation, independent research review and final frozen manifest
+still precede activation. Existing 60-session AND 12-week requirements are intact.
+No production changes, source requests, paid model calls or trades in this step.
