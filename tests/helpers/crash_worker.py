@@ -37,7 +37,9 @@ class Broker:
             try:
                 response = httpx.post(endpoint + "/" + name, json=list(args), timeout=5)
             except httpx.TransportError as error:
-                if stage.endswith("lost_ack") and name == "cancel":
+                if stage.endswith("lost_ack") and (
+                    name == "submit" if stage.startswith("accepted") else name == "cancel"
+                ):
                     Path(config_path).with_name("transport-failure.json").write_text(
                         json.dumps({"operation": name, "error": type(error).__name__})
                     )

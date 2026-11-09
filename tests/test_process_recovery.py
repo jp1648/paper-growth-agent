@@ -27,6 +27,9 @@ from trader.store import Store
     [
         "prepared",
         "accepted",
+        "accepted_lost_ack",
+        "accepted_partial_lost_ack",
+        "accepted_filled_lost_ack",
         "order",
         "cancel",
         "cancel_race",
@@ -112,7 +115,14 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
                 return
             args = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             result = getattr(broker, method)(*args)
-            if stage.endswith("lost_ack") and method == "cancel":
+            if stage.endswith("lost_ack") and (
+                method == "submit" if stage.startswith("accepted") else method == "cancel"
+            ):
+                if stage == "accepted_partial_lost_ack":
+                    broker.fixture_fill(result["client_order_id"], "4", status="partially_filled")
+                elif stage == "accepted_filled_lost_ack":
+                    broker.fixture_fill(result["client_order_id"])
+
                 dropped_responses.append(method)
                 self.connection.shutdown(socket.SHUT_RDWR)
                 self.connection.close()
@@ -154,9 +164,10 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
         )
         assert result.returncode == -signal.SIGKILL, result.stderr
         if stage.endswith("lost_ack"):
-            assert dropped_responses == ["cancel"]
+            operation = "submit" if stage.startswith("accepted") else "cancel"
+            assert dropped_responses == [operation]
             failure = json.loads((tmp_path / "transport-failure.json").read_text())
-            assert failure == {"operation": "cancel", "error": "RemoteProtocolError"}
+            assert failure == {"operation": operation, "error": "RemoteProtocolError"}
     finally:
         server.shutdown()
         server.server_close()
@@ -287,6 +298,33 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
             assert len(reopened.events("broker_activity")) == submissions + 1
             assert broker.submits == submissions
             assert recovered.execute(decision, "new-after-process-restore")["status"] == "rejected"
+        elif stage.startswith("accepted") and stage.endswith("lost_ack"):
+            assert len(reopened.items("intent")) == 1
+            assert not reopened.items("order")
+            assert recovered.reservation_summary() == dec("1001")
+            fills = list(broker.activities)
+            if fills:
+                broker.activities.clear()
+                with pytest.raises(LedgerError):
+                    recovered.reconcile()
+                assert reopened.get("reconciliation")["ok"] is False
+                for _ in range(2):
+                    with pytest.raises(LedgerError):
+                        recovered.execute(decision, "process-drill")
+                    assert broker.submits == 1
+                broker.activities.extend(fills)
+            for _ in range(3):
+                recovered.execute(decision, "process-drill")
+                recovered.reconcile()
+            assert reopened.get("reconciliation")["ok"] is True
+            qty = 4 if "partial" in stage else 10 if "filled" in stage else 0
+            assert reopened.get("audit")["cash"] == str(100000 - 100 * qty)
+            assert dec(reopened.get("audit")["shares"].get("ACME", "0")) == qty
+            assert recovered.reservation_summary() == dec("601" if qty == 4 else "0" if qty == 10 else "1001")
+            assert len(reopened.items("intent")) == len(reopened.items("order")) == 1
+            assert len(reopened.items("activity")) == len(fills)
+            assert len(reopened.events("broker_activity")) == len(fills)
+            assert broker.submits == 1
         elif stage == "prepared":
             with pytest.raises(LedgerError, match="Unresolved submission"):
                 recovered.execute(decision, "process-drill")

@@ -3326,3 +3326,28 @@ Retained sources and the concrete cash-evidence requirements are documented in
 `paper-measurement-contract.md`. Operator enrollment clarification is pending.
 Do not infer zero cost/yield from missing simulated activity. No live requests,
 account changes, paid research, orders or trial activation occurred.
+
+
+### Accepted submission with lost HTTP response and client death — November 8, 2026
+
+Extended the existing real subprocess/loopback broker drill with three submission
+cases: accepted/unfilled, accepted/partially filled, and accepted/fully filled.
+The broker handler applies the order (and optional fill), then closes the actual
+HTTP connection without replying. The worker records `RemoteProtocolError` and is
+terminated by SIGKILL before recording an order response. Reopened SQLite retains
+one durable intent and its reservation, with no saved order response.
+
+Recovery resolves the same client ID without another submission. For filled
+cases, withholding the activity while exposing broker balances blocks reconciliation
+and repeated execution attempts. Supplying the retained activity then reconciles
+cash, quantities, reservations and once-only activity journal entries. Three
+subsequent execute/reconcile attempts retain one broker submission.
+
+All 45 process/backup recovery tests passed; Ruff and diff checks passed. This is
+loopback broker and same-disk client-process evidence. It does not prove actual
+Alpaca behavior, loss of the original disk, cloud ownership handover or a network
+partition between concurrently running hosts. No production changes, paid calls,
+orders, pause changes or live authorization occurred.
+Independent review approved the final hashes after 20 process tests, four final
+accepted-stage reruns and 25 backup tests. Record:
+`state/independent-review-20261108/submit-lost-ack-review.json`.
