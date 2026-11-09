@@ -3110,3 +3110,19 @@ and retained raw price/calendar binding. It does not certify source authenticity
 complete payment/correction handling or prospective measurement readiness.
 Detailed billing export has a destination table but the bounded trader-project
 query still returned no rows; this is pending cost ingestion, not zero cost.
+
+### Non-session benchmark payments — November 8, 2026
+
+The hypothetical benchmark now recognizes a confirmed weekend/holiday payment
+at the first regular-session close on or after its actual date, retaining that
+actual date for strict next-day/availability-aware reinvestment. Regression tests
+first reproduced the rejection; the fix preserves cash locking for late evidence
+and rejects delayed placement, noncanonical dates, ex-date/future payment dates,
+and confirmation predating payment. No synthetic weekend marks are introduced.
+
+Independent review approved the timing/accounting logic; evidence is retained in
+`state/independent-review-20261108/non-session-payment-review.json`. Full offline
+suite: 952 passed, seven external checks skipped; final focused tests: 69 passed.
+This change is not yet deployed. Partial/reversed payments, other special actions,
+authentic payment/tax evidence and all-cost portfolio comparison remain incomplete.
+No research spending, orders, trial activation or pause changes occurred.

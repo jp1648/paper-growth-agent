@@ -456,3 +456,52 @@ def test_retained_capture_rejects_mismatched_evidence(sourced_ledger, fault):
         (capture / "page-001.json").write_text("{}")
     with pytest.raises(ValueError):
         bind_prices(capture, d)
+
+
+@pytest.mark.parametrize("available,shares", [("2026-11-14T15:00:00Z", "10"), ("2026-11-16T21:00:00Z", "9")])
+def test_weekend_payment_uses_actual_date_and_first_eligible_close(ledger_input, available, shares):
+    from trader.benchmark import build_ledger
+
+    d = ledger_input
+    days = (12, 13, 16, 17)
+    for row, day in zip(d["sessions"], days, strict=True):
+        row.update(date=f"2026-11-{day}", close=f"2026-11-{day}T21:00:00Z")
+    d["expected_sessions"] = [r["date"] for r in d["sessions"]]
+    d["sessions"][1]["events"] = [
+        {
+            "id": "d1",
+            "kind": "dividend",
+            "evidence": "issuer",
+            "gross_per_share": "1",
+            "withholding_per_share": "0",
+            "fee_per_share": "0",
+        }
+    ]
+    payment = {
+        "id": "p1",
+        "kind": "payment",
+        "evidence": "completed-payment",
+        "dividend_id": "d1",
+        "payment_date": "2026-11-14",
+        "available_at": available,
+        "net_cash": "9",
+    }
+    d["sessions"][2]["events"] = [payment]
+    result = build_ledger(d)
+    assert result["balances"][2]["shares"] == shares
+    assert result["balances"][2]["net_receivable"] == "0"
+    assert result["entitlements"]["d1"]["payment_date"] == "2026-11-14"
+    assert result["balances"][-1]["shares"] == "10"
+    for invalid_date in ("20261114", "2026-11-13", "2026-11-17"):
+        payment["payment_date"] = invalid_date
+        with pytest.raises(ValueError):
+            build_ledger(d)
+    payment["payment_date"] = "2026-11-14"
+    payment["available_at"] = "2026-11-13T23:59:59-05:00"
+    with pytest.raises(ValueError, match="predate payment"):
+        build_ledger(d)
+    payment["available_at"] = available
+    d["sessions"][2]["events"] = []
+    d["sessions"][3]["events"] = [payment]
+    with pytest.raises(ValueError, match="first regular session"):
+        build_ledger(d)

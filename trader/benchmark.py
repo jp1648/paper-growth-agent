@@ -239,13 +239,16 @@ def _build_ledger(document):
                 }
             elif kind == "payment":
                 entitlement = entitlements[event["dividend_id"]]
-                if entitlement["paid"] or day <= entitlement["ex_date"]:
+                payment_day = date.fromisoformat(event["payment_date"]).isoformat()
+                if payment_day != event["payment_date"]:
+                    raise ValueError("Require canonical payment date")
+                if entitlement["paid"] or payment_day <= entitlement["ex_date"]:
                     raise ValueError("Duplicate or ambiguous payment boundary")
-                if event["payment_date"] != day:
-                    raise ValueError("Place payment on its economic payment-date session")
+                if not index or not rows[index - 1]["date"] < payment_day <= day:
+                    raise ValueError("Place payment on first regular session on or after payment date")
                 if dt(event["available_at"]).astimezone(
                     ZoneInfo("America/New_York")
-                ).date() < date.fromisoformat(day):
+                ).date() < date.fromisoformat(payment_day):
                     raise ValueError("Completed-payment confirmation cannot predate payment")
                 paid = amount(event["net_cash"], cents=True)
                 if paid != dec(entitlement["net"]):
@@ -254,9 +257,10 @@ def _build_ledger(document):
                 entitlement.update(
                     paid=True,
                     payment_id=identifier,
+                    payment_date=payment_day,
                     payment_evidence=event["evidence"],
                     available_at=event["available_at"],
-                    reinvest_on=reinvestment_session(day, event["available_at"], rows),
+                    reinvest_on=reinvestment_session(payment_day, event["available_at"], rows),
                 )
             else:
                 raise ValueError("Unsupported corporate action")
@@ -333,7 +337,7 @@ def _build_ledger(document):
         "limitations": [
             "Evidence and coverage are supplied claims, not independently certified.",
             "Restated economic-date ledger; late payment knowledge cannot generate retroactive purchases.",
-            "Non-session payments, partial/reversed payments, cash in lieu and ambiguous actions require review.",
+            "Partial/reversed payments, cash in lieu and ambiguous actions require review.",
             "Not trial activation or completed after-cost portfolio comparison.",
         ],
     }
