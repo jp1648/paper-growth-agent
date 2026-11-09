@@ -1,6 +1,6 @@
 # Prospective study scope and funding decision — draft
 
-Status: pending operator choice; no activation or configuration change.
+Status: research-only expansion selected under the user’s November 9 delegation; trial not activated.
 This resolves feasibility before the opening manifest is frozen. The existing
 protocol remains five distinct reviewed companies, 30 independently reviewed
 completed investigations, ten closed position episodes, and at least 60 regular
@@ -15,11 +15,19 @@ never force trades, loosen thresholds after results, or count historical exercis
 | Expand both | Five explicitly named companies | Five only after account/asset/risk review and explicit approval | Changes candidate universe and exposure; requires a new frozen configuration and prospective window. |
 | Retain three | Current three | Current three | Cannot meet the current five-company requirement. A separately justified, versioned protocol revision would need explicit approval before any outcomes; do not silently lower the threshold. |
 
-No option is selected here. A question asking the operator to choose is already
-pending. The current configuration and five-company requirement remain intact.
+Selected: research AAPL, MSFT, AMZN, PG and CAT; execution remains AAPL, MSFT and
+AMZN. PG (Procter & Gamble, CIK 80424) adds Consumer Staples; CAT (Caterpillar,
+CIK 18230) adds Industrials. Selection is for business-model diversity before any
+candidate outputs or prospective returns, not a buy recommendation. Issuer identity
+was verified from [PG’s SEC filing](https://www.sec.gov/Archives/edgar/data/80424/000008042425000076/pg-20250630.htm)
+and [CAT’s SEC filing](https://www.sec.gov/Archives/edgar/data/18230/000001823026000008/cat-20251231.htm).
+The current five-company requirement remains intact.
 SPY/QQQ passive benchmark calculations are not additional company investigations.
-Research-only coverage must be enforced separately from the order universe if
-selected; the present single-universe configuration does not implement that split.
+The new research-only mapping is enforced separately from the order universe.
+Graph execution explicitly refuses research-only symbols; direct order requests
+still face the unchanged execution allowlist. Prospective research-only reviews
+may count toward research coverage, but never closed-position episodes or evidence
+that five symbols are tradable. Deployment evidence is recorded separately.
 
 For any expansion, select the additional companies by a documented pre-outcome
 sampling rule, with supported filings and business/sector coverage. Do not choose
@@ -29,7 +37,7 @@ company reviews and cannot satisfy the prospective count.
 
 ## Investigation schedule and cost feasibility
 
-Proposed sampling schedule, subject to approval: three scheduled
+Selected sampling design; exact calendar remains to be frozen before activation: three scheduled
 investigations per week over twelve weeks, yielding 36 opportunities. Rotate the
 five reviewed companies in a frozen order (seven each, with one predeclared eighth
 opportunity), spread across the study.
@@ -70,8 +78,9 @@ expires; prove available credit before each paid run. This document does not
 certify the current provider balance or costs outside this project.
 
 Model caps exclude infrastructure and data-provider charges. The Google Cloud
-export table metadata at November 9 02:10 UTC still reports zero rows. That is
-missing evidence, not free operation. Required costs include executor, database,
+export metadata on November 9 now reports eight rows, but the bounded November
+1–10 UTC query for this project returned no rows. That is missing attributed cost
+evidence, not free operation. Required costs include executor, database,
 dashboard, logging, backups, storage, networking, builds and paid data; allocate
 shared resources before activation and retain gross cost separately from credits.
 Cash interest/fees require the actual account's terms and enrollment evidence.
@@ -90,3 +99,10 @@ The pending account-terms question is not answered by an advertised yield.
 
 No broker orders, live credentials, automatic resume, funding purchase, protocol
 threshold reduction or historical-result rewrite is authorized by this draft.
+
+
+The existing held-first runner is not the proposed fixed study schedule. It cannot
+claim fair budget access across five companies. Before trial activation, freeze
+and implement the calendar/rotation with explicit treatment of safety reviews;
+keep current monitoring priority for held-position safety. Enabling five research
+symbols does not complete scheduling, activate the trial or resume trading.

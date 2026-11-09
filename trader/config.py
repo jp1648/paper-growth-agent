@@ -79,6 +79,13 @@ class Settings(Model):
     universe: dict[Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9.\-]{0,9}$")], Security] = Field(
         default_factory=dict
     )
+    research_only_universe: dict[Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9.\-]{0,9}$")], Security] = Field(
+        default_factory=dict
+    )
+
+    @property
+    def research_universe(self) -> dict[str, Security]:
+        return self.universe | self.research_only_universe
 
     def research_model(self, role: str) -> ResearchModel:
         if role in self.role_models:
@@ -94,6 +101,8 @@ class Settings(Model):
 
     @model_validator(mode="after")
     def paper_only(self):
+        if self.universe.keys() & self.research_only_universe.keys():
+            raise ValueError("Research-only symbols must not overlap the execution universe")
         if self.executor_fence and not self.checkpoint_bucket:
             raise ValueError("Executor fencing requires a private checkpoint_bucket")
         if self.broker_url != PAPER_URL:

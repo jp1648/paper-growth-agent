@@ -608,6 +608,7 @@ def run_suite(cfg, suite_path, output_dir, run_id, max_cost, split="development"
                 "database": str(destination / "ledger.sqlite"),
                 "x_enabled": False,
                 "flovia_x_enabled": False,
+                "research_only_universe": {},
                 "research_max_cost_usd": cap,
                 "universe": {
                     c["inputs"]["symbol"]: Security(sector="Evaluation", cik="1") for c in suite["cases"]

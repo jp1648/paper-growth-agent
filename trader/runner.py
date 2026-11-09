@@ -181,7 +181,7 @@ class Runner:
     @traced("runner.research_batch")
     def research_batch(self, slot, phase):
         snap = self.store.get("snapshot")
-        symbols = set(self.cfg.universe) | {p["symbol"] for p in snap["positions"]}
+        symbols = set(self.cfg.research_universe) | {p["symbol"] for p in snap["positions"]}
         outcomes = []
         held = {p["symbol"] for p in snap["positions"]}
 
@@ -241,7 +241,8 @@ class Runner:
                     {
                         "symbol": symbol,
                         "run_key": run_key,
-                        "research_only": phase in {"preopen", "weekly"},
+                        "research_only": phase in {"preopen", "weekly"}
+                        or symbol in self.cfg.research_only_universe,
                         "trigger": reason,
                         "fresh": phase in {"preopen", "weekly"} or reason == "new news evidence",
                     }

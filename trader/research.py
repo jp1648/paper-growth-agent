@@ -117,7 +117,7 @@ def build_graph(service, team):
         store.put(s["run_key"], {"at": now()}, "research_committed")
 
     def risk(s):
-        if s.get("research_only"):
+        if s.get("research_only") or s["symbol"] in service.cfg.research_only_universe:
             return {"risk": []}
         d = Decision.model_validate(s["decision"])
         prior = store.get(service.client_order_id(s["run_key"]), "intent")
@@ -127,21 +127,24 @@ def build_graph(service, team):
         return {"risk": reasons}
 
     def execution(s):
-        result = (
-            {"status": "deferred", "reason": "Research outside regular trading hours"}
-            if s.get("research_only")
-            else service.execute(
-                s["decision"],
-                s["run_key"],
-                {
-                    "sources": s["evidence"],
-                    "research": s["research"],
-                    "valuation": s["valuation"],
-                    "critique": s.get("critique"),
-                    "catalysts": s["catalysts"],
-                },
+        if s["symbol"] in service.cfg.research_only_universe:
+            result = {"status": "research_only", "reason": "Symbol is excluded from execution universe"}
+        else:
+            result = (
+                {"status": "deferred", "reason": "Research outside regular trading hours"}
+                if s.get("research_only")
+                else service.execute(
+                    s["decision"],
+                    s["run_key"],
+                    {
+                        "sources": s["evidence"],
+                        "research": s["research"],
+                        "valuation": s["valuation"],
+                        "critique": s.get("critique"),
+                        "catalysts": s["catalysts"],
+                    },
+                )
             )
-        )
         thesis = store.get(s["symbol"], "thesis")
         if thesis and thesis.get("run_key") == s["run_key"]:
             thesis["execution"] = result

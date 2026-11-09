@@ -3563,3 +3563,35 @@ weeks; actual available credit and all provider/infra costs remain prerequisites
 Billing metadata at 02:10 UTC still reports zero rows; no cost query or zero-cost
 claim. Review retained in `state/independent-review-20261108/scope-feasibility-review.json`.
 No new code, deployment, paid research, trades, scope or budget changes in this step.
+
+### November 9 delegated scope and bounded Apple attempt
+
+User delegated remaining routine scope decisions. Selected research coverage is
+AAPL/MSFT/AMZN/PG/CAT; execution eligibility remains AAPL/MSFT/AMZN. A separate
+research-only configuration and graph boundary prevent extra research symbols
+from reaching order execution; the direct execution allowlist remains enforced.
+Independent scope review approved this distinction, not prospective activation.
+The held-first runner is not yet the frozen 36-opportunity study calendar.
+
+Fresh signed-in provider evidence showed $81.91 available credit expiring
+November29. One reviewed frozen Apple v3 attempt ran with $5/run and $6/day;
+stable ID `annual-normalized-v3-dev-20261109-1`. All four specialist reports
+completed; final lead synthesis was blocked before another paid call. Recorded
+usage settled at $3.6508275 with zero unknown calls or unsettled reservations.
+Final payload 47,432 bytes required a conservative $1.487 next-call reservation:
+$5.1378275 exceeded the unchanged $5 cap. This is a failed research attempt,
+not an accepted decision. No orders or automatic resume occurred.
+
+An offline repair replaces repeated final-stage source content previews with an
+index retaining source metadata and content hashes. Reports, calculations and
+original evidence are preserved; the index is explicitly not independently
+inspected evidence. This repair does not resolve unfinished economic work:
+normalization and available filing analysis still need completion. No second paid
+attempt is authorized by this entry; do not rerun the stable ID. Recordings,
+settlement and independent review are private under `state/validation-20261109/`.
+
+Cloud billing metadata now reports eight export rows, but the bounded project
+query for November1–10 UTC returned no rows. No zero-cost or final-cost claim.
+The scope and final-context changes are local until a new release receipt confirms
+deployment. Cash-account evidence, funded prospective schedule, independent
+research acceptance and prospective time/information thresholds remain gates.

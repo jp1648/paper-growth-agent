@@ -97,7 +97,7 @@ class EvidenceProvider:
 
     @traced("evidence.get")
     def get(self, symbol, fresh=False):
-        if symbol not in self.cfg.universe:
+        if symbol not in self.cfg.research_universe:
             raise ValueError("Symbol outside configured research universe")
         cached = self.store.get(symbol, "evidence_cache")
         if (
@@ -115,11 +115,11 @@ class EvidenceProvider:
 
     def fetch(self, symbol):
         started_at = now()
-        if symbol not in self.cfg.universe:
+        if symbol not in self.cfg.research_universe:
             raise ValueError("Symbol outside configured research universe")
         if not self.cfg.sec_user_agent or "@" not in self.cfg.sec_user_agent:
             raise ValueError("Set SEC user-agent application name and contact email")
-        cik = self.cfg.universe[symbol].cik.zfill(10)
+        cik = self.cfg.research_universe[symbol].cik.zfill(10)
         sources = []
         tags = {
             "Revenues",
@@ -229,7 +229,7 @@ class EvidenceProvider:
         cutoff = now()
         if not timedelta(0) <= cutoff - since < timedelta(days=365):
             raise ValueError("Filing freshness cutoff is outside recent submissions coverage")
-        cik = self.cfg.universe[symbol].cik.zfill(10)
+        cik = self.cfg.research_universe[symbol].cik.zfill(10)
         raw = self.request(f"https://data.sec.gov/submissions/CIK{cik}.json").json()
         if str(raw.get("cik", "")).zfill(10) != cik:
             raise ValueError("SEC response company identity does not match configured CIK")
@@ -244,7 +244,7 @@ class EvidenceProvider:
         accession = filing["accessionNumber"]
         if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", accession):
             raise ValueError("Invalid SEC accession")
-        cik = int(self.cfg.universe[symbol].cik)
+        cik = int(self.cfg.research_universe[symbol].cik)
         base = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession.replace('-', '')}/"
         raw = self.request(base + "index.json").json()
         items = [

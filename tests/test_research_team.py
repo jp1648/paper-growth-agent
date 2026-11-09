@@ -1448,3 +1448,33 @@ def test_unknown_document_is_recoverable_without_creating_evidence():
     document = tools["filing_documents"].invoke({"symbol": "ACME", "accession": "0000000001-26-000001"})[0]
     passage = tools["read_document"].invoke({"document_id": document["document_id"]})
     assert passage["id"] in desk.sources and "cash flow" in passage["content"]
+
+
+def test_final_context_indexes_evidence_without_mutating_reports_or_originals():
+    import copy
+    import hashlib
+
+    from trader.store import dumps
+
+    cfg = Settings()
+    bundle = Evidence().get("ACME")
+    bundle["sources"].append(
+        {
+            "id": "passage-test",
+            "content": "original text " * 2000,
+            "url": "https://www.sec.gov/Archives/fixture.htm",
+            "truncated": True,
+        }
+    )
+    desk = ResearchDesk(cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, bundle, Budget(cfg), None)
+    desk.reports = {"business": {"evidence_ids": ["passage-test"], "gap": "tax bridge incomplete"}}
+    desk.calculations = {"calculation-test": {"value": "12.34"}}
+    original = copy.deepcopy(desk.sources)
+    context = desk.final_context()
+    assert context["reports"] == desk.reports and context["calculations"] == desk.calculations
+    assert desk.sources == original
+    for source, indexed in zip(original.values(), context["evidence"], strict=True):
+        assert "content" not in indexed
+        assert indexed["id"] == source["id"]
+        assert indexed["content_sha256"] == hashlib.sha256(dumps(source.get("content")).encode()).hexdigest()
+    assert len(dumps(context["evidence"])) < len(dumps(desk.source_previews(original.values())))

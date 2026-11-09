@@ -164,7 +164,7 @@ async def listen(settings, store, config_path):
         stream(
             "wss://stream.data.alpaca.markets/v1beta1/news",
             {"action": "auth", "key": key, "secret": secret},
-            {"action": "subscribe", "news": list(settings.universe)},
+            {"action": "subscribe", "news": list(settings.research_universe)},
             "news",
         ),
         finite_runs(),

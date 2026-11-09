@@ -1121,9 +1121,15 @@ class ResearchDesk:
             "reports": self.reports,
             "report_times": self.report_times,
             "calculations": self.calculations,
-            "evidence": self.source_previews(self.sources.values()),
+            "evidence": [
+                {
+                    **{key: value for key, value in source.items() if key != "content"},
+                    "content_sha256": hashlib.sha256(dumps(source.get("content")).encode()).hexdigest(),
+                }
+                for source in self.sources.values()
+            ],
             "targeted_news_review": bool(self.targeted),
-            "instruction": "All four specialist reports are complete. Return the final Decision using these reports and their cited evidence. Preserve uncertainties and unresolved gaps; do not invent additional evidence.",
+            "instruction": "All four specialist reports are complete. Return the final Decision using these reports and their cited evidence. The evidence index contains metadata and content hashes only; original content remains in the audit, not this synthesis request. Do not treat the index as independently inspected evidence. Preserve uncertainties and unresolved gaps; do not invent additional evidence.",
         }
 
     def finalize(self, audit, report_times):
