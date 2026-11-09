@@ -64,11 +64,17 @@ def build_file(source, output):
             raise ValueError("Each study week requires three sessions; review exceptional closures")
         for row in (days[0], days[len(days) // 2], days[-1]):
             number = len(opportunities) + 1
+            claim_from = datetime.fromisoformat(row["open"]) + timedelta(minutes=30)
+            claim_before = datetime.fromisoformat(row["close"]) - timedelta(minutes=30)
+            if claim_from >= claim_before:
+                raise ValueError("Session too short for the reviewed claiming window")
             opportunities.append(
                 {
                     "id": f"{identity}:scheduled:{number:02d}",
                     "symbol": SYMBOLS[(number - 1) % len(SYMBOLS)],
                     "week": week + 1,
+                    "claim_from": claim_from.isoformat(),
+                    "claim_before": claim_before.isoformat(),
                     **row,
                 }
             )
@@ -89,6 +95,13 @@ def build_file(source, output):
             "missed_slots": "Retain missed/failed/deferred slots; no automatic rescheduling or paid catchup",
             "safety": "Safety reviews have priority and are recorded separately under the same budget",
             "budget": "Fresh funding and remaining daily/run allowance must pass before every paid call",
+            "claiming": "Open+30 inclusive to close-30 exclusive; claim once before any paid request",
+            "completion": "Claimed run may finish within existing bounded run deadline; retain actual times",
+            "scheduled_denominator": 36,
+            "minimum_mechanical_completions": 33,
+            "minimum_independent_economic_acceptances": 30,
+            "sufficiency": "Freeze per-company sufficient-case templates before opening; later retrieval failures remain failures",
+            "safety_stratum": "Report all safety attempts, costs and actionable reviews separately; never pad scheduled counts",
         },
         "limitations": [
             "Supplied calendar authenticity/completeness and all activation prerequisites require review.",

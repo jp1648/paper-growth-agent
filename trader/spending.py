@@ -80,6 +80,12 @@ class DailyReservation:
         # Reserve before any API call; a crash keeps the full allowance charged to this day.
         with store.db:
             store.db.execute("BEGIN IMMEDIATE")
+            if store.get("active", "paper_study") is not None:
+                from .paper_dispatch import funding_gate
+
+                reason = funding_gate(store, cfg, now())
+                if unrestricted_research or reason:
+                    raise DailyBudgetExceeded(reason or "Unbounded research is forbidden during a study")
             status = spending_status(store, cfg.research_daily_cost_usd)
             self.unrestricted_research = unrestricted_research
             self.allowance = (

@@ -147,3 +147,48 @@ sample; per-company coverage must remain visible in reporting. Before dispatch
 integration, freeze the invocation time and missed-slot cutoff, the treatment of
 safety attempts in each denominator, and the sufficiency classification rules.
 The slot list itself proves none of those semantic decisions.
+
+## Selected dispatch and denominator rules — November 9
+
+Independent review approved these conservative rules for implementation, not
+activation. Each scheduled slot may be claimed from regular open plus 30 minutes
+(inclusive) until regular close minus 30 minutes (exclusive). A run claimed in
+that window may finish under its existing bounded run deadline; retain actual
+start/end times. An atomic durable claim precedes graph invocation, and a separate
+invocation claim prevents repeated graph starts after failure. Crashes and unknown
+responses consume the attempt; no same-slot paid retry or later-date catchup.
+
+The fixed scheduled denominator is 36. Require at least 33 mechanical completions
+and 30 independently economically accepted scheduled investigations, covering all
+five companies. Before opening, verify primary-source coverage and freeze a
+sufficient-case template for each company. This does not claim future packets or
+provider availability are already verified. Retrieval failures remain failures,
+not retrospective reasons to shrink the denominator. Safety reviews have their
+own recorded stratum; their costs/failures/actionable-decision reviews stay in
+overall reporting but do not pad either scheduled numerator. No pause state
+permits scheduled or safety model research; reconciliation/monitoring continues.
+
+Runtime dispatch is dormant unless the experiment ledger contains an explicitly
+operator-approved `paper_study/active` record. Bind experiment, full source digest,
+configuration digest, schedule digest, approval identity/time and acceptance
+packet digest. These fields record an operator attestation; their mere presence
+cannot substantiate account eligibility, research acceptance or source authenticity.
+No production approval record has been created. The approved schedule must fit
+inside the original experiment expiry; there is no implicit extension or reset.
+
+Funding requires a separate retained provider-confirmed available-credit record,
+verified within 30 minutes, unexpired beyond the bounded run deadline, with a
+minimum $10 buffer and a digest of the current settled global model-spend ledger.
+Every active-study investigation, including safety research, rechecks this inside
+the atomic model-budget reservation. Spending changes invalidate the receipt;
+unknown charges block. A full capped run must fit both the remaining $6 daily
+allowance and available credit; unbounded research is forbidden. No runtime code
+purchases credits or infers renewal. Ordinary manual graph calls cannot bypass the
+study route. Calendar/clock/config/source changes fail closed; existing execution,
+reconciliation, risk and paper-only controls remain authoritative.
+
+Missing funding, pause and safety displacement reasons are retained separately
+and attached to missed receipts. The runner preserves post-close reporting and
+original experiment-expiry cancellation behavior. The study record does not
+resume trading. A production installation/activation procedure still needs the
+complete substantive opening packet and explicit approval.

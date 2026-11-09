@@ -4,7 +4,7 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from .models import Decision, dec, dt, now
+from .models import Decision, dec, dt, dumps, now
 from .observability import traced
 
 
@@ -15,6 +15,8 @@ class GraphState(TypedDict, total=False):
     trigger: str
     research_only: bool
     finalize_from: str
+    study_id: str
+    study_stratum: str
     portfolio: dict
     evidence: dict
     quote: dict
@@ -38,6 +40,34 @@ def build_graph(service, team):
     def portfolio(s):
         if service.kill_path.exists():
             raise RuntimeError("Kill switch is active; research paused")
+        study = store.get("active", "paper_study")
+        if study is not None and (
+            s.get("study_id") != study["schedule"]["study_id"]
+            or s.get("study_stratum") not in {"scheduled", "safety"}
+        ):
+            raise RuntimeError("Active study research must pass through the study dispatcher")
+        if study is not None:
+            if s["study_stratum"] == "scheduled":
+                claim = store.get(dumps([s["study_id"], s["run_key"]]), "paper_slot")
+                if (
+                    not claim
+                    or claim.get("symbol") != s["symbol"]
+                    or claim.get("outcome") == "missed"
+                    or claim.get("schedule_sha256") != study["schedule_sha256"]
+                ):
+                    raise RuntimeError("Scheduled graph has no matching durable slot claim")
+            else:
+                job = store.get(s["run_key"], "job")
+                if (
+                    not s["run_key"].startswith(s["study_id"] + ":safety:")
+                    or not job
+                    or job.get("status") != "running"
+                ):
+                    raise RuntimeError("Safety graph has no matching running study job")
+            if not store.claim_paper_slot(
+                s["study_id"], s["run_key"], {"symbol": s["symbol"], "at": now()}, kind="paper_invocation"
+            ):
+                raise RuntimeError("Study graph invocation already consumed; no automatic retry")
         snap = service.reconcile()
         previous = store.get(s["symbol"], "thesis")
         return {

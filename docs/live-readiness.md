@@ -3746,3 +3746,31 @@ No actual study calendar/start was chosen, paid call made or production release
 changed. Authentic calendar, frozen dispatch/cutoff/denominator policies, runner
 integration and all substantive opening prerequisites remain required. See
 [the scope and schedule contract](prospective-scope-decision.md#offline-schedule-draft).
+
+## November 9: reviewed dormant runtime dispatch and fresh funding inventory
+
+Implemented the approved-study runner branch, fixed claiming windows, durable
+slot/invocation claims, held-position safety priority, unchanged trade allowlist,
+missed-slot reasons and per-investigation funding gates. Default behavior is
+unchanged without an approved study record. Independent review found and verified
+repairs for stale funding after broker I/O, multi-investigation safety spending,
+experiment-window mismatch, cached-result collisions and lost deferral reasons.
+Final graph-boundary review also verified matching durable claims and no automatic
+second invocation. Exact review: `state/validation-20261109/paper-dispatch-review.json`.
+
+Full local suite: **1069 passed, 7 skipped**; Ruff passes. These are implementation
+checks, not a funded/accepted study. No production study record, funding receipt,
+new model call, order, experiment extension or pause clear was created.
+
+Read-only production inventory confirms original experiment expiry
+`2027-01-21T02:40:02.515004+00:00`, zero active study records, zero unsettled model
+runs, and November 9 estimated model spend `$3.6508275`. A study starting November
+10 cannot fit its 84-day minimum inside that existing expiry. An explicit audited
+lifecycle decision is required; never silently alter original experiment history.
+Refreshed signed-in OpenAI credit-grant UI shows `$81.91` available, expiring
+November 29. This is adequate current balance for a later bounded attempt, not
+proof of funding through a twelve-week study. Retained observations:
+`state/validation-20261109/runtime-study-inventory.json` and
+`state/validation-20261109/funding-observation-20261109T202211Z.json`.
+Research acceptance, cash/account terms, full cost allocation, actual combined
+infrastructure recovery and broker correction evidence remain substantive gates.

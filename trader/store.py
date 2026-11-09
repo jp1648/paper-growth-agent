@@ -87,6 +87,28 @@ class Store:
             emit("document.adjustment", {"key": item["id"], "value": item}, experiment_id=self.scope)
             emit("explicit_adjustment", item, experiment_id=self.scope)
 
+    def claim_paper_slot(self, study_id, slot_id, receipt, *, kind="paper_slot"):
+        """Consume a scheduled slot once; a crash cannot grant a second paid attempt."""
+        if not isinstance(study_id, str) or not study_id or not isinstance(slot_id, str) or not slot_id:
+            raise ValueError("Require study and slot identities")
+        if {"study_id", "slot_id", "status"} & receipt.keys():
+            raise ValueError("Receipt cannot override claim identity or status")
+        if kind not in {"paper_slot", "paper_invocation"}:
+            raise ValueError("Unknown study claim kind")
+        key = dumps([study_id, slot_id])
+        body = dumps({"study_id": study_id, "slot_id": slot_id, "status": "claimed", **receipt})
+        with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            if self.get(key, kind) is not None:
+                return False
+            self.db.execute("INSERT INTO documents VALUES (?,?,?,?)", (self.scope, kind, key, body))
+            self.db.execute(
+                "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+                (self.scope, now().isoformat(), kind + "_claimed", body),
+            )
+        emit(kind + "_claimed", json.loads(body), experiment_id=self.scope)
+        return True
+
     def approve_revision(self, identifier, revision):
         """Commit the accounting correction and its approval receipt together."""
         receipt = {"id": identifier, **revision}

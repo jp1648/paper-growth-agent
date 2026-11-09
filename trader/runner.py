@@ -151,6 +151,14 @@ class Runner:
                 "status": "experiment ended; positions remain open",
                 "report": portfolio_report(self.service),
             }
+        study = self.store.get("active", "paper_study")
+        if study is not None:
+            from .paper_dispatch import dispatch
+
+            result = dispatch(self, study, clock, day)
+            if phase == "postclose":
+                result["daily_report"] = daily_report(self.service)
+            return result
         if not phase:
             return {"status": "reconciled; outside research cadence"}
         if self.service.kill_path.exists() and phase != "postclose":
@@ -179,9 +187,10 @@ class Runner:
         return result
 
     @traced("runner.research_batch")
-    def research_batch(self, slot, phase):
+    def research_batch(self, slot, phase, symbols=None, study_id=None):
         snap = self.store.get("snapshot")
-        symbols = set(self.cfg.research_universe) | {p["symbol"] for p in snap["positions"]}
+        if symbols is None:
+            symbols = set(self.cfg.research_universe) | {p["symbol"] for p in snap["positions"]}
         outcomes = []
         held = {p["symbol"] for p in snap["positions"]}
 
@@ -245,6 +254,7 @@ class Runner:
                         or symbol in self.cfg.research_only_universe,
                         "trigger": reason,
                         "fresh": phase in {"preopen", "weekly"} or reason == "new news evidence",
+                        **({"study_id": study_id, "study_stratum": "safety"} if study_id else {}),
                     }
                 )
                 self.store.put(key, {"status": "complete", "at": now()}, "job")
