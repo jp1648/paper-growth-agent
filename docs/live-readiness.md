@@ -13,7 +13,7 @@ readiness. The prospective trial remains `predeclared_not_started`.
 | Goal | Verified state | Remaining requirement / next action |
 |---|---|---|
 | 1. Costs | 33 model-spend records settled using retained provider evidence. Detailed Google Cloud billing export configured; its table exists but bounded project queries still return no rows. | Authenticate/allocate all operating costs before trial activation. Empty export is not zero cost; Flovia unknown operations remain preserved and blocked. |
-| 2. Release | Paused runtime revision d55f473 source-verified across 32 Python files; exact-commit CI 42546222647 passed 979 tests/one skipped, 87% branch coverage. Existing Cloud Run dashboard execution panel is deployed and authenticated checks passed. Fresh reconciliation and unchanged experiment/position/configuration/spending/pause verified. | Preserve this release receipt and repeat exact-artifact checks for future changes; deployment is not trial activation. |
+| 2. Release | Paused runtime revision 64ced33 source-verified across 33 Python files; exact-commit CI 42548737133 passed 995 tests/one skipped, 87% branch coverage. Existing Cloud Run dashboard execution panel is deployed and authenticated checks passed. Fresh reconciliation and unchanged experiment/position/configuration/spending/pause verified. | Preserve this release receipt and repeat exact-artifact checks for future changes; deployment is not trial activation. |
 | 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
@@ -3512,3 +3512,32 @@ approved the mechanical repair only; exact hashes are in
 secret scan passed after an exact-fingerprint exception for the prior bundle
 documentation's ordinary prose false positive; no credential or scanner rule was
 removed. Deployment and a newly bound paid-run plan remain outstanding.
+
+
+### Canonical-SBC and draft-bundle release — November 8 NY / November 9 UTC
+
+Deployed source `64ced33ebc075273a667ada2f759d79ad7bd8a94`, image
+`us-east1-docker.pkg.dev/trader-observatory-20261105/trader/agent@sha256:e80d2c14f379e7feddf2cbc9f75720d51beb3ca3a08fef9fc22b35c83d9ae4c6`.
+The first CI attempt correctly stopped deployment: the isolated mutation harness
+had omitted the new cohort fixtures. Its copy list was corrected; clean baseline
+and all 16 disabled-guard checks then passed locally and in CI. Exact-commit CI
+42548737133 passed 995 tests (one opted-in paper order test skipped), 87% branch
+coverage, real isolated PostgreSQL, dashboard/browser and full-history secret checks.
+
+Scoped build 91839861-1cd2-4a7c-815e-3f079efe54f1 succeeded. Only tracked Docker
+context was uploaded. Verified all 33 Python file hashes in the image and actual
+running container. Container started 02:08:01 UTC; reconciliation succeeded
+02:08:07 UTC, strictly after startup. Ledger integrity, original experiment,
+document counts, one AAPL paper share, no active orders, pause, configuration and
+spending hashes matched before/after. Read-only container root and active service
+verified. Rollback retained at `state/release-rollback-64ced33` on the executor;
+local receipts are under `state/release-64ced33/`.
+
+The independent replacement Apple v3 plan is approved for planning only:
+`state/evaluations/planned-apple-v3-20261109/`, stable ID
+`annual-normalized-v3-dev-20261109-1`. Exact research code hashes match deployed
+source; a separate runtime binding records that only safety-test fixture setup
+changed after the reviewed plan revision. No run or reservation was created.
+Earliest date remains November 9 NY; fresh funding, $6/day/$5/run, pause and
+unused-ID checks are mandatory. The original v2/v7 plan remains explicitly blocked.
+No paid research or orders occurred in this release; no trial/live activation.
