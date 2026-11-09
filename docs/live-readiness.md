@@ -13,7 +13,7 @@ readiness. The prospective trial remains `predeclared_not_started`.
 | Goal | Verified state | Remaining requirement / next action |
 |---|---|---|
 | 1. Costs | Retained model-spend records are settled; November 9 estimated model spend is $3.6508275. Detailed Cloud billing export exists and the project is linked to the matching billing account; its eight exported rows cover older October 13 usage, with zero trader-attributed rows. | Authenticate/allocate all operating costs before trial activation. Missing trader rows are not zero cost; preserve blocked Flovia unknown operations. |
-| 2. Release | Paused runtime 4847027 verified across 33 Python files; both exact-head CI runs passed. Local full suite: 1003 passed, six skipped, one deselected. Fresh startup reconciliation passed; experiment, position, configuration, spending and pause unchanged. Existing authenticated Cloud Run dashboard remains deployed. | Preserve exact-artifact receipts; deployment is not research acceptance or trial activation. |
+| 2. Release | Paused runtime 24a04ef verified across 35 Python files; both exact-head CI runs passed. Local full suite: 1069 passed, seven skipped. Fresh startup reconciliation passed; experiment, position, configuration, spending and pause unchanged. Existing authenticated Cloud Run dashboard remains deployed. | Preserve exact-artifact receipts; deployment is not research acceptance or trial activation. |
 | 3. Research | November 9 Apple attempt failed the final-call budget guard; independent semantic review also rejected material coverage and normalization gaps, including a historical sum error. Final-context reduction, paginated filing navigation and exact signed cash-flow sums are now deployed and independently reviewed. | One separately identified Apple development attempt is planned for November 10 or later, with fresh funding/ledger checks, $5 run/$6 daily ceilings and independent outcome review. No further paid retry November 9. Microsoft holdout remains ungenerated. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
@@ -3774,3 +3774,31 @@ proof of funding through a twelve-week study. Retained observations:
 `state/validation-20261109/funding-observation-20261109T202211Z.json`.
 Research acceptance, cash/account terms, full cost allocation, actual combined
 infrastructure recovery and broker correction evidence remain substantive gates.
+
+### Paused runtime release receipt
+
+Source `24a04eff46f60b9c64b7a014d889e7dd40dcc5e5` passed exact-head CI
+42692747114 and 42692734480. Build `187cb78a-6be6-4b22-9f41-5f9017fab8a3`
+produced image digest
+`sha256:b4a79e6e0a95827b113c165b0b1f168c46b56896856bf32257b0c2168f9cff54`.
+All 35 running Python files match, the root filesystem is read-only, and startup
+at 20:29:50 UTC was followed by successful reconciliation at 20:30:10 UTC.
+Original experiment, document counts, AAPL paper quantity one, spending digest,
+configuration and pause remain unchanged. Receipt: `state/release-24a04ef/receipt.json`.
+No approved study or runtime funding receipt was installed; dispatch stays dormant.
+
+The superseded November 10 plan is preserved and its old preflight now refuses
+unconditionally. The replacement independently reviewed plan is
+`state/evaluations/planned-apple-coverage-20261110-runtime-24a04ef/` with the same
+unused stable ID `annual-coverage-v3-dev-20261110-1`, unchanged Apple case/prompt/v8,
+and all 35 source hashes bound. Execute its preflight as a file with adjacent
+reviewed artifacts, fresh funding evidence and unchanged pause before any later
+paid launch. No November 9 retry is authorized by this release.
+
+A read-only paper-broker calendar capture retained 85 sessions from November 10,
+2026 through March 15, 2027. The offline **hypothetical**, unapproved November 10
+start example ends February 5, 2027 after 60 sessions and at least 84 days; it has
+36 scheduled slots. This is not the selected activation date. Raw calendar/hash
+and draft: `state/prospective-calendar-20261109/`. It confirms that the original
+January 21 UTC experiment expiry and November 29 grant expiry cannot cover even
+that earliest example. Neither date was extended or reset.
