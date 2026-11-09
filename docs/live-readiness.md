@@ -3206,3 +3206,21 @@ Read-only container root and active service verified. Rollback retained privatel
 Receipt: `state/release-6e51d89/receipt.json`. This deploys reviewed non-session,
 partial and funded-reversal benchmark payments and paired-return evidence binding.
 No model calls, order submissions, trial activation or live-money authorization.
+
+### Broker bust contract recheck — November 8, 2026
+
+Rechecked current official Trading API versus Broker API documentation; the latter's
+correction stream cannot establish this executor's historical activity/order
+contract. Concrete missing fields and a provider request draft (not sent) are in
+`broker-correction-contract.md`. No inferred bust schema or ledger bypass added.
+
+Expanded the existing zero-quantity fixture across filled/reopened/partially-filled
+order statuses. It now proves reconciliation itself creates the pause before any
+manual pause, preserves the audited order/complete intent and refuses resume while
+divergence persists; invalid revision approval still cannot overwrite history.
+These are fixture rejection tests, not evidence of supported real broker recovery.
+Readiness/accounting/process-recovery suites passed 93 tests. Independent review
+approved the test changes and separately reran 57 readiness tests; exact-hash report
+is `state/independent-review-20261108/broker-bust-boundary-review.json`. Ruff and
+whitespace checks passed. No runtime code, deployment, model call or broker action
+changed in this step.

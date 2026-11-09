@@ -337,7 +337,8 @@ def test_revision_chain_can_return_to_original_then_change_again(env):
     assert broker.submits == 0
 
 
-def test_zero_quantity_bust_remains_blocked_without_verified_contract(env, decision):
+@pytest.mark.parametrize("order_status", ["filled", "new", "partially_filled"])
+def test_zero_quantity_bust_remains_blocked_without_verified_contract(env, decision, order_status):
     service, broker, _ = env
     result = service.execute(decision, "bust-entry")
     cid = result["client_order_id"]
@@ -346,10 +347,20 @@ def test_zero_quantity_bust_remains_blocked_without_verified_contract(env, decis
     order_before = service.store.get(cid, "order")
     busted = {**original, "qty": "0"}
     broker.activities = [busted]
-    broker.orders[cid]["filled_qty"] = "0"
+    broker.orders[cid].update(filled_qty="0", status=order_status)
     broker.raw_account.update(cash="100000", equity="100000")
     broker.positions = []
-    service.kill_path.write_text("bust review")
+    from trader.service import BrokerHistoryError
+
+    assert not service.kill_path.exists()
+    with pytest.raises(BrokerHistoryError):
+        service.reconcile()
+    assert service.kill_path.exists()
+    assert service.store.get(cid, "order") == order_before
+    assert service.store.get(cid, "intent")["status"] == "complete"
+    with pytest.raises(BrokerHistoryError):
+        service.resume()
+    assert service.kill_path.exists()
     with pytest.raises(RuntimeError, match="Invalid fill activity"):
         service.acknowledge_revision(
             {
