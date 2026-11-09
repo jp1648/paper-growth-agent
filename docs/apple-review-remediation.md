@@ -249,3 +249,25 @@ supplemental evidence mentioned in analyst notes must not silently enter the
 frozen annual-only evaluation. A revised report needs independent review against
 all original requirements; this clarification does not accept the failed run or
 remove unresolved-gap BUY/ADD controls.
+
+### Signed historical arithmetic helper — reviewed offline
+
+`sum_cash_flows` sums 1–20 labeled signed USD components for a canonical nonfuture
+period end. Inputs are bounded decimal strings with at most two fractional digits;
+exact Decimal arithmetic returns the original rows and total without silent
+rounding. Duplicate/blank labels and unknown evidence IDs are rejected. The tool
+retains an immutable `cash_flow_sum` audit event through the existing trace/budget
+path; it creates neither source IDs nor valuation-registry entries.
+
+Tests reproduce FY2024 +$3.651bn and FY2025 -$25bn and cover precision, malformed
+amounts, bounds, references, duplicate lines and dates. The model is instructed to
+use the helper when reporting derived historical cash-flow aggregates. It verifies
+only arithmetic: transcription, signs, omitted/overlapping lines, classification
+and normalized interpretation still require original evidence and independent
+review. Tool-call and monetary limits are unchanged.
+
+Valuation instructions now distinguish explicit justified conditional assumptions
+from unknowable future realizations. Source-verified starting values, quantitative
+assumptions, economic rationale and adverse sensitivities are required; default
+zero deltas and unexamined material claims remain unacceptable. No scoring or
+execution gate is relaxed. This change is not evidence of a successful new run.

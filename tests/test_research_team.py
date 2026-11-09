@@ -1554,3 +1554,63 @@ def test_filing_search_preserves_unknown_and_oversize_gaps():
     assert not gap["available"] and "id" not in gap
     assert tools["read_document"].invoke({"document_id": document["document_id"]}) == gap
     assert len(calls) == 1 and desk.sources == before
+
+
+@pytest.mark.parametrize(
+    "period,amounts,total",
+    [
+        ("2024-09-28", [-3788, -1356, -1046, -11731, 6020, 15552], "3651000000"),
+        ("2025-09-27", [-6682, -347, 1400, -9197, 902, -11076], "-25000000000"),
+    ],
+)
+def test_signed_cash_flow_sum_retains_inputs_without_creating_evidence(period, amounts, total):
+    cfg = Settings()
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    tool = next(t for t in desk.tools() if t.name == "sum_cash_flows")
+    rows = [
+        {"label": f"Disclosed line {i}", "amount_usd": str(amount * 1000000), "evidence_id": "fixture-sec"}
+        for i, amount in enumerate(amounts)
+    ]
+    result = tool.invoke({"period_end": period, "components": rows})
+    assert result["total_usd"] == total and result["components"] == rows
+    assert result["kind"] == "derived_arithmetic" and "id" not in result
+    assert not desk.calculations and set(desk.sources) == {"fixture-sec"}
+    assert desk.budget.events[-1] == ("cash_flow_sum", result)
+    result["components"][0]["amount_usd"] = "0"
+    assert desk.budget.events[-1][1]["components"][0]["amount_usd"] == rows[0]["amount_usd"]
+
+
+def test_signed_cash_flow_sum_rejects_bad_inputs_and_preserves_precision():
+    cfg = Settings()
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    tool = next(t for t in desk.tools() if t.name == "sum_cash_flows")
+
+    def invoke(rows, period="2025-12-31"):
+        return tool.invoke({"period_end": period, "components": rows})
+
+    row = {"label": "First", "amount_usd": "999999999999999.99", "evidence_id": "fixture-sec"}
+    result = invoke([row, row | {"label": "Second", "amount_usd": "-999999999999999.98"}])
+    assert result["total_usd"] == "0.01"
+    count = len(desk.budget.events)
+    for amount in ["NaN", "Infinity", "1e1000", "0.001", "1000000000000000", ""]:
+        with pytest.raises(ValueError):
+            invoke([row | {"amount_usd": amount}])
+    for rows in [
+        [],
+        [row] * 21,
+        [row, row | {"label": " first "}],
+        [row | {"label": " "}],
+        [row | {"evidence_id": "calculation-derived"}],
+        [row | {"evidence_id": "unknown"}],
+    ]:
+        with pytest.raises(ValueError):
+            invoke(rows)
+    with pytest.raises(ValueError):
+        invoke([row], "20251231")
+    with pytest.raises(ValueError):
+        invoke([row], "2999-12-31")
+    assert len(desk.budget.events) == count

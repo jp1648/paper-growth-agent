@@ -3661,3 +3661,17 @@ FY2024 working-capital sum wrong: +$3.651bn, not +$8.651bn. The correction and
 source limits are preserved in `apple-review-remediation.md`; no original result
 or acceptance was rewritten. The next investigation still requires corrected
 historical reconciliation, complete material analysis and independent acceptance.
+
+### November 9 signed cash-flow arithmetic repair — local
+
+Added bounded exact signed-sum arithmetic for historical cash-flow components,
+with original reference checks and immutable audit output. It does not verify
+transcription, create citable evidence, alter valuation provenance or relax any
+execution/budget guard. Valuation guidance distinguishes justified conditional
+forecasts from historical facts, retaining material-gap rejection. Independent
+review approved exact hashes after 129 tests; full offline suite passed 1003 tests
+(six external skips, one paper deselection), Ruff clean.
+
+Review: `state/validation-20261109/cash-flow-sum-review.json`. No new provider call,
+trade or deployment occurred in this step. CI, paused release verification and a
+fresh reviewed source/prompt-bound later-day plan precede any paid validation.
