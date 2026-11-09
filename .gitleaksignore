@@ -1,3 +1,4 @@
-# False positive: prose "Source authenticity, mark/inventory"; no credential.
+# False positives in documentation prose and its explanatory comment; no credentials.
 # Exact historical finding only; do not suppress generic-api-key globally.
 bf7766ae72258df5150a7a1221c95d457a9bf917:docs/paper-measurement-contract.md:generic-api-key:554
+3b167e6d70548dbec9d625039efebcd889268c00:.gitleaksignore:generic-api-key:1
