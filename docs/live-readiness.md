@@ -3088,3 +3088,25 @@ affected modules (55 passing tests). Exact code/test/suite hashes and review sco
 are retained in `state/independent-review-20261108/scoring-fix-review.json`. This
 versions scoring, not research economic approval; old scoring results cannot be
 compared without explicit replay. No paid model calls or broker actions occurred.
+
+### Reviewed measurement/scoring release — November 8, 2026
+
+Revision `185c65f0bfbf7d00b14f0f32f3e3516d3ad66a40` deployed to the paused
+executor at November 9 00:38 UTC (November 8 New York). Exact-revision CI
+`42540870691` succeeded: 956 backend tests passed, one opt-in skipped, 86% branch
+coverage, safety mutation checks, dashboard/browser checks and secret scan passed.
+Scoped build `de9ba84d-6503-4e35-99b7-c17defa825ca` produced immutable digest
+`sha256:0a9bd13bf01198d6b1f7d91c38ab51c82eb3057b59575c3143f6327b9b803472`;
+all 32 Python files matched reviewed source in the image and running container.
+
+Receipt `state/release-185c65f/receipt.json` retains before/after evidence and a
+private rollback snapshot. Fresh reconciliation succeeded at 00:38:53 UTC;
+experiment, document counts, one AAPL paper share, configuration, spending and
+pause were unchanged. No pending order, paid research or trial activation.
+
+This release includes the historical-versus-normalized scoring correction and
+reviewed hypothetical benchmark purchases, dividend/split replay, daily returns,
+and retained raw price/calendar binding. It does not certify source authenticity,
+complete payment/correction handling or prospective measurement readiness.
+Detailed billing export has a destination table but the bounded trader-project
+query still returned no rows; this is pending cost ingestion, not zero cost.
