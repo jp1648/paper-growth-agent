@@ -687,3 +687,104 @@ def test_weekend_reversal_cannot_borrow_later_payment(ledger_input, reverse_inpu
     d["sessions"][-1]["events"] = [reversal]
     with pytest.raises(ValueError, match="another payment lock"):
         build_ledger(d)
+
+
+def test_paired_returns_bind_recomputed_benchmark_and_full_costs(sourced_ledger, tmp_path, capsys):
+    import copy
+    import json
+
+    from trader.cli import main
+    from trader.paper_observations import bind_benchmark
+
+    capture, ledger = sourced_ledger
+
+    def claim(equity, cost="0"):
+        return {
+            "reported_equity": equity,
+            "net_receivables_not_in_equity": "0",
+            "complete": True,
+            "evidence": "retained-fixture",
+            "cumulative_external_costs": {
+                kind: {"amount": cost, "status": "final", "evidence": "verified-fixture"}
+                for kind in ("model", "data", "infrastructure", "other")
+            },
+        }
+
+    doc = {
+        "version": 1,
+        "currency": "USD",
+        "benchmark": "SPY",
+        "flow_policy": "no_external_flows",
+        "source_manifest_sha256": "a" * 64,
+        "benchmark_method": "whole shares 5bps",
+        "cost_allocation_method": "all costs before credits",
+        "expected_sessions": ["2026-11-02"],
+        "opening": {"date": "2026-10-30", "portfolio": claim("1000"), "benchmark": claim("1000")},
+        "observations": [
+            {
+                "date": "2026-11-02",
+                "portfolio": claim("1010", "1"),
+                "benchmark": claim("1008.55"),
+                "external_deposits": "0",
+                "external_withdrawals": "0",
+                "flow_evidence": "verified-zero",
+            }
+        ],
+    }
+    source, benchmark, output = (
+        tmp_path / name for name in ("paired.json", "benchmark.json", "returns.json")
+    )
+    source.write_text(json.dumps(doc))
+    benchmark.write_text(json.dumps(ledger))
+    args = [
+        "--config",
+        "absent.toml",
+        "build-paper-observations",
+        "--input",
+        str(source),
+        "--output",
+        str(output),
+        "--benchmark-input",
+        str(benchmark),
+        "--benchmark-capture",
+        str(capture),
+    ]
+    assert main(args) == 0
+    result = json.loads(output.read_text())
+    assert Decimal(result["observations"][0]["portfolio_return"]) == Decimal(".006")
+    assert Decimal(result["observations"][0]["benchmark_return"]) == Decimal(".00855")
+    assert result["benchmark_binding"]["balances_verified"] == 2
+    assert not result["benchmark_binding"]["source_authenticity_verified"]
+    with pytest.raises(FileExistsError):
+        main(args)
+    for fault in ("capital", "window", "nav", "receivable", "duplicate_cost"):
+        changed = copy.deepcopy(doc)
+        if fault == "capital":
+            changed["opening"]["portfolio"]["reported_equity"] = "999"
+        elif fault == "window":
+            changed["observations"][0]["date"] = "2026-11-03"
+        elif fault == "nav":
+            changed["observations"][0]["benchmark"]["reported_equity"] = "1009"
+        elif fault == "receivable":
+            changed["observations"][0]["benchmark"]["net_receivables_not_in_equity"] = "1"
+        else:
+            changed["observations"][0]["benchmark"]["cumulative_external_costs"]["model"]["amount"] = "1"
+        with pytest.raises(ValueError):
+            bind_benchmark(changed, ledger)
+    with pytest.raises(ValueError, match="together"):
+        main(args[:-2])
+    from trader.benchmark import build_ledger
+    from trader.paper_observations import build_observations
+
+    ledger.update(opening_capital="1000000000000", slippage_bps=0)
+    ledger["sessions"][0]["mark"] = "0.000000000001"
+    ledger["sessions"][1]["mark"] = "123456789012.123456789012"
+    exact = build_ledger(ledger)["balances"][1]["nav"]
+    doc["opening"]["portfolio"] = claim("1000000000000")
+    doc["opening"]["benchmark"] = claim("1000000000000")
+    doc["observations"][0]["benchmark"] = claim(exact)
+    assert bind_benchmark(doc, ledger)["balances_verified"] == 2
+    assert build_observations(doc)["balances"][0]["benchmark"]["net_nav"] == exact
+    doc["observations"][0]["benchmark"] = claim(str(+Decimal(exact)))
+    with pytest.raises(ValueError, match="differs"):
+        bind_benchmark(doc, ledger)

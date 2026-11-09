@@ -3,12 +3,19 @@
 import hashlib
 import json
 from datetime import date
+from decimal import localcontext
 from pathlib import Path
 
 from .models import ZERO, dec
 
 
 def build_observations(document):
+    with localcontext() as context:
+        context.prec = 60
+        return _build_observations(document)
+
+
+def _build_observations(document):
     if type(document.get("version")) is not int or document["version"] not in (1, 2):
         raise ValueError("Require observation input version 1 or 2")
     if document.get("currency") != "USD" or document.get("benchmark") != "SPY":
@@ -121,9 +128,22 @@ def build_observations(document):
     }
 
 
-def build_file(source, output):
+def build_file(source, output, *, benchmark_input=None, benchmark_capture=None):
     raw = Path(source).read_bytes()
-    result = build_observations(json.loads(raw))
+    document = json.loads(raw)
+    result = build_observations(document)
+    if (benchmark_input is None) != (benchmark_capture is None):
+        raise ValueError("Benchmark input and retained capture must be supplied together")
+    if benchmark_input is not None:
+        from .benchmark import bind_prices
+
+        benchmark_raw = Path(benchmark_input).read_bytes()
+        benchmark_document = json.loads(benchmark_raw)
+        prices = bind_prices(benchmark_capture, benchmark_document)
+        result["benchmark_binding"] = bind_benchmark(document, benchmark_document) | {
+            "input_sha256": hashlib.sha256(benchmark_raw).hexdigest(),
+            "retained_prices": prices,
+        }
     result["input_sha256"] = hashlib.sha256(raw).hexdigest()
     with Path(output).open("x") as stream:
         stream.write(json.dumps(result, indent=2, allow_nan=False) + "\n")
@@ -208,4 +228,51 @@ def reconcile_marks(capture, document):
             "Cash already includes booked fees and distributions; unpaid net entitlements and external expenses remain separate.",
             "Marked equity is a measurement overlay, not a broker ledger update or trial acceptance.",
         ],
+    }
+
+
+def bind_benchmark(document, benchmark_document):
+    with localcontext() as context:
+        context.prec = 60
+        return _bind_benchmark(document, benchmark_document)
+
+
+def _bind_benchmark(document, benchmark_document):
+    """Recompute comparator accounting rather than trusting pasted NAV/return rows."""
+    from .benchmark import build_ledger
+
+    ledger = build_ledger(benchmark_document)
+    if ledger["symbol"] != "SPY":
+        raise ValueError("Primary paired observations require SPY")
+    points = [document["opening"], *document["observations"]]
+    if [point["date"] for point in points] != [row["date"] for row in ledger["balances"]]:
+        raise ValueError("Observation window must exactly match benchmark ledger")
+    capital = dec(ledger["opening_capital"])
+    opening = document["opening"]["portfolio"]
+    portfolio_capital = dec(opening["reported_equity"]) + dec(opening["net_receivables_not_in_equity"])
+    if document["version"] == 2:
+        portfolio_capital -= dec(opening["accrued_liabilities_not_in_equity"]["amount"])
+    if portfolio_capital != capital:
+        raise ValueError("Portfolio and benchmark must start with identical economic capital")
+    for index, (point, balance) in enumerate(zip(points, ledger["balances"], strict=True)):
+        claim = point["benchmark"]
+        # The opening denominator is pre-purchase capital; initial friction enters once on day one.
+        receivable = ZERO if index == 0 else dec(balance["net_receivable"])
+        equity = capital if index == 0 else dec(balance["nav"]) - receivable
+        if (
+            dec(claim["reported_equity"]) != equity
+            or dec(claim["net_receivables_not_in_equity"]) != receivable
+        ):
+            raise ValueError("Benchmark equity/receivable differs from reconstructed ledger")
+        if any(dec(cost["amount"]) for cost in claim["cumulative_external_costs"].values()):
+            raise ValueError("Comparator costs already in ledger; external cost adjustment requires review")
+        if document["version"] == 2 and dec(claim["accrued_liabilities_not_in_equity"]["amount"]):
+            raise ValueError("Benchmark liabilities are not supported by reconstructed ledger")
+    return {
+        "symbol": "SPY",
+        "opening_capital": str(capital),
+        "balances_verified": len(points),
+        "purchases": ledger["purchases"],
+        "unpaid_entitlements": ledger["unpaid_entitlements"],
+        "source_authenticity_verified": False,
     }

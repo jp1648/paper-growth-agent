@@ -319,3 +319,23 @@ order, regardless of input order. A debit cannot use a later receipt or cash
 whose reinvestment release is on/after the debit date. Payment and reversal events
 on the same economic date require explicit ordering review rather than assuming
 that one funded the other.
+
+### Paired return binding
+
+`build-paper-observations --input paired.json --output returns.json
+--benchmark-input benchmark.json --benchmark-capture CAPTURE` reconstructs the
+SPY ledger and verifies its retained raw price/calendar capture before comparing
+every supplied benchmark equity/receivable claim. The two optional flags must be
+supplied together. Without them the original claims-only diagnostic remains.
+
+The opening row uses pre-purchase capital shared with the portfolio; the first
+observation includes initial purchase friction exactly once. Observation dates
+must cover exactly the remaining benchmark rows. Model, data, infrastructure and
+other external costs still require final evidence and cumulative nondecreasing
+amounts through the existing builder. Benchmark trading fees are already included
+in reconstructed cash, so extra benchmark external-cost/liability adjustments
+stop for review. The output records exact benchmark-input hash and retained-price
+binding. This does not authenticate external costs, portfolio marks or payment
+claims, and does not activate the trial.
+Ledger binding and paired NAV arithmetic share the ledger's 60-digit decimal
+context; rounded substitutes are rejected, not accepted as exact balances.

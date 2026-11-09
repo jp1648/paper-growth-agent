@@ -3166,3 +3166,28 @@ No production deployment, paid research, broker actions or trial activation.
 Independent reviewer approved the corrected implementation after reproducing and
 rejecting future funding, temporary lock use and same-day ambiguity. Retained
 review: `state/independent-review-20261108/payment-reversal-review.json`.
+
+### Reconstructed benchmark to paired returns — November 8, 2026
+
+The paired-return CLI can now bind supplied benchmark claims to a recomputed
+benchmark ledger and validated retained raw price/calendar capture. It requires
+both benchmark input/capture arguments together, identical opening economic
+capital and an exact window; each equity/receivable component must match. Initial
+purchase friction enters only the first observation, with pre-purchase capital as
+denominator. Extra benchmark costs/liabilities cannot silently duplicate ledger
+fees. Existing final-evidence model/data/infrastructure/other-cost gates remain.
+
+End-to-end fixture verifies all four agent costs against a reconstructed SPY
+return, immutable output, and rejection of mismatched capital/window/NAV,
+receivables and double costs. Independent review identified a decimal-precision
+mismatch accepting a rounded substitute; ledger binding and paired NAV now share
+60-digit arithmetic, with exact-value/rounded-substitute regression coverage.
+Full final offline suite: 957 passed, seven external checks skipped. Focused
+benchmark/paired-return/uncertainty suite: 83 passed.
+
+The bounded billing query still returned no rows; cost ingestion/attribution is
+pending, not zero-cost evidence. Source authenticity, actual portfolio/account
+terms, complete cost reconciliation and trial activation remain unverified.
+No deployment, paid research, broker orders or pause changes occurred.
+Independent reviewer approved the corrected final hashes and separately ran 97
+focused tests. Review: `state/independent-review-20261108/paired-binding-review.json`.

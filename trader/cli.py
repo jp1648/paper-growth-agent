@@ -82,6 +82,8 @@ def main(argv=None):
     )
     paper_observations.add_argument("--input", required=True)
     paper_observations.add_argument("--output", required=True)
+    paper_observations.add_argument("--benchmark-input")
+    paper_observations.add_argument("--benchmark-capture")
     benchmark = sub.add_parser(
         "preview-benchmark-purchase", help="Offline hypothetical ETF purchase arithmetic"
     )
@@ -152,7 +154,17 @@ def main(argv=None):
     if args.command == "build-paper-observations":
         from .paper_observations import build_file
 
-        print(json.dumps(build_file(args.input, args.output), indent=2))
+        print(
+            json.dumps(
+                build_file(
+                    args.input,
+                    args.output,
+                    benchmark_input=args.benchmark_input,
+                    benchmark_capture=args.benchmark_capture,
+                ),
+                indent=2,
+            )
+        )
         return 0
     if args.command == "audit-dividend-entitlements":
         from .dividends import audit_entitlements
