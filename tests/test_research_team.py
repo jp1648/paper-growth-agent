@@ -1478,3 +1478,79 @@ def test_final_context_indexes_evidence_without_mutating_reports_or_originals():
         assert indexed["id"] == source["id"]
         assert indexed["content_sha256"] == hashlib.sha256(dumps(source.get("content")).encode()).hexdigest()
     assert len(dumps(context["evidence"])) < len(dumps(desk.source_previews(original.values())))
+
+
+def test_filing_search_is_bounded_navigation_then_citable_read():
+    cfg = Settings()
+    provider = Evidence()
+    text = "Contents: Tax. " + "x" * 13000 + " TAX [award] ß " + "y" * 13000 + " Tax. " * 8
+    reads = []
+    provider.document = lambda metadata: reads.append(metadata["url"]) or text
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    tools = {t.name: t for t in desk.tools()}
+    document = tools["filing_documents"].invoke({"symbol": "ACME", "accession": "0000000001-26-000001"})[0]
+    before = dict(desk.sources)
+    result = tools["search_document"].invoke(
+        {"document_id": document["document_id"], "queries": ["tax", "[award]", "absent"]}
+    )
+    assert desk.sources == before and "id" not in result
+    tax, award, absent = result["results"]
+    assert len(tax["matches"]) == 3 and tax["next_start_offset"]
+    later = tools["search_document"].invoke(
+        {"document_id": document["document_id"], "queries": ["tax"], "start_offset": tax["next_start_offset"]}
+    )["results"][0]
+    assert later["matches"][0]["offset"] > tax["matches"][-1]["offset"]
+    assert desk.sources == before
+    with pytest.raises(ValueError, match="nonnegative"):
+        tools["search_document"].invoke(
+            {"document_id": document["document_id"], "queries": ["tax"], "start_offset": -1}
+        )
+    assert absent["matches"] == []
+    assert award["matches"][0]["offset"] == text.index("[award]")
+    for match in tax["matches"]:
+        assert text[match["offset"] : match["offset"] + 3].lower() == "tax"
+        assert len(match["preview"]) <= 240
+    assert len(json.dumps(result)) < 4000
+    offset = tax["matches"][1]["offset"]
+    passage = tools["read_document"].invoke({"document_id": document["document_id"], "offset": offset})
+    assert passage["offset"] == offset and passage["content"] == text[offset : offset + 12000]
+    assert passage["id"] in desk.sources and len(reads) == 1
+
+
+@pytest.mark.parametrize("queries", [[], ["a"] * 4, [" "], ["a" * 301]])
+def test_filing_search_rejects_unbounded_queries(queries):
+    cfg = Settings()
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    search = next(t for t in desk.tools() if t.name == "search_document")
+    with pytest.raises(ValueError, match="one to three"):
+        search.invoke({"document_id": "unknown", "queries": queries})
+    assert not desk.texts
+
+
+def test_filing_search_preserves_unknown_and_oversize_gaps():
+    from trader.evidence import EvidenceTooLarge
+
+    cfg = Settings()
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    tools = {t.name: t for t in desk.tools()}
+    before = dict(desk.sources)
+    assert not tools["search_document"].invoke({"document_id": "unknown", "queries": ["tax"]})["available"]
+    document = tools["filing_documents"].invoke({"symbol": "ACME", "accession": "0000000001-26-000001"})[0]
+    calls = []
+
+    def oversized(metadata):
+        calls.append(metadata)
+        raise EvidenceTooLarge()
+
+    provider.document = oversized
+    gap = tools["search_document"].invoke({"document_id": document["document_id"], "queries": ["tax"]})
+    assert not gap["available"] and "id" not in gap
+    assert tools["read_document"].invoke({"document_id": document["document_id"]}) == gap
+    assert len(calls) == 1 and desk.sources == before

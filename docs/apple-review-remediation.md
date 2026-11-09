@@ -158,9 +158,9 @@ portfolio from the actual paused paper account holding one AAPL share. Original
 recording/suite bytes are retained. Jay was asked to review this abstention only.
 
 
-## Next sufficient-evidence development run — prepared, not executed
+## Superseded v2 plan — retained, never executed
 
-The original complete Apple case is retained unchanged in
+This plan was superseded by the canonical-SBC v3 case before execution. It must not be run. The original complete Apple case is retained unchanged in
 `state/evaluations/planned-apple-normalized-20261109/suite.json`; its plan records
 parent/subset/case hashes, scoring v7, current prompt and relevant source hashes.
 Stable planned run ID: `annual-normalized-dev-20261109-1`. Microsoft is excluded.
@@ -179,3 +179,47 @@ new output directory and the preflight-bounded cap. Retain the full four-role
 output and traces, then obtain independent semantic review against every requirement
 in this document. Complete API execution and WATCH alone cannot approve normalized
 valuation. Preserve rejected outputs and all costs regardless of outcome.
+
+
+## November 9 sufficient-evidence v3 result — failed, independently reviewed
+
+`annual-normalized-v3-dev-20261109-1` used the corrected canonical-SBC frozen
+case. All four specialist reports completed, but no final decision was produced:
+the conservative final-call reservation would exceed the unchanged $5 run cap.
+Estimated usage $3.6508275 settled with zero unknown calls. A separate hash-bound
+independent AI review records a reviewed failure; original artifacts remain intact.
+The final-only evidence-index repair is deployed and offline-reviewed, not yet
+validated by a new model run. See the November9 release in `live-readiness.md`.
+
+The valuation retained historical-proxy sensitivities, not an accepted normalized
+forecast. Canonical SBC was available and read; recurring taxes/working capital,
+reinvestment, forward shares/awards and financing remained unresolved. Available
+competition, regulatory and concentration evidence was not fully inspected. This
+is distinct from the mechanical final-call failure: successful synthesis alone
+would not close the required economic work. No additional paid retry on November9.
+
+Next work must improve evidence allocation and complete economically justified
+analysis without forcing zero adjustments, concealing gaps or tuning Microsoft
+holdout outputs. Preserve the original rejected cases and this failure in all
+completion-rate and cost reporting.
+
+### Coverage repair — bounded filing navigation (offline)
+
+The retained run used 15 passages of 12,000 characters each but covered only
+72,335 distinct characters, about 60% overlap. Ten-call specialist allowances
+were exhausted. Some margins/competition material was already retrieved by another
+role; concentration and App Store legal-risk sections remained outside retained
+passages. Adding more generic instructions alone would not address that access cost.
+
+`search_document` locates up to three literal queries with at most three short
+verbatim previews each and original text offsets. Pagination reaches later matches without broad scans or guessed offsets. It creates no evidence IDs;
+`read_document` remains necessary for citable passages. Both use the same bounded
+retrieval and document cache. Search is charged through the existing tool guard,
+with no increase to specialist, total-tool, context, time or dollar limits.
+Coverage-first instructions prioritize distinct material sections; valuation reserves
+calls for accounting and scenario diagnostics. Citation lists are exempt from the
+four-item narrative limit so supporting sources are not discarded arbitrarily.
+
+This is an offline retrieval improvement, not a completed forecast, accepted report,
+new paid run or permission to substitute assumptions for missing evidence. Retained
+original cases and Microsoft holdout outputs are not changed or tuned.

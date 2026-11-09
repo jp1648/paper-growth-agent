@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import os
+import re
 import threading
 import time
 from datetime import timedelta
@@ -126,7 +127,7 @@ ROLES = {
             "Investigate growth durability, competition, cash flow, debt, dilution, "
             "customer concentration and accounting quality. Read filings; seek contrary evidence. "
             "Analyze available product/segment and geographic revenue changes and margins quantitatively, including their contribution to growth. Explain how mix and concentration affect the thesis. "
-            "Do not label available but unread evidence unavailable; inspect operating discussion and notes before listing gaps. Distinguish receivables concentration from revenue concentration and retention. "
+            "Use search_document to locate distinct operating, concentration and regulatory sections before spending calls on overlapping passages. Do not label available but unread evidence unavailable; inspect operating discussion and notes before listing gaps. Distinguish receivables concentration from revenue concentration and retention. "
             "Separate truly absent sources, unread/budget-limited evidence, and unresolved economic interpretation. Cite exact passages for each material factual claim."
         ),
     ),
@@ -141,7 +142,7 @@ ROLES = {
     "valuation": (
         Valuation,
         (
-            "Use business and catalyst findings. Call value_scenarios with explicitly "
+            "Use business and catalyst findings. Locate distinct tax, award and financing sections with search_document rather than repeatedly reading overlapping pages. Reserve three tool calls for inspect_cash_flow, value_scenarios and inspect_valuation; spend remaining calls on material gaps. Call value_scenarios with explicitly "
             "justified cash-flow assumptions. Supply financial_source_id and financial_period_end from original "
             "structured facts: matched annual USD operating cash flow, USD capex and diluted weighted-average shares "
             "from one coherent filing accession/date/form. Do not mix amended and older facts. "
@@ -584,6 +585,33 @@ class ResearchDesk:
                 }
         return previews
 
+    def document_text(self, document_id):
+        metadata = self.documents.get(document_id)
+        if metadata is None:
+            return {
+                "available": False,
+                "error": "unknown_reference",
+                "requested_id": document_id,
+                "note": "No listed document has this ID. Use an exact ID from filing_documents; an empty list means no document is available. This response supplies no evidence and cannot be cited.",
+            }
+        if document_id in self.unavailable_documents:
+            return copy.deepcopy(self.unavailable_documents[document_id])
+        if document_id not in self.texts:
+            try:
+                self.texts[document_id] = self.provider.document(metadata)
+            except EvidenceTooLarge:
+                gap = {
+                    "document_id": document_id,
+                    "url": metadata["url"],
+                    "available": False,
+                    "reason": "SEC document exceeds the 8000000-byte retrieval bound; no text was retained. Try the primary filing or a separately listed exhibit. This unavailable document supplies no evidence for any claim.",
+                }
+                self.unavailable_documents[document_id] = gap
+                with self.budget.lock:
+                    self.budget.events.append(("research_evidence_gap", copy.deepcopy(gap)))
+                return copy.deepcopy(gap)
+        return self.texts[document_id]
+
     def tools(self):
         @tool
         def company_evidence(symbol: str) -> dict:
@@ -657,36 +685,51 @@ class ResearchDesk:
                 return result
 
         @tool
+        def search_document(document_id: str, queries: list[str], start_offset: int = 0) -> dict:
+            """Locate up to three matches per literal query from an absolute start_offset. Use next_start_offset for later matches. Navigation only; read_document supplies citable evidence."""
+            if (
+                start_offset < 0
+                or not 1 <= len(queries) <= 3
+                or any(not q.strip() or len(q) > 300 for q in queries)
+            ):
+                raise ValueError(
+                    "Supply one to three nonempty queries of at most 300 characters and a nonnegative offset"
+                )
+            with self.lock:
+                text = self.document_text(document_id)
+                if not isinstance(text, str):
+                    return text
+                results = []
+                for query in queries:
+                    matches = []
+                    for match in re.compile(re.escape(query), re.IGNORECASE).finditer(text, start_offset):
+                        start = match.start()
+                        matches.append({"offset": start, "preview": text[max(0, start - 80) : start + 160]})
+                        if len(matches) == 3:
+                            break
+                    results.append(
+                        {
+                            "query": query,
+                            "matches": matches,
+                            "next_start_offset": match.end() if len(matches) == 3 else None,
+                        }
+                    )
+                return {
+                    "document_id": document_id,
+                    "results": results,
+                    "note": "Navigation previews are incomplete and not citable evidence. Read relevant offsets with read_document using an empty query. No match is not proof the underlying issue is absent.",
+                }
+
+        @tool
         def read_document(document_id: str, query: str = "", offset: int = 0) -> dict:
             """Read a 12000-character SEC passage; query locates text, offset paginates. Cite returned ID."""
             if offset < 0 or len(query) > 300:
                 raise ValueError("Invalid passage query or offset")
             with self.lock:
-                metadata = self.documents.get(document_id)
-                if metadata is None:
-                    return {
-                        "available": False,
-                        "error": "unknown_reference",
-                        "requested_id": document_id,
-                        "note": "No listed document has this ID. Use an exact ID from filing_documents; an empty list means no document is available. This response supplies no evidence and cannot be cited.",
-                    }
-                if document_id in self.unavailable_documents:
-                    return copy.deepcopy(self.unavailable_documents[document_id])
-                if document_id not in self.texts:
-                    try:
-                        self.texts[document_id] = self.provider.document(metadata)
-                    except EvidenceTooLarge:
-                        gap = {
-                            "document_id": document_id,
-                            "url": metadata["url"],
-                            "available": False,
-                            "reason": "SEC document exceeds the 8000000-byte retrieval bound; no text was retained. Try the primary filing or a separately listed exhibit. This unavailable document supplies no evidence for any claim.",
-                        }
-                        self.unavailable_documents[document_id] = gap
-                        with self.budget.lock:
-                            self.budget.events.append(("research_evidence_gap", copy.deepcopy(gap)))
-                        return copy.deepcopy(gap)
-                text = self.texts[document_id]
+                text = self.document_text(document_id)
+                if not isinstance(text, str):
+                    return text
+                metadata = self.documents[document_id]
                 start = text.casefold().find(query.casefold()) if query else 0
                 if start < 0:
                     return {"found": False, "note": "Query absent; not proof the underlying risk is absent"}
@@ -859,6 +902,7 @@ class ResearchDesk:
             company_evidence,
             filing_documents,
             read_document,
+            search_document,
             value_scenarios,
             inspect_valuation,
             inspect_cash_flow,
@@ -979,7 +1023,7 @@ class ResearchDesk:
                     if self.budget.unrestricted_research
                     else " You have at most ten tool calls for this specialist report."
                 )
-                + " Keep your entire structured report under 600 words, with concise fields and at most four items per list. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
+                + " Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
                 if role != "research_lead"
                 else ""
             ),
@@ -1093,7 +1137,7 @@ class ResearchDesk:
             "reports may be reused by the system. All four reports must exist before your final decision. "
             "Use your assigned auxiliary planning/source allowance when enforced; reserve delegation for all four specialists. Delegate evidence gaps rather than browsing exhaustively yourself. Compare with existing holdings and cash, resolve conflicts, "
             "then propose BUY/ADD/HOLD/REDUCE/SELL/WATCH. The critique is mandatory. Use quantity zero for "
-            "HOLD/WATCH and numeric limit_price zero (never N/A). Use holding_period_days zero for WATCH when no holding is proposed; other actions require 1–730 days. Keep the final decision concise (under 600 words), including at most four items per list. Use whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "
+            "HOLD/WATCH and numeric limit_price zero (never N/A). Use holding_period_days zero for WATCH when no holding is proposed; other actions require 1–730 days. Keep the final decision concise (under 600 words), including at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Use whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "
             "invalidation conditions and a future review date. An unresolved material gap blocks BUY/ADD.",
             [t for t in self.tools() if t.name != "value_scenarios"],
             subagents,

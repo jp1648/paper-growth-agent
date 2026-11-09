@@ -3619,3 +3619,25 @@ The failed Apple attempt now has a separate hash-bound independent AI semantic
 review. Offline scoring records one reviewed failure, no pending reviews and zero
 accepted decisions. Original recording/results remain unchanged. No additional
 paid research, orders, trial activation or live release occurred.
+
+### November 9 next research repair — reviewed offline, not deployed
+
+Added bounded `search_document` navigation with at most three literal queries,
+three short previews per query, absolute offsets and pagination. Existing document
+retrieval/cache/limits are reused. Results create no evidence IDs; only the
+unchanged passage reader creates citable evidence. Independent review verified
+pagination reaches Apple's retained concentration note at offset 164652 and that
+the resulting passage exactly matches the original text. No holdout outputs used.
+
+Full offline suite passed 1000 tests (six external skips, one paper deselection)
+before the final pagination addition; all 69 research-team tests passed afterward.
+Independent final review passed 126 focused tests, including pagination and
+unchanged citation, normalization and budget guards. Citation lists no longer
+inherit the four-item narrative limit. Specialist and total budgets are unchanged.
+Review: `state/validation-20261109/document-navigation-review.json`.
+
+This is not model-validated coverage or accepted financial normalization. No new
+paid investigation, orders or deployment in this step. Deploy only after CI for
+the exact revision passes, preserving pause and the prior release's scope/config.
+Any future model attempt needs a fresh plan binding the changed prompt/source
+hashes; do not reuse the prior reviewed plan or failed stable ID.
