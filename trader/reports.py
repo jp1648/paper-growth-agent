@@ -56,14 +56,42 @@ def _portfolio_report(service):
         intent = intents.get(fill["order_id"])
         if intent and intent.get("quote"):
             reference = dec(intent["quote"]["ask" if fill["side"] == "buy" else "bid"])
+            if reference <= ZERO:
+                raise ValueError("Execution reference must be positive")
             sign = 1 if fill["side"] == "buy" else -1
             slippage.append(
                 {
                     "activity_id": fill["id"],
                     "usd_vs_submission_quote": (dec(fill["price"]) - reference) * dec(fill["qty"]) * sign,
                     "reference_feed": intent["quote"]["feed"],
+                    "reference_price": reference,
+                    "reference_notional_usd": reference * dec(fill["qty"]),
+                    "quantity": dec(fill["qty"]),
                 }
             )
+    referenced = {row["activity_id"] for row in slippage}
+    missing_reference = [fill["id"] for fill in fills if fill["id"] not in referenced]
+    reference_notional = sum((row["reference_notional_usd"] for row in slippage), ZERO)
+    known_slippage = sum((row["usd_vs_submission_quote"] for row in slippage), ZERO)
+    complete = bool(fills) and not missing_reference
+    execution_quality = {
+        "scope": "Current experiment effective fills; not a frozen prospective window",
+        "fill_count": len(fills),
+        "referenced_fill_count": len(slippage),
+        "unreferenced_activity_ids": missing_reference,
+        "reference_coverage_complete": complete,
+        "fill_notional_usd": sum((dec(fill["qty"]) * dec(fill["price"]) for fill in fills), ZERO),
+        "reference_notional_usd": reference_notional,
+        "referenced_slippage_usd": known_slippage if slippage else None,
+        "aggregate_slippage_usd": known_slippage if complete else None,
+        "aggregate_slippage_bps": known_slippage / reference_notional * 10000 if complete else None,
+        "limitations": [
+            "Positive values mean worse execution than the retained side quote; negative means improvement.",
+            "Basis points use total reference notional, not an unweighted average of fills.",
+            "Fees and unfilled opportunity cost are excluded; market impact is not separately identified; not full implementation shortfall.",
+            "Paper fills and the retained quote feed do not establish live execution quality.",
+        ],
+    }
     warnings = [
         f"{s} appreciated/exceeds entry cap: block additions and review"
         for s, weight in exposures.items()
@@ -125,6 +153,7 @@ def _portfolio_report(service):
         else None,
         "open_orders": store.active_orders(),
         "execution_slippage": slippage,
+        "execution_quality": execution_quality,
         "exit_position_age_intervals": audit["holding_periods"],
         "open_positions_since": {p["symbol"]: audit["opened_at"].get(p["symbol"]) for p in positions},
         "decisions": store.items("intent"),

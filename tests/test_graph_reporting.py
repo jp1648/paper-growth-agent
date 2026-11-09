@@ -226,3 +226,55 @@ def test_future_inputs_cannot_debounce_forever_or_trigger_price_research(env, de
     else:
         assert result[0] is False
     assert broker.submits == 0
+
+
+def test_execution_slippage_coverage_and_notional_weighting(env, decision):
+    service, broker, _ = env
+    empty = portfolio_report(service)["execution_quality"]
+    assert empty["fill_count"] == 0
+    assert empty["aggregate_slippage_bps"] is None
+    cid = service.execute(decision, "execution-quality")["client_order_id"]
+    broker.fixture_fill(cid, qty="4", price="99", status="partially_filled")
+    broker.fixture_fill(cid, qty="6", price="100")
+    service.reconcile()
+    result = portfolio_report(service)
+    quality = result["execution_quality"]
+    assert quality["fill_count"] == quality["referenced_fill_count"] == 2
+    assert quality["fill_notional_usd"] == D("996")
+    assert quality["reference_notional_usd"] == D("1000")
+    assert quality["aggregate_slippage_usd"] == D("-4")
+    assert quality["aggregate_slippage_bps"] == D("-40")
+    assert quality["reference_coverage_complete"]
+    intent = service.store.get(cid, "intent")
+    intent.pop("quote")
+    service.store.put(cid, intent, "intent")
+    missing = portfolio_report(service)["execution_quality"]
+    assert not missing["reference_coverage_complete"]
+    assert missing["referenced_fill_count"] == 0
+    assert len(missing["unreferenced_activity_ids"]) == 2
+    assert missing["aggregate_slippage_usd"] is None
+    assert missing["aggregate_slippage_bps"] is None
+    assert missing["fill_notional_usd"] == D("996")
+    assert broker.submits == 1
+
+
+def test_sell_slippage_sign_and_partial_reference_coverage(env, decision):
+    service, broker, _ = env
+    entry = service.execute(decision, "entry-reference")["client_order_id"]
+    broker.fixture_fill(entry)
+    service.reconcile()
+    sell = decision.model_copy(update={"action": "SELL", "exit_reason": "risk", "limit_price": D("99.90")})
+    exit_id = service.execute(sell, "exit-reference")["client_order_id"]
+    broker.fixture_fill(exit_id, price="99.90")
+    service.reconcile()
+    result = portfolio_report(service)
+    assert result["execution_slippage"][-1]["usd_vs_submission_quote"] == D("0.90")
+    assert result["execution_quality"]["aggregate_slippage_usd"] == D("0.90")
+    intent = service.store.get(entry, "intent")
+    intent.pop("quote")
+    service.store.put(entry, intent, "intent")
+    quality = portfolio_report(service)["execution_quality"]
+    assert quality["referenced_fill_count"] == 1
+    assert quality["referenced_slippage_usd"] == D("0.90")
+    assert quality["aggregate_slippage_usd"] is None
+    assert quality["aggregate_slippage_bps"] is None

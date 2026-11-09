@@ -3224,3 +3224,22 @@ approved the test changes and separately reran 57 readiness tests; exact-hash re
 is `state/independent-review-20261108/broker-bust-boundary-review.json`. Ruff and
 whitespace checks passed. No runtime code, deployment, model call or broker action
 changed in this step.
+
+### Execution evidence coverage — November 8, 2026
+
+Portfolio reports now expose effective fill count, reference coverage, missing
+activity IDs, measured-subset slippage and full aggregate USD/basis points. Full
+aggregates remain null with missing references or no fills. Weighted basis points
+use total reference notional; per-fill quantity/price/feed references are retained.
+Tests verify unequal partial fills, buy improvement, sell adverse execution and
+missing all/one reference. Existing report fields remain available.
+
+This is current-experiment quote-relative paper reporting, not a frozen trial
+metric or full implementation shortfall. Fees and unfilled opportunity cost are
+excluded; market impact is not independently identified. Review corrected that
+label rather than claiming impact was excluded from observed price differences.
+Full offline suite passed 961 tests, seven external checks skipped. No deployment,
+paid research, orders or pause changes occurred.
+Independent reviewer approved the corrected final hashes, reran 80 focused tests
+and verified weighting with different reference prices. Exact review retained at
+`state/independent-review-20261108/execution-quality-review.json`.

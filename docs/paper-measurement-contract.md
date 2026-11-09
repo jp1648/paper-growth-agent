@@ -467,3 +467,24 @@ sort/page size/quality policy, noncanonical dates, or an interval over 366 days
 are rejected before interpreting records. This prevents a narrowed or partially
 traversed request from being mistaken for the declared capture method. It still
 does not authenticate rewritten evidence or certify provider completeness.
+
+## Execution slippage coverage diagnostic
+
+The portfolio report's `execution_quality` summarizes current-experiment effective
+fills, not a selected prospective window. `fill_count` and
+`referenced_fill_count` disclose side-quote coverage; missing activity IDs remain
+explicit. `referenced_slippage_usd` is only the measured subset. Full aggregate USD
+and basis points are null if any fill lacks a reference, or there are no fills.
+No fills are not evidence of zero execution cost.
+
+Signed slippage is `(fill price - retained quote) * quantity` for buys and its
+negative for sells, using ask/bid respectively. Positive means adverse execution.
+Basis points are total signed USD divided by total reference notional times 10000,
+not the average of per-fill percentages. Reference price, notional, quantity and
+feed remain attached to each fill. Nonpositive reference prices are rejected.
+
+These are quote-relative paper diagnostics. Fees and opportunity cost on unfilled shares are excluded; market impact is not
+separately identified. Do not label this full implementation shortfall. Paper fill/quote feed differences and original execution limitations
+still apply. Existing effective activities include approved revisions; no original
+fill or trading history is changed by reporting. Prospective-window collection,
+complete broker contract and live execution-quality evidence remain separate.
