@@ -67,3 +67,13 @@ Proof: `state/billing-export-20261108/enabled.png` and
 query or zero-cost claim was made. Export availability/backfill can lag. Dataset
 storage and subsequent queries may incur BigQuery charges. The export does not
 change the account's payment plan, buy credits, or start trading.
+
+### First table check
+
+The detailed export table now exists:
+`trader-observatory-20261105.trader_billing.gcp_billing_export_resource_v1_0121DB_608AFE_E176C7`.
+A project-filtered November 1–9 UTC query passed a dry run (0 bytes) and executed
+with a 10 MB maximum-billed-bytes bound. It returned no rows; initial export/backfill
+is still pending. Query, table metadata and empty result are retained under
+`state/billing-export-20261108/`. Credits are summed per usage row before grouping
+to avoid multiplying base cost. No zero-cost inference or trial acceptance.

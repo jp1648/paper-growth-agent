@@ -208,3 +208,28 @@ after entitlement, delayed/reversed payment, unknown net tax, late confirmation,
 splits/cash in lieu, cent-boundary affordability, initial costs, no affordable whole
 share, accrued-then-settled fees and revisions propagating through the return chain.
 Selecting the policy does not certify these implementations or research quality.
+
+## Implemented building blocks — November 8, 2026
+
+`trader.benchmark.purchase` implements cent-rounded maximal affordability, separate
+fixed order fees, whole-share zero/5/10bp sensitivities, and six-decimal fractional
+zero-slip sensitivity. Zero affordable quantity charges no fee; rounded-free
+purchases produce no shares. `reinvestment_session` requires a later payment-day
+session and a close strictly after evidence availability. Calendar completeness
+and price/payment authenticity remain upstream evidence responsibilities.
+
+`paper-agent preview-benchmark-purchase --input purchase.json` runs before any
+operational configuration/broker construction. Input requires version 1, USD,
+SPY/QQQ, cash/mark/fee as decimal strings, slippage_bps (0/5/10), fractional boolean,
+canonical session, reason (opening/distribution_reinvestment), price_sha256 and
+fee_evidence_sha256. Reinvestment also requires payment_date, available_at, retained
+sessions (`date`, timezone-aware `close`), distribution_id and payment_evidence.
+Output is explicitly hypothetical/diagnostic. Its marked NAV describes only the
+provided cash and newly purchased lot; it must be combined with existing inventory
+by the future ledger. Its opening denominator applies only to an opening purchase,
+never to whole-portfolio returns on a reinvestment purchase. Variable fee schedules
+need a supported fee calculation before use; an unexplained zero is not valid.
+
+The independent review ran 11 focused tests plus 2,000 affordability and cash-
+conservation checks. Full entitlement/split/payment ledger, revised daily return
+chain, collector integration and activation remain incomplete.

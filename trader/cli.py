@@ -82,6 +82,10 @@ def main(argv=None):
     )
     paper_observations.add_argument("--input", required=True)
     paper_observations.add_argument("--output", required=True)
+    benchmark = sub.add_parser(
+        "preview-benchmark-purchase", help="Offline hypothetical ETF purchase arithmetic"
+    )
+    benchmark.add_argument("--input", required=True)
     inventory = sub.add_parser("reconcile-paper-marks", help="Offline inventory to common raw marks")
     inventory.add_argument("capture")
     inventory.add_argument("--input", required=True)
@@ -116,6 +120,11 @@ def main(argv=None):
     entitlement.add_argument("directory")
     entitlement.add_argument("--input", required=True)
     args = parser.parse_args(argv)
+    if args.command == "preview-benchmark-purchase":
+        from .benchmark import preview
+
+        print(dumps(preview(json.loads(Path(args.input).read_text()))))
+        return 0
     if args.command == "reconcile-paper-marks":
         from .paper_observations import reconcile_marks
 
