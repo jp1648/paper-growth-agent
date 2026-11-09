@@ -17,7 +17,7 @@ readiness. The prospective trial remains `predeclared_not_started`.
 | 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
-| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | Authenticate real portfolio/payment/account terms and costs; finish special-action/correction handling, secondary comparisons and remaining metrics; freeze/approve future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
+| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Integrate retained bindings, common study identity, sensitivities, cash terms and complete costs into one evidence bundle; finish special-action handling and remaining metrics; resolve the three-symbol/five-symbol mismatch and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
 | 7. Live gate | Separate draft contract and paper-only endpoint boundary remain. | No live account eligibility/settled-funds evidence, capital/exposure release approval or proven investment edge. Explicit account-specific release and approval remain mandatory. |
 
 No automatic trial activation follows from these changes. Safe engineering work
@@ -3433,3 +3433,33 @@ No production state, infrastructure, broker orders or trading controls changed.
 Independent review approved the exact test hash after independently running all
 23 process cases. Record:
 `state/independent-review-20261108/replacement-checkpoint-review.json`.
+
+
+## Independent critical-path reassessment — November 8, 2026
+
+Review: `state/independent-review-20261108/readiness-priorities-current.md`.
+The independent reviewer confirms NO-GO and recommends these next actions:
+
+1. Resolve the prospective universe mismatch. Both local configuration and a
+   fresh read of the running container show AAPL/AMZN/MSFT, while the protocol
+   requires five distinct prospectively reviewed symbols. Historical evaluations
+   and SPY/QQQ comparisons cannot silently satisfy that count. A user choice is
+   pending between broader research-only coverage, a reviewed candidate-universe
+   expansion, or an explicit protocol reconsideration. Preserve the current
+   five-symbol condition and trading universe until that decision is made.
+2. Integrate existing measurements into one offline draft evidence bundle, binding
+   original inputs, retained price/ledger sources, study identity/window/capital,
+   sensitivity methods and complete cost requirements. Missing account, cash,
+   payment, cost or review evidence must remain explicit blockers. This is the
+   next engineering priority, not another standalone calculator or dashboard.
+3. Complete Microsoft input/rubric suitability review without candidate output;
+   execute the already-prepared Apple development case only after its later-day
+   fresh preflight. Missing-evidence abstention does not approve full research.
+
+The review specifically cautions against indefinitely expanding narrow local
+recovery variants. Actual cross-host/partition/disk-loss behavior, broker bust
+semantics, account evidence, billing population and prospective observations remain
+separate gates. No current test total, release receipt or historical backfill can
+satisfy those missing outcomes. Ten closed episodes are a sample sufficiency
+condition, never a requirement to force trades. Goal remains active; safe evidence
+integration work remains, but live activation is not authorized.
