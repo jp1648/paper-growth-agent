@@ -44,6 +44,10 @@ from trader.store import Store
         "sell_cancel_race_canceled",
         "sell_cancel_race_lost_ack",
         "sell_cancel_race_canceled_lost_ack",
+        "cancel_race_lost_ack_replacement",
+        "cancel_race_canceled_lost_ack_replacement",
+        "sell_cancel_race_lost_ack_replacement",
+        "sell_cancel_race_canceled_lost_ack_replacement",
         "activity",
         "adjustment",
         "adjustment_mid",
@@ -178,7 +182,7 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
-    if backup:
+    if backup and not replacement:
         # Recover an older durable ledger after actual process death; retain the crashed state.
         with closing(sqlite3.connect(tmp_path / "crashed-ledger.sqlite")) as retained:
             service.store.db.backup(retained)
@@ -190,7 +194,7 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
         ):
             source.backup(target)
     if replacement:
-        checkpoint = next(service.store.path.parent.glob("backups/intent-*.sqlite"))
+        checkpoint = backup or next(service.store.path.parent.glob("backups/intent-*.sqlite"))
         replacement_root = tmp_path / "replacement"
         replacement_root.mkdir()
         destination = replacement_root / "ledger.sqlite"
@@ -221,6 +225,10 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
         recovered = Service(service.cfg, reopened, broker, data)
         assert reopened.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert reopened.scope == service.store.scope
+        if replacement:
+            assert not original_path.exists()
+            assert reopened.path == destination
+            assert recovered.kill_path.exists()
         if stage.startswith("revision"):
             committed = stage == "revision_committed"
             assert len(reopened.items("broker_revision")) == int(committed)

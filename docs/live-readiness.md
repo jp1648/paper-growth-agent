@@ -3703,3 +3703,28 @@ No reservation or paid model call was made during this release.
 Read-only billing diagnosis found eight export rows, all older October 13 usage,
 and no trader-attributed or unattributed rows. Billing linkage matches the export
 account. This establishes incomplete cost evidence, not zero infrastructure cost.
+
+## November 9: replacement-ledger cancellation-race coverage
+
+Extended the existing real-process/loopback-broker harness with four combinations:
+buy and sell, each with a final full fill or partial-fill cancellation. Each loses
+the cancellation response, kills the worker with SIGKILL, copies the retained
+pre-cancel backup to a different database/control directory and makes the original
+configured ledger path unavailable. Missing replacement binding first refuses
+execution; the replacement is explicitly paused before binding it for recovery.
+
+A real unavailable loopback endpoint then blocks reconciliation across three
+restarts. Assertions retain partial cash/shares and reservations, refuse new
+orders while terminal activity is delayed, reconcile the late activity exactly
+once and reject a stale partial-order replica after terminal recovery. Submission
+and cancellation counts remain unchanged; the pause remains present. All seven
+replacement cases and the combined process/backup/ownership suites pass:
+**69 passed**. Ruff and diff checks pass.
+
+This is isolated fixture evidence using copied SQLite files, not physical disk
+loss, cloud checkpoint selection/replication, concurrent two-host fencing or an
+actual broker correction contract. Those infrastructure/contract gates remain
+open. No production code, deployment, provider request, spending or order changed.
+Evidence: `state/validation-20261109/combined-recovery-tests.log`. Independent AI
+review approved this local fixture scope and independently passed all 27 process
+recovery cases; hash-bound review: `state/validation-20261109/replacement-cancel-review.json`.
