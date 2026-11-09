@@ -3802,3 +3802,55 @@ start example ends February 5, 2027 after 60 sessions and at least 84 days; it h
 and draft: `state/prospective-calendar-20261109/`. It confirms that the original
 January 21 UTC experiment expiry and November 29 grant expiry cannot cover even
 that earliest example. Neither date was extended or reset.
+
+## November 9 combined cloud recovery drill and lifecycle proposal
+
+A combined recovery drill ran on two disposable private Container-Optimized OS
+VMs using the deployed immutable `24a04ef` image, a dedicated service account and
+checkpoint bucket, and an independently persistent synthetic broker reached only
+through loopback IAP/SSH tunnels. No production credentials or disk were mounted.
+
+The corrected attempt verified pre-submit cloud checkpoint replication, broker
+acceptance followed by lost acknowledgement and worker SIGKILL, source VM shutdown,
+conditional pinned-owner transfer, and replacement recovery from the exact cloud
+checkpoint generation without the source ledger. Three separate replacement
+processes failed to reach the broker and retained the reservation. Missing initial
+and late fill activity blocked reconciliation; restored activity converged to six
+synthetic shares, cash 99,400 and zero reservation. Repeated reconciliation retained
+exactly one submit and one cancellation. Both VMs were then running: the original
+source's real ownership guard rejected submit and cancel with no controller RPC.
+A separate read confirmed the source could access the owner record but its numeric
+identity did not match the replacement.
+
+The first attempt is retained as a failed fault-injection harness: Python running
+as container PID 1 ignored self-SIGKILL, so the service continued to look up the
+order. The corrected attempt used Docker `--init`, asserted PID > 1, and verified
+exit 137 with no post-submit lookup. A stale tunnel also caused a pre-initialization
+account timeout; no submission occurred, its empty directory was preserved, and a
+new loopback port was verified before proceeding. Neither failure was hidden or
+counted as recovery acceptance.
+
+Evidence, exact VM identities, generations, logs, hashes and archived fixture
+ledgers: `state/combined-cloud-drill-20261109/`, with corrected result in `attempt2/`.
+This tests controlled cloud-host interruption and the real Service/Store/checkpoint/
+ownership components against a synthetic broker. It does not certify hardware
+destruction, actual Alpaca correction semantics or a production daemon takeover.
+No additional paid research or actual broker order was initiated.
+
+The [lifecycle proposal](prospective-lifecycle-proposal.md) specifies an audited,
+immutable amendment and common effective-expiry resolver while retaining the
+original experiment declaration and all history. It is a proposal, not an applied
+extension or approval to activate the study. The current Apple retry remains
+ineligible before November 10 New York time and requires its existing reviewed
+preflight; the original experiment and grant deadlines remain unchanged.
+
+Independent review accepted the corrected drill's stated scope after inspecting
+the exact checkpoint and both archived SQLite/WAL ledgers, the replacement's
+retained pause and final accounting, and unchanged request counts during fencing
+(`attempt2/independent-acceptance.json`). Cleanup removed both test VMs and boot
+disks, the dedicated bucket/service account and its repository IAM binding;
+post-cleanup inventory verification is retained in `cleanup-verified.json`.
+The production owner generation did not change. A read-only runtime check confirmed
+successful reconciliation, original experiment, one AAPL paper share, no active
+orders, preserved pause and unchanged spending/configuration hashes. Cloud resource
+charges await provider billing; no zero-cost or final-cost claim is made.
