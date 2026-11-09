@@ -18,8 +18,8 @@ def build_observations(document):
 def _build_observations(document):
     if type(document.get("version")) is not int or document["version"] not in (1, 2):
         raise ValueError("Require observation input version 1 or 2")
-    if document.get("currency") != "USD" or document.get("benchmark") != "SPY":
-        raise ValueError("Require primary SPY comparison in USD")
+    if document.get("currency") != "USD" or document.get("benchmark") not in ("SPY", "QQQ"):
+        raise ValueError("Require SPY or descriptive secondary QQQ comparison in USD")
     if document.get("flow_policy") != "no_external_flows":
         raise ValueError("Intraday flows require subperiod valuations; this builder prohibits flows")
     for key in ("benchmark_method", "cost_allocation_method", "source_manifest_sha256"):
@@ -85,6 +85,7 @@ def _build_observations(document):
     previous = {side: nav(opening[side]) for side in ("portfolio", "benchmark")}
     if any(sum(values[2].values(), ZERO) for values in previous.values()):
         raise ValueError("Opening cumulative observation-window costs must be zero")
+    initial = previous.copy()
     observations, balances = [], []
     for row in rows:
         evidence(row["flow_evidence"])
@@ -103,13 +104,32 @@ def _build_observations(document):
             previous[side] = gross, net, costs
         observations.append(result)
         balances.append(balance)
+    performance = {}
+    for side in ("portfolio", "benchmark"):
+        metrics = {}
+        for index, basis in enumerate(("gross", "net")):
+            opening_nav = initial[side][index]
+            peak, drawdown = opening_nav, ZERO
+            for balance in balances:
+                value = dec(balance[side][f"{basis}_nav"])
+                peak = max(peak, value)
+                drawdown = max(drawdown, 1 - value / peak)
+            metrics[f"{basis}_total_return"] = str(value / opening_nav - 1)
+            metrics[f"{basis}_max_drawdown"] = str(drawdown)
+        performance[side] = metrics
+    performance["net_excess_return"] = str(
+        dec(performance["portfolio"]["net_total_return"]) - dec(performance["benchmark"]["net_total_return"])
+    )
     return {
         "version": 1,
         "status": "diagnostic_only",
         "input_version": document["version"],
         "return_basis": "flow_adjusted_net_total_return",
         "currency": "USD",
-        "benchmark": "SPY",
+        "benchmark": document["benchmark"],
+        "comparison_role": "primary" if document["benchmark"] == "SPY" else "secondary_descriptive_only",
+        "performance": performance,
+        "drawdown_method": "Positive session-close peak-to-trough fraction including opening economic NAV; not intraday drawdown.",
         "benchmark_method": document["benchmark_method"],
         "cost_allocation_method": document["cost_allocation_method"],
         "flow_method": "No external flows; gross deposits and withdrawals checked separately",
@@ -123,6 +143,7 @@ def _build_observations(document):
             "Net receivables require supported entitlement and deductions; gross unpaid dividends are insufficient.",
             "Calendar, marks, splits, benchmark holdings/reinvestment and cost allocation need independent review.",
             "Version 1 has no liability bridge; version 2 requires explicit evidenced unbooked liabilities.",
+            "QQQ is descriptive only and cannot replace the preregistered primary SPY comparison.",
             "No trial activation, acceptance or trading authorization follows from this calculation.",
         ],
     }
@@ -242,8 +263,8 @@ def _bind_benchmark(document, benchmark_document):
     from .benchmark import build_ledger
 
     ledger = build_ledger(benchmark_document)
-    if ledger["symbol"] != "SPY":
-        raise ValueError("Primary paired observations require SPY")
+    if document.get("benchmark") not in ("SPY", "QQQ") or ledger["symbol"] != document["benchmark"]:
+        raise ValueError("Observation benchmark must match reconstructed SPY or QQQ ledger")
     points = [document["opening"], *document["observations"]]
     if [point["date"] for point in points] != [row["date"] for row in ledger["balances"]]:
         raise ValueError("Observation window must exactly match benchmark ledger")
@@ -269,7 +290,7 @@ def _bind_benchmark(document, benchmark_document):
         if document["version"] == 2 and dec(claim["accrued_liabilities_not_in_equity"]["amount"]):
             raise ValueError("Benchmark liabilities are not supported by reconstructed ledger")
     return {
-        "symbol": "SPY",
+        "symbol": ledger["symbol"],
         "opening_capital": str(capital),
         "balances_verified": len(points),
         "purchases": ledger["purchases"],

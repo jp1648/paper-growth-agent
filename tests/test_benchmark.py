@@ -365,7 +365,7 @@ def test_ledger_direct_and_file_use_same_money_precision(ledger_input, tmp_path)
 
 
 @pytest.fixture
-def sourced_ledger(ledger_input, tmp_path, monkeypatch):
+def sourced_ledger(ledger_input, tmp_path, monkeypatch, request):
     import json
     from datetime import UTC, datetime
 
@@ -380,15 +380,17 @@ def sourced_ledger(ledger_input, tmp_path, monkeypatch):
         json.dumps([{"date": d, "open": "09:30", "close": "16:00"} for d in ("2026-10-30", "2026-11-02")])
     )
     capture = tmp_path / "capture"
+    symbol = getattr(request, "param", "SPY")
     capture_prices(
-        provider(lambda req: httpx.Response(200, json={"bars": {"SPY": bars()}, "next_page_token": None})),
-        ["SPY"],
+        provider(lambda req: httpx.Response(200, json={"bars": {symbol: bars()}, "next_page_token": None})),
+        [symbol],
         calendar,
         capture,
     )
     prices = validate_prices(capture)
     d = ledger_input
     d.update(
+        symbol=symbol,
         price_manifest_sha256=prices["manifest_sha256"],
         calendar_sha256=prices["calendar_sha256"],
         expected_sessions=["2026-10-30", "2026-11-02"],
@@ -689,6 +691,7 @@ def test_weekend_reversal_cannot_borrow_later_payment(ledger_input, reverse_inpu
         build_ledger(d)
 
 
+@pytest.mark.parametrize("sourced_ledger", ["SPY", "QQQ"], indirect=True)
 def test_paired_returns_bind_recomputed_benchmark_and_full_costs(sourced_ledger, tmp_path, capsys):
     import copy
     import json
@@ -713,7 +716,7 @@ def test_paired_returns_bind_recomputed_benchmark_and_full_costs(sourced_ledger,
     doc = {
         "version": 1,
         "currency": "USD",
-        "benchmark": "SPY",
+        "benchmark": ledger["symbol"],
         "flow_policy": "no_external_flows",
         "source_manifest_sha256": "a" * 64,
         "benchmark_method": "whole shares 5bps",
@@ -753,7 +756,12 @@ def test_paired_returns_bind_recomputed_benchmark_and_full_costs(sourced_ledger,
     result = json.loads(output.read_text())
     assert Decimal(result["observations"][0]["portfolio_return"]) == Decimal(".006")
     assert Decimal(result["observations"][0]["benchmark_return"]) == Decimal(".00855")
+    assert result["benchmark_binding"]["symbol"] == ledger["symbol"]
     assert result["benchmark_binding"]["balances_verified"] == 2
+    changed = copy.deepcopy(doc)
+    changed["benchmark"] = "QQQ" if ledger["symbol"] == "SPY" else "SPY"
+    with pytest.raises(ValueError, match="must match"):
+        bind_benchmark(changed, ledger)
     assert not result["benchmark_binding"]["source_authenticity_verified"]
     with pytest.raises(FileExistsError):
         main(args)

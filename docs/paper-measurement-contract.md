@@ -186,11 +186,15 @@ calendar/source evidence still have to be established before study acceptance.
 
 `paper-agent build-paper-observations --input nav.json --output returns.json`
 is an offline, configuration-free calculation. It creates a new output only and
-hashes the exact input bytes. The output can feed `analyze-paper-returns` once its
+hashes the exact input bytes. Primary SPY output can feed `analyze-paper-returns` once its
 60-session/12-week requirements are met. Shorter datasets can be built for
-diagnostics but cannot pass that analysis window check.
+diagnostics but cannot pass that analysis window check. QQQ output is rejected
+by the primary uncertainty command. Both outputs include descriptive cumulative
+gross/net returns, session-close drawdowns including opening NAV, and net excess
+return; they do not certify source evidence or a profitable edge.
 
-Input version 1 declares `currency: "USD"`, `benchmark: "SPY"`,
+Input version 1 declares `currency: "USD"`, `benchmark: "SPY"` (primary) or
+`"QQQ"` (descriptive secondary only),
 `flow_policy: "no_external_flows"`, `source_manifest_sha256`, `benchmark_method`,
 `cost_allocation_method`, and an ordered `expected_sessions` list. `opening` has a
 canonical `date` before the first session and separate `portfolio` and `benchmark`

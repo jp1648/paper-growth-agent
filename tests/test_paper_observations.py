@@ -219,3 +219,33 @@ def test_legacy_version_cannot_silently_discard_accrued_fee(document):
     }
     with pytest.raises(ValueError, match="version 2"):
         build_observations(document)
+
+
+@pytest.mark.parametrize("symbol", ["SPY", "QQQ"])
+def test_descriptive_returns_drawdown_and_primary_boundary(document, symbol):
+    document["benchmark"] = symbol
+    rows = document["observations"]
+    rows[0]["portfolio"] = claim("110", cost="1")
+    rows[1]["portfolio"] = claim("90", cost="2")
+    rows[2]["portfolio"] = claim("105", cost="3")
+    rows[0]["benchmark"] = claim("99")
+    rows[1]["benchmark"] = claim("101")
+    rows[2]["benchmark"] = claim("102")
+    result = build_observations(document)
+    metrics = result["performance"]
+    assert Decimal(metrics["portfolio"]["gross_total_return"]) == Decimal(".05")
+    assert Decimal(metrics["portfolio"]["net_total_return"]) == Decimal(".02")
+    assert float(metrics["portfolio"]["gross_max_drawdown"]) == pytest.approx(20 / 110)
+    assert float(metrics["portfolio"]["net_max_drawdown"]) == pytest.approx(21 / 109)
+    assert Decimal(metrics["benchmark"]["net_max_drawdown"]) == Decimal(".01")
+    assert Decimal(metrics["net_excess_return"]) == 0
+    assert result["benchmark"] == symbol
+    if symbol == "QQQ":
+        assert result["comparison_role"] == "secondary_descriptive_only"
+        with pytest.raises(ValueError, match="primary"):
+            paired_uncertainty(result)
+    else:
+        assert result["comparison_role"] == "primary"
+    document["benchmark"] = "CASH"
+    with pytest.raises(ValueError, match="SPY or"):
+        build_observations(document)

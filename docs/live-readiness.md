@@ -13,7 +13,7 @@ readiness. The prospective trial remains `predeclared_not_started`.
 | Goal | Verified state | Remaining requirement / next action |
 |---|---|---|
 | 1. Costs | 33 model-spend records settled using retained provider evidence. Detailed Google Cloud billing export configured; its table exists but bounded project queries still return no rows. | Authenticate/allocate all operating costs before trial activation. Empty export is not zero cost; Flovia unknown operations remain preserved and blocked. |
-| 2. Release | Paused runtime revision 6e51d89 source-verified across 32 Python files; exact-commit CI 42542650155 passed 963 tests/one skipped, 87% branch coverage. Fresh reconciliation and unchanged experiment/position/configuration/spending/pause verified. | Preserve this release receipt and repeat exact-artifact checks for future changes; deployment is not trial activation. |
+| 2. Release | Paused runtime revision 8b803c0 source-verified across 32 Python files; exact-commit CI 42544172308 passed 968 tests/one skipped, 87% branch coverage. Existing Cloud Run dashboard execution panel is deployed and authenticated checks passed. Fresh reconciliation and unchanged experiment/position/configuration/spending/pause verified. | Preserve this release receipt and repeat exact-artifact checks for future changes; deployment is not trial activation. |
 | 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
@@ -3280,3 +3280,21 @@ $344.33 notional, $0.02 worse than its retained quote, or +0.58087 bps. This is
 quote-relative paper execution evidence, not full implementation shortfall or
 proof of live quality. No model investigations or trades were initiated.
 Evidence and immutable image digests: `state/release-8b803c0/receipt.json`.
+
+
+### Secondary comparison reporting — November 8, 2026 (local)
+
+The offline observation builder now supports the predeclared descriptive QQQ
+comparison through the same NAV, complete-cost and optional retained-ledger path.
+Benchmark identity must match the reconstructed ledger; SPY remains the sole
+primary uncertainty input. Both outputs include gross/net cumulative return,
+maximum session-close drawdown including opening economic NAV, and net excess
+return. This is not cross-artifact cohort validation or source authentication.
+
+Verification: 66 focused tests, 965 full offline tests passed (seven opt-in tests
+skipped), Ruff clean. Independent review approved exact source hashes after
+120 tests plus 40 financial-arithmetic cases; record retained at
+`state/independent-review-20261108/secondary-comparison-review.json`.
+No production deployment, provider/model calls, orders or trial activation.
+The combined frozen report must still enforce common portfolio/window/cost inputs
+across baselines; the cash comparator and its verified account terms remain open.

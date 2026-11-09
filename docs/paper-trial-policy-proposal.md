@@ -324,7 +324,7 @@ that one funded the other.
 
 `build-paper-observations --input paired.json --output returns.json
 --benchmark-input benchmark.json --benchmark-capture CAPTURE` reconstructs the
-SPY ledger and verifies its retained raw price/calendar capture before comparing
+SPY or QQQ ledger and verifies its retained raw price/calendar capture before comparing
 every supplied benchmark equity/receivable claim. The two optional flags must be
 supplied together. Without them the original claims-only diagnostic remains.
 
@@ -339,3 +339,23 @@ binding. This does not authenticate external costs, portfolio marks or payment
 claims, and does not activate the trial.
 Ledger binding and paired NAV arithmetic share the ledger's 60-digit decimal
 context; rounded substitutes are rejected, not accepted as exact balances.
+
+
+### Secondary QQQ observations and descriptive performance
+
+The same `build-paper-observations` input accepts `benchmark: "QQQ"` for the
+predeclared secondary comparison. It requires the same complete costs, no-flow
+window, NAV and receivable treatment; optional retained ledger binding must match
+the named symbol exactly. Its output is labelled `secondary_descriptive_only`.
+The primary uncertainty command still rejects QQQ; a better secondary outcome
+cannot replace SPY in the acceptance rule.
+
+Both ETF outputs now include gross and net cumulative return, gross and net
+maximum session-close drawdown (including opening NAV), and net excess return as
+the difference of cumulative returns. Gross includes booked trading costs but
+excludes separately allocated operating costs. These are descriptive arithmetic,
+not statistical significance, intraday risk, source authentication or trial
+acceptance. Comparisons must use the same portfolio series, window and cost
+allocation in the eventual frozen report. Cash comparison remains unsupported
+until its actual account interest/fee terms and economic ledger are supplied;
+an unverified zero yield is not a substitute.
