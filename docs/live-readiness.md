@@ -3411,3 +3411,25 @@ container running with read-only root filesystem; rollback backup retained.
 Receipt: `state/release-d55f473/receipt.json`. No research calls, orders or trial
 activation. This deploys comparison arithmetic, not authenticated source/cash
 baseline completion or accepted sufficient-evidence research.
+
+
+### Lost-response recovery from a pre-submit checkpoint on a replacement path
+
+November 8, 2026: the three accepted-submit/lost-response/SIGKILL cases now also
+recover into a separate local directory using only the prepared-intent checkpoint.
+The original configured database is closed and renamed out of reach (forensic
+copy preserved); its closed WAL/SHM paths are removed. A fresh control directory
+starts paused. Execution without the restored ledger binding raises; explicit
+binding then permits reconciliation, not new exposure.
+
+The unfilled, partial-fill and full-fill cases preserve the experiment and initial
+reservation, reject missing fill evidence, recover correct balances/reservations
+and journal activities once, and keep exactly one broker submission through
+repeated attempts. The original configured database remains absent and the new
+pause remains set. All 68 process, backup and transfer tests passed; Ruff clean.
+This proves local replacement-path recovery after real client process death,
+not physical disk destruction, cross-VM cloud takeover or actual Alpaca behavior.
+No production state, infrastructure, broker orders or trading controls changed.
+Independent review approved the exact test hash after independently running all
+23 process cases. Record:
+`state/independent-review-20261108/replacement-checkpoint-review.json`.

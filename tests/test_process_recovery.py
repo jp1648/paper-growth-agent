@@ -3,6 +3,7 @@
 import copy
 import json
 import os
+import shutil
 import signal
 import socket
 import sqlite3
@@ -30,6 +31,9 @@ from trader.store import Store
         "accepted_lost_ack",
         "accepted_partial_lost_ack",
         "accepted_filled_lost_ack",
+        "accepted_lost_ack_replacement",
+        "accepted_partial_lost_ack_replacement",
+        "accepted_filled_lost_ack_replacement",
         "order",
         "cancel",
         "cancel_race",
@@ -51,6 +55,8 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
     env, decision, tmp_path, stage, monkeypatch
 ):
     service, broker, data = env
+    replacement = stage.endswith("_replacement")
+    stage = stage.removesuffix("_replacement")
     selling = stage.startswith("sell_")
     if selling:
         stage = stage.removeprefix("sell_")
@@ -183,6 +189,33 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
             closing(sqlite3.connect(service.cfg.database)) as target,
         ):
             source.backup(target)
+    if replacement:
+        checkpoint = next(service.store.path.parent.glob("backups/intent-*.sqlite"))
+        replacement_root = tmp_path / "replacement"
+        replacement_root.mkdir()
+        destination = replacement_root / "ledger.sqlite"
+        shutil.copyfile(checkpoint, destination)
+        # Retain forensic evidence, but make the original configured paths unavailable.
+        original_path = service.store.path
+        service.store.db.close()
+        original_path.rename(tmp_path / "unavailable-original.sqlite")
+        for suffix in ("-wal", "-shm"):
+            Path(str(original_path) + suffix).unlink(missing_ok=True)
+        assert not original_path.exists()
+        service.cfg = service.cfg.model_copy(
+            update={"database": str(destination), "control_dir": str(replacement_root / "control")}
+        )
+        restored = Store(destination)
+        try:
+            candidate = Service(service.cfg, restored, broker, data)
+            candidate.kill_path.write_text("Replacement recovery must remain paused")
+            with pytest.raises(RuntimeError, match="binding missing"):
+                candidate.execute(decision, "process-drill")
+            restored.control_path(service.cfg.control_dir, candidate.account_id, ".ledger").write_text(
+                str(restored.path)
+            )
+        finally:
+            restored.db.close()
     reopened = Store(service.cfg.database)
     try:
         recovered = Service(service.cfg, reopened, broker, data)
@@ -317,6 +350,9 @@ def test_process_death_preserves_intent_and_reconciles_without_duplicate(
                 recovered.execute(decision, "process-drill")
                 recovered.reconcile()
             assert reopened.get("reconciliation")["ok"] is True
+            if replacement:
+                assert recovered.kill_path.exists()
+                assert not original_path.exists()
             qty = 4 if "partial" in stage else 10 if "filled" in stage else 0
             assert reopened.get("audit")["cash"] == str(100000 - 100 * qty)
             assert dec(reopened.get("audit")["shares"].get("ACME", "0")) == qty

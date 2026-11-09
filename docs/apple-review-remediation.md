@@ -124,8 +124,8 @@ below. Neither failed run satisfies independent acceptance.
 The missing-fact correction was subsequently deployed as paused release 156277c
 (see the readiness release receipt). A full offline graph now proves tool-gap →
 unsupported valuation → critique → WATCH/zero shares completion using a scripted
-model. The subsequent real-model rerun is recorded below; independent review
-remains pending. Neither test resolves the supported-valuation/normalization
+model. The subsequent real-model rerun and independent AI abstention review are recorded
+below. Neither test resolves the supported-valuation/normalization
 requirements.
 
 ## Completed missing-evidence result — independent AI abstention review approved
