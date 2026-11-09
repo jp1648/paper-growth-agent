@@ -257,7 +257,12 @@ including days without purchases. All money/rates use decimal strings.
 Events have a unique id, kind and evidence. Ordinary dividend events are on the
 ex-date and supply gross_per_share, withholding_per_share and fee_per_share; rates
 apply to pre-purchase shares. Payment events supply dividend_id, payment_date,
-available_at and net_cash matching the full net entitlement. Payments belong on
+available_at and positive net_cash no greater than the remaining net entitlement.
+Each receipt is retained in the entitlement payments list; received cash reduces
+the remaining receivable by exactly the same amount. Each receipt has independent
+evidence availability and reinvestment eligibility; a late-confirmed tranche
+cannot be spent by an earlier eligible tranche. Purchase records identify both
+the distribution and the individual payments making cash eligible. Payments belong on
 the first supplied regular-session row on or after their actual payment date;
 weekend/holiday cash conversion is reflected at that next close. The actual date
 is retained and drives reinvestment eligibility, so a confirmed weekend payment
@@ -269,7 +274,7 @@ restated diagnostic ledger, not an assertion that late evidence was available at
 the economic date. Only purchase eligibility uses confirmation availability.
 
 Remaining before actual trial use: connect authentic captures and account terms,
-handle partial/reversed payments, reviewed cash-in-lieu
+handle reversed payments, reviewed cash-in-lieu
 and special actions, integrate portfolio/all-cost paired return reporting and
 freeze the opening manifest. Unsupported events currently stop calculation;
 supplied coverage/evidence claims are not independent certification. These explicit

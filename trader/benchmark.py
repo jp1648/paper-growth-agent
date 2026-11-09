@@ -234,7 +234,8 @@ def _build_ledger(document):
                     "fee": str(charges),
                     "net": str(gross - withholding - charges),
                     "paid": False,
-                    "reinvest_on": None,
+                    "received": "0",
+                    "payments": [],
                     "evidence": event["evidence"],
                 }
             elif kind == "payment":
@@ -251,27 +252,35 @@ def _build_ledger(document):
                 ).date() < date.fromisoformat(payment_day):
                     raise ValueError("Completed-payment confirmation cannot predate payment")
                 paid = amount(event["net_cash"], cents=True)
-                if paid != dec(entitlement["net"]):
-                    raise ValueError("Partial/reversed or inconsistent payment requires separate review")
+                if paid <= 0:
+                    raise ValueError("Payment must be positive")
+                received = dec(entitlement["received"]) + paid
+                if received > dec(entitlement["net"]):
+                    raise ValueError("Payment exceeds outstanding entitlement")
                 cash += paid
-                entitlement.update(
-                    paid=True,
-                    payment_id=identifier,
-                    payment_date=payment_day,
-                    payment_evidence=event["evidence"],
-                    available_at=event["available_at"],
-                    reinvest_on=reinvestment_session(payment_day, event["available_at"], rows),
+                entitlement.update(received=str(received), paid=received == dec(entitlement["net"]))
+                entitlement["payments"].append(
+                    {
+                        "id": identifier,
+                        "net_cash": str(paid),
+                        "payment_date": payment_day,
+                        "evidence": event["evidence"],
+                        "available_at": event["available_at"],
+                        "reinvest_on": reinvestment_session(payment_day, event["available_at"], rows),
+                    }
                 )
             else:
                 raise ValueError("Unsupported corporate action")
         cash += interest
-        due = [key for key, claim in entitlements.items() if claim["reinvest_on"] == day]
+        payments = [(key, payment) for key, claim in entitlements.items() for payment in claim["payments"]]
+        due_payments = [(key, payment) for key, payment in payments if payment["reinvest_on"] == day]
+        due = list(dict.fromkeys(key for key, _ in due_payments))
         if index == 0 or due:
             locked = sum(
                 (
-                    dec(e["net"])
-                    for e in entitlements.values()
-                    if e["paid"] and (e["reinvest_on"] is None or e["reinvest_on"] > day)
+                    dec(payment["net_cash"])
+                    for _, payment in payments
+                    if payment["reinvest_on"] is None or payment["reinvest_on"] > day
                 ),
                 Decimal(0),
             )
@@ -304,10 +313,11 @@ def _build_ledger(document):
                     "date": day,
                     "reason": "opening" if index == 0 else "distribution_reinvestment",
                     "distribution_ids": due,
+                    "payment_ids": [payment["id"] for _, payment in due_payments],
                     "price_sha256": row["price_sha256"],
                 }
             )
-        receivable = sum((dec(e["net"]) for e in entitlements.values() if not e["paid"]), Decimal(0))
+        receivable = sum((dec(e["net"]) - dec(e["received"]) for e in entitlements.values()), Decimal(0))
         nav = cash + quantity * mark + receivable
         balances.append(
             {
@@ -337,7 +347,7 @@ def _build_ledger(document):
         "limitations": [
             "Evidence and coverage are supplied claims, not independently certified.",
             "Restated economic-date ledger; late payment knowledge cannot generate retroactive purchases.",
-            "Partial/reversed payments, cash in lieu and ambiguous actions require review.",
+            "Reversed payments, cash in lieu and ambiguous actions require review.",
             "Not trial activation or completed after-cost portfolio comparison.",
         ],
     }

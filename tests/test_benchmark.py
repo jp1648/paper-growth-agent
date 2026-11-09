@@ -271,7 +271,7 @@ def test_late_confirmation_does_not_backdate_reinvestment(ledger_input):
     result = build_ledger(d)
     assert len(result["purchases"]) == 1
     assert result["balances"][-1]["cash"] == "108.55"
-    assert result["balances"][-1]["net_receivable"] == "0"
+    assert Decimal(result["balances"][-1]["net_receivable"]) == 0
 
 
 def test_ledger_cli_preserves_previous_output(ledger_input, tmp_path, capsys):
@@ -489,8 +489,8 @@ def test_weekend_payment_uses_actual_date_and_first_eligible_close(ledger_input,
     d["sessions"][2]["events"] = [payment]
     result = build_ledger(d)
     assert result["balances"][2]["shares"] == shares
-    assert result["balances"][2]["net_receivable"] == "0"
-    assert result["entitlements"]["d1"]["payment_date"] == "2026-11-14"
+    assert Decimal(result["balances"][2]["net_receivable"]) == 0
+    assert result["entitlements"]["d1"]["payments"][0]["payment_date"] == "2026-11-14"
     assert result["balances"][-1]["shares"] == "10"
     for invalid_date in ("20261114", "2026-11-13", "2026-11-17"):
         payment["payment_date"] = invalid_date
@@ -504,4 +504,52 @@ def test_weekend_payment_uses_actual_date_and_first_eligible_close(ledger_input,
     d["sessions"][2]["events"] = []
     d["sessions"][3]["events"] = [payment]
     with pytest.raises(ValueError, match="first regular session"):
+        build_ledger(d)
+
+
+def test_partial_payments_preserve_receivable_and_lock_each_tranche(ledger_input):
+    from trader.benchmark import build_ledger
+
+    d = ledger_input
+    d["sessions"][1]["events"] = [
+        {
+            "id": "d1",
+            "kind": "dividend",
+            "evidence": "issuer",
+            "gross_per_share": "1",
+            "withholding_per_share": "0",
+            "fee_per_share": "0",
+        }
+    ]
+    first = {
+        "id": "p1",
+        "kind": "payment",
+        "evidence": "paid-1",
+        "dividend_id": "d1",
+        "payment_date": "2026-11-11",
+        "available_at": "2026-11-11T22:00:00Z",
+        "net_cash": "4",
+    }
+    d["sessions"][2]["events"] = [first]
+    result = build_ledger(d)
+    assert result["balances"][2]["cash"] == "103.55"
+    assert Decimal(result["balances"][2]["net_receivable"]) == 5
+    assert result["unpaid_entitlements"] == ["d1"]
+    assert result["balances"][-1]["shares"] == "10"
+    second = dict(first, id="p2", evidence="paid-2", net_cash="5", available_at="2026-11-12T21:00:00Z")
+    d["sessions"][2]["events"].append(second)
+    d["sessions"][3]["mark"] = "105"
+    result = build_ledger(d)
+    assert result["balances"][2]["cash"] == "108.55"
+    assert Decimal(result["balances"][2]["net_receivable"]) == 0
+    assert result["balances"][-1]["cash"] == "108.55"
+    assert result["balances"][-1]["shares"] == "9"
+    assert result["purchases"][-1]["payment_ids"] == ["p1"]
+    assert not result["unpaid_entitlements"]
+    assert len(result["entitlements"]["d1"]["payments"]) == 2
+    second["net_cash"] = "6"
+    with pytest.raises(ValueError, match="outstanding"):
+        build_ledger(d)
+    second["net_cash"] = "0"
+    with pytest.raises(ValueError, match="positive"):
         build_ledger(d)

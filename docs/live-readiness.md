@@ -3126,3 +3126,23 @@ suite: 952 passed, seven external checks skipped; final focused tests: 69 passed
 This change is not yet deployed. Partial/reversed payments, other special actions,
 authentic payment/tax evidence and all-cost portfolio comparison remain incomplete.
 No research spending, orders, trial activation or pause changes occurred.
+
+### Partial benchmark payment accounting — November 8, 2026
+
+Benchmark dividend receipts now retain individual payment records and cumulative
+received cash. Every positive receipt reduces the outstanding net receivable by
+the identical amount; overpayment and duplicate identities fail closed. Each
+tranche has independent evidence-availability and reinvestment timing. Purchase
+records retain both distribution IDs and eligible payment IDs. Late payment cash
+remains locked even when another tranche is eligible. The output replaces the
+single-payment metadata with an explicit payments list; no application consumers
+of the former fields were found.
+
+The pre-change regression reproduced partial-payment rejection. Full offline suite
+passed 953 tests with seven external checks skipped; the strengthened final timing
+regression and retained-price tests passed 70 checks. Reversed payments and special
+actions still fail closed and remain readiness work; this is not a complete trial
+measurement implementation. No deployment, broker action or paid research occurred.
+Independent review approved the final code, test and policy hashes, reran 70 focused
+checks and separately exercised negative/duplicate/excess/post-settlement receipts.
+Evidence: `state/independent-review-20261108/partial-payment-review.json`.
