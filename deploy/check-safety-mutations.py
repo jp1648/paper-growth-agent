@@ -63,7 +63,13 @@ def main():
         for folder in ("trader", "tests"):
             shutil.copytree(ROOT / folder, target / folder, ignore=shutil.ignore_patterns("__pycache__"))
         (target / "evaluations").mkdir()
-        shutil.copy2(ROOT / "evaluations/baseline-v1.json", target / "evaluations/baseline-v1.json")
+        for name in (
+            "baseline-v1.json",
+            "annual-filings-v2.json",
+            "annual-filings-v3.json",
+            "annual-filings-v3-manifest.json",
+        ):
+            shutil.copy2(ROOT / "evaluations" / name, target / "evaluations" / name)
         for name, mutation in [("baseline", None), *MUTATIONS.items()]:
             if mutation:
                 file, before, after = mutation
