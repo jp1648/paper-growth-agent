@@ -90,6 +90,9 @@ def main(argv=None):
     paper_comparison.add_argument("--primary", required=True)
     paper_comparison.add_argument("--secondary", required=True)
     paper_comparison.add_argument("--output", required=True)
+    paper_bundle = sub.add_parser("build-paper-bundle", help="Offline draft evidence bundle; no activation")
+    paper_bundle.add_argument("--input", required=True)
+    paper_bundle.add_argument("--output", required=True)
     benchmark = sub.add_parser(
         "preview-benchmark-purchase", help="Offline hypothetical ETF purchase arithmetic"
     )
@@ -156,6 +159,11 @@ def main(argv=None):
             else compare_prices(args.before, args.after)
         )
         print(dumps(result))
+        return 0
+    if args.command == "build-paper-bundle":
+        from .paper_bundle import build_file
+
+        print(dumps(build_file(args.input, args.output)))
         return 0
     if args.command == "compare-paper-inputs":
         from .paper_observations import compare_inputs

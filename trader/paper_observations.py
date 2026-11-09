@@ -306,16 +306,7 @@ def compare_inputs(primary_source, secondary_source, output):
     if primary.get("benchmark") != "SPY" or secondary.get("benchmark") != "QQQ":
         raise ValueError("Require primary SPY and secondary QQQ inputs in that order")
     results = [build_observations(document) for document in (primary, secondary)]
-    for key in ("version", "currency", "flow_policy", "expected_sessions", "cost_allocation_method"):
-        if primary[key] != secondary[key]:
-            raise ValueError(f"Comparisons have different shared input: {key}")
-    for key in ("date", "portfolio"):
-        if primary["opening"][key] != secondary["opening"][key]:
-            raise ValueError(f"Comparisons have different opening {key}")
-    for left, right in zip(primary["observations"], secondary["observations"], strict=True):
-        for key in ("date", "portfolio", "flow_evidence", "external_deposits", "external_withdrawals"):
-            if left[key] != right[key]:
-                raise ValueError(f"Comparisons have different {key} at {left['date']}")
+    verify_shared_portfolio(primary, secondary)
     result = {
         "version": 1,
         "status": "diagnostic_only",
@@ -335,3 +326,17 @@ def compare_inputs(primary_source, secondary_source, output):
     with Path(output).open("x") as stream:
         stream.write(json.dumps(result, indent=2, allow_nan=False) + "\n")
     return result
+
+
+def verify_shared_portfolio(primary, secondary):
+    """Compare original validated claims, including costs and flows."""
+    for key in ("version", "currency", "flow_policy", "expected_sessions", "cost_allocation_method"):
+        if primary[key] != secondary[key]:
+            raise ValueError(f"Comparisons have different shared input: {key}")
+    for key in ("date", "portfolio"):
+        if primary["opening"][key] != secondary["opening"][key]:
+            raise ValueError(f"Comparisons have different opening {key}")
+    for left, right in zip(primary["observations"], secondary["observations"], strict=True):
+        for key in ("date", "portfolio", "flow_evidence", "external_deposits", "external_withdrawals"):
+            if left[key] != right[key]:
+                raise ValueError(f"Comparisons have different {key} at {left['date']}")

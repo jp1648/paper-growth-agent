@@ -526,3 +526,39 @@ Before implementing the cash comparator's accrual/settlement rules, retain:
 
 The cash baseline remains unresolved pending this evidence. No zero-yield default
 or silently omitted comparator is permitted in an accepted trial report.
+
+### Offline draft bundle
+
+`trader build-paper-bundle --input bundle.json --output report.json` assembles
+retained inputs without loading broker configuration. Version 1 input contains a
+`study_id`, a hash-bound `protocol` reference, `study_manifest`, `comparisons`, and
+`evidence`. Every file reference is `{ "path": "relative/file.json", "sha256":
+"<exact SHA-256>" }`, relative to the bundle input directory; parent traversal,
+absolute paths and symlinks are rejected. Existing output is never overwritten.
+
+Comparison keys are `SPY:whole_5bps`, `QQQ:whole_5bps`, and the same symbols with
+`whole_0bps`, `whole_10bps`, or `fractional_0bps`. Each entry supplies the same
+`study_id` and references `observations`, `ledger`, and `capture_manifest`
+(the retained price capture's `manifest.json`). The builder recalculates returns,
+reconstructs benchmark accounting, verifies retained price dependencies, and
+requires identical original portfolio, costs, flows and observation windows
+across all supplied comparisons. Supplied performance summaries are not trusted.
+The declared start session and cost allocation method must match observations.
+
+Missing comparisons and protocol manifest fields are listed explicitly. Evidence
+categories are `account_terms`, `cash_comparison`, `cost_finality`, `payments`,
+`independent_reviews`, `universe_decision`, and `prospective_eligibility`. An
+attachment proves only that exact bytes were retained, not substantive acceptance.
+Missing evidence is not replaced with zero costs, assumed interest or approval.
+Every result remains `draft_diagnostic_only` with `activation_authorized: false`,
+even if every attachment is present. Source authenticity, mark/inventory
+reconciliation, genuine prospective eligibility and substantive independent
+acceptance remain separate checks. This command does not change the trading pause.
+
+Same-symbol sensitivities currently require identical underlying ledger inputs,
+except fractional-share and slippage choices. Different fee, tax, payment or
+interest assumptions cannot silently masquerade as sensitivity results. This is
+conservative: genuine quantity-dependent receipts or residual-cash interest may
+differ between scenarios and will require explicit review and a future
+rate/convention binding before this assembler accepts them. Never fabricate equal
+cash amounts to satisfy the check.

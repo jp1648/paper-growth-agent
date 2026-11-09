@@ -3463,3 +3463,21 @@ separate gates. No current test total, release receipt or historical backfill ca
 satisfy those missing outcomes. Ten closed episodes are a sample sufficiency
 condition, never a requirement to force trades. Goal remains active; safe evidence
 integration work remains, but live activation is not authorized.
+
+### Offline bundle integration follow-up
+
+Added `build-paper-bundle` to connect retained prices, reconstructed benchmark
+ledgers, original NAV claims, common study identity and sensitivity inventory.
+Independent review approved draft-only use after a reproduced fee-assumption
+mismatch was fixed. Unknown account/cash/cost/review evidence remains a blocker;
+attachment presence is not acceptance. The current preactivation inventory is
+retained in `state/paper-bundle-draft-20261108/` (28 missing fields/comparisons/
+evidence categories; no outcome series invented). No trial activation, paid
+research, orders or runtime deployment occurred in this change.
+
+Quantity-dependent distribution payments and residual-cash interest across
+sensitivities currently require separate review: the conservative assembler
+rejects differing underlying ledger inputs. It must not be satisfied by copying
+incorrect cash amounts. Mark/inventory reconciliation, sufficient-evidence
+research acceptance, the universe scope decision, account terms, final billing
+and the prospective observation window remain on the critical path.
