@@ -17,7 +17,7 @@ readiness. The prospective trial remains `predeclared_not_started`.
 | 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
-| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Integrate retained bindings, common study identity, sensitivities, cash terms and complete costs into one evidence bundle; finish special-action handling and remaining metrics; resolve the three-symbol/five-symbol mismatch and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
+| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Draft bundle now integrates retained bindings, study identity and sensitivity inventory; substantiate cash terms, complete costs and independent evidence; finish special-action handling and remaining metrics; resolve the three-symbol/five-symbol mismatch and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
 | 7. Live gate | Separate draft contract and paper-only endpoint boundary remain. | No live account eligibility/settled-funds evidence, capital/exposure release approval or proven investment edge. Explicit account-specific release and approval remain mandatory. |
 
 No automatic trial activation follows from these changes. Safe engineering work
@@ -3481,3 +3481,34 @@ rejects differing underlying ledger inputs. It must not be satisfied by copying
 incorrect cash amounts. Mark/inventory reconciliation, sufficient-evidence
 research acceptance, the universe scope decision, account terms, final billing
 and the prospective observation window remain on the critical path.
+
+
+### Pre-spend source suitability finding and canonical SBC repair
+
+Independent source-only review found a concrete blocker in both complete annual
+cases: normalization required `StockBasedCompensation`, while the retained SEC
+companyfacts actually use `us-gaap:ShareBasedCompensation`. The collector whitelist
+had the same wrong name, and synthetic fixtures repeated it. A second paid run
+would not repair this deterministic input failure.
+
+Corrected collector, diagnostic and normalization code to the canonical tag;
+cache schema 5 refetches old schema 4 bundles. Scoring is now v8. New annual-
+filings-v3 adds exact original-accession SBC records only to complete cases;
+original v2, missing-evidence cases, prior candidate outputs and the old Apple
+plan remain untouched. The old planned Apple attempt is explicitly blocked by a
+retained preflight record and must not execute under stale code/source bindings.
+No paid calls, holdout candidate, broker actions or deployment occurred here.
+
+The independent raw-file check confirmed AAPL $12.863bn and MSFT $11.974bn,
+coherent annual periods/units/accessions. The filing supports a bounded research
+exercise, not a uniquely justified normalized forecast. Source repair and
+arithmetic tests do not approve investment reasoning or start the prospective
+study. Exact source-only review: `state/independent-review-20261108/msft-input-suitability-review.json`.
+
+Verification: 989 offline tests passed, six skipped and the paper-order test
+excluded; 149 source/financial/evaluation tests independently passed. Reviewer
+approved the mechanical repair only; exact hashes are in
+`state/independent-review-20261108/canonical-sbc-fix-review.json`. Full Git-history
+secret scan passed after an exact-fingerprint exception for the prior bundle
+documentation's ordinary prose false positive; no credential or scanner rule was
+removed. Deployment and a newly bound paid-run plan remain outstanding.

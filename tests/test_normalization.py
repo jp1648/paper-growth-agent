@@ -18,7 +18,7 @@ def normalization():
     bundle = provider.get("ACME")
     source = bundle["sources"][0]
     facts = source["content"]["facts"]
-    facts["StockBasedCompensation"] = {"USD": [{**facts[CFO]["USD"][0], "val": 40}]}
+    facts["ShareBasedCompensation"] = {"USD": [{**facts[CFO]["USD"][0], "val": 40}]}
     support = {"id": "assumptions", "content": "Synthetic share-base and adjustment evidence only."}
     bridge = {
         "adjustments": [
@@ -88,11 +88,11 @@ def test_invalid_normalization_is_not_a_supported_value(normalization, fault):
     desk, source, bridge = normalization
     facts = source["content"]["facts"]
     if fault == "missing_sbc":
-        del facts["StockBasedCompensation"]
+        del facts["ShareBasedCompensation"]
     elif fault == "mixed_sbc":
-        facts["StockBasedCompensation"]["USD"][0]["accn"] = "0000000001-26-000002"
+        facts["ShareBasedCompensation"]["USD"][0]["accn"] = "0000000001-26-000002"
     elif fault == "negative_sbc":
-        facts["StockBasedCompensation"]["USD"][0]["val"] = -1
+        facts["ShareBasedCompensation"]["USD"][0]["val"] = -1
     elif fault == "duplicate_category":
         bridge["adjustments"][0]["category"] = "working_capital"
     elif fault == "missing_category":
@@ -169,7 +169,7 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(norm
 
 def test_missing_sbc_tools_disclose_gap_without_creating_calculation(normalization):
     desk, source, bridge = normalization
-    del source["content"]["facts"]["StockBasedCompensation"]
+    del source["content"]["facts"]["ShareBasedCompensation"]
     # Desk source ownership is retained; explicitly remove from its copied source as well.
     desk.sources[source["id"]] = source
     tools = {t.name: t for t in desk.tools()}
@@ -188,3 +188,60 @@ def test_missing_sbc_tools_disclose_gap_without_creating_calculation(normalizati
     )
     assert tools["value_scenarios"].invoke(args)["available"] is False
     assert not desk.calculations
+
+
+@pytest.mark.parametrize("symbol,sbc", [("AAPL", "12863000000"), ("MSFT", "11974000000")])
+def test_frozen_v3_canonical_sec_sbc_enables_arithmetic_not_economic_approval(symbol, sbc):
+    import hashlib
+    from datetime import datetime
+
+    from trader.financials import annual_facts
+    from trader.models import dec
+
+    path = Path("evaluations/annual-filings-v3.json")
+    manifest = json.loads(Path("evaluations/annual-filings-v3-manifest.json").read_text())
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == manifest["suite_sha256"]
+    old = json.loads(Path("evaluations/annual-filings-v2.json").read_text())
+    new = json.loads(path.read_text())
+    for before, after in zip(old["cases"], new["cases"], strict=True):
+        stripped = copy.deepcopy(after)
+        stripped["inputs"]["sources"][0]["content"]["facts"].pop("ShareBasedCompensation", None)
+        stripped["inputs"]["sources"][0]["content"].get("fact_taxonomies", {}).pop(
+            "ShareBasedCompensation", None
+        )
+        assert stripped == before
+    case = next(
+        c for c in new["cases"] if c["inputs"]["symbol"] == symbol and c["expected"]["outcome"] == "complete"
+    )
+    src = case["inputs"]["sources"][0]
+    assert src["content"]["fact_taxonomies"]["ShareBasedCompensation"] == "us-gaap"
+    entry = next(e for e in manifest["sources"] if e["symbol"] == symbol)
+    cutoff = datetime.fromisoformat(case["cutoff"])
+    record = annual_facts(src, entry["period_end"], cutoff, [("ShareBasedCompensation", "USD")])[
+        "ShareBasedCompensation"
+    ]
+    assert str(record["val"]) == sbc
+    assert record["accn"] == entry["accession"]
+    bridge = {
+        "adjustments": [
+            {
+                "category": k,
+                "annual_delta_usd": "0",
+                "rationale": "Arithmetic test only; no economic assertion",
+                "evidence_ids": [src["id"]],
+            }
+            for k in ("cash_taxes", "working_capital", "capital_expenditure", "net_borrowing")
+        ],
+        "valuation_shares": entry["diluted_shares"],
+        "share_base_date": entry["period_end"],
+        "share_evidence_ids": [src["id"]],
+        "share_rationale": "Historical shares for arithmetic test only",
+        "financing_and_claims": "Synthetic zero bridge, not an accepted investment forecast",
+    }
+    result = normalized_cash_flow(src, entry["period_end"], cutoff, bridge, {src["id"]: src})
+    assert dec(result["bridged_equity_cash_flow_usd"]) == dec(entry["cfo_usd"]) - dec(
+        entry["capex_usd"]
+    ) - dec(sbc)
+    original = next(c for c in old["cases"] if c["id"] == case["id"])["inputs"]["sources"][0]
+    with pytest.raises(MissingAnnualFact):
+        normalized_cash_flow(original, entry["period_end"], cutoff, bridge, {original["id"]: original})

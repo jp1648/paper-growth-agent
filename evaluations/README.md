@@ -66,7 +66,7 @@ to pass the cohort; separately test bounded document access or honest abstention
 
 ## Separate semantic reviews
 
-The current scoring contract is `financial-provenance-v7`. A candidate's embedded
+The current scoring contract is `financial-provenance-v8`. A candidate's embedded
 `human_review` is rejected; a model output cannot approve itself. A reviewer must
 supply a separate JSON file to `paper-agent evaluate --reviews reviews.json`
 alongside the existing `--suite`, `--responses`, `--output` and `--run-id` options.
@@ -96,3 +96,30 @@ The offline `analyze-paper-returns` command implements the declared paired
 block-resampling calculation. See [input contract and method](paper-analysis.md).
 It does not accept existing price-only daily reports as study evidence, verify
 input provenance, start the trial or grant live approval.
+
+
+## Canonical SEC compensation repair — annual filings v3
+
+`annual-filings-v3.json` preserves all v2 cases and adds only exact original-
+accession `us-gaap:ShareBasedCompensation` USD records to the two complete cases.
+The prior collector and normalizer incorrectly requested `StockBasedCompensation`;
+neither retained issuer companyfacts file contains that tag. The v3 manifest
+binds original raw downloads, unchanged filing text, parent suite and new bytes.
+Apple FY2025 SBC is $12.863 billion; Microsoft is $11.974 billion. Dates, periods
+and accessions align with each case's annual cash-flow inputs. Missing-capex
+variants remain unchanged. No Microsoft candidate has been generated or inspected.
+
+Scoring v8 and evidence-cache schema 5 use the canonical tag. Do not rewrite old
+recordings or relabel earlier mechanical success as normalized economic acceptance.
+The source-only reviewer confirmed that the filing supports a bounded exercise,
+not a uniquely correct forecast or a predetermined purchase. Cash-tax, working-
+capital, reinvestment, share-base and financing assumptions still require supported
+reasoning and independent review; a zero bridge in a regression is arithmetic,
+not an endorsed forecast.
+
+The prepared `annual-normalized-dev-20261109-1` v2/v7 plan is blocked by the retained
+`state/evaluations/planned-apple-normalized-20261109/blocked-preflight-sbc.json`.
+Its original manifest remains intact. Do not execute it: a newly reviewed plan,
+source/prompt/scoring bindings, deployed code verification and fresh budget checks
+are required before another paid attempt. Historical sensitivity completion and
+supported normalized-investment-research acceptance must be reported separately.

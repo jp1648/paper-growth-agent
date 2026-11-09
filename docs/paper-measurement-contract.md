@@ -551,9 +551,9 @@ categories are `account_terms`, `cash_comparison`, `cost_finality`, `payments`,
 attachment proves only that exact bytes were retained, not substantive acceptance.
 Missing evidence is not replaced with zero costs, assumed interest or approval.
 Every result remains `draft_diagnostic_only` with `activation_authorized: false`,
-even if every attachment is present. Source authenticity, mark/inventory
-reconciliation, genuine prospective eligibility and substantive independent
-acceptance remain separate checks. This command does not change the trading pause.
+even if every attachment is present. Separate checks must establish authentic
+sources, reconciled inventory and prices, prospective eligibility and substantive
+independent acceptance. This command does not change the trading pause.
 
 Same-symbol sensitivities currently require identical underlying ledger inputs,
 except fractional-share and slippage choices. Different fee, tax, payment or

@@ -15,7 +15,7 @@ from .models import Decision
 from .research_team import Catalysts, Critique, Research, Valuation
 
 SCHEMAS = {"business": Research, "catalysts": Catalysts, "valuation": Valuation, "adversarial": Critique}
-SCORING_CONTRACT = "financial-provenance-v7"
+SCORING_CONTRACT = "financial-provenance-v8"
 
 
 def fingerprint(value):

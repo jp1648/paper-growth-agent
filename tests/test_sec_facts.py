@@ -18,6 +18,7 @@ def provider(env, monkeypatch, facts_cik=1, filings_cik="0000000001"):
                     "PaymentsForRepurchaseOfCommonStock",
                     "PaymentsOfDividendsCommonStock",
                     "IncomeTaxesPaidNet",
+                    "ShareBasedCompensation",
                 )
             },
             "custom": {"NetIncomeLoss": {"units": {"USD": [{"val": 99999, "filed": "2026-01-01"}]}}},
@@ -44,6 +45,8 @@ def test_sec_taxonomy_collision_cannot_replace_standard_fact(env, monkeypatch):
     assert content["fact_taxonomies"]["NetIncomeLoss"] == "us-gaap"
     assert content["fact_taxonomies"]["EntityCommonStockSharesOutstanding"] == "dei"
     assert content["cik"] == "0000000001"
+    assert content["facts"]["ShareBasedCompensation"]["USD"][0]["val"] == 10
+    assert content["fact_taxonomies"]["ShareBasedCompensation"] == "us-gaap"
     for tag in ("PaymentsForRepurchaseOfCommonStock", "PaymentsOfDividendsCommonStock", "IncomeTaxesPaidNet"):
         assert content["facts"][tag]["USD"][0]["val"] == 10
         assert content["fact_taxonomies"][tag] == "us-gaap"
@@ -61,10 +64,10 @@ def test_sec_payload_must_match_configured_company(env, monkeypatch, field, valu
 def test_legacy_unverified_cache_is_refetched(env, monkeypatch):
     source = provider(env, monkeypatch)
     legacy = source.fetch("ACME")
-    legacy["sec_schema"] = 3
+    legacy["sec_schema"] = 4
     source.store.put("ACME", legacy, "evidence_cache")
     bundle = source.get("ACME")
-    assert bundle["sec_schema"] == 4
+    assert bundle["sec_schema"] == 5
     assert bundle["sources"][0]["content"]["cik"] == "0000000001"
 
 
@@ -312,7 +315,7 @@ def test_fetch_keeps_verified_same_day_filing_but_excludes_date_only_facts(env, 
     assert [s["published_at"] for s in bundle["sources"] if s["id"].startswith("news-")] == [
         (AT - timedelta(seconds=1)).isoformat()
     ]
-    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 4
+    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 5
 
 
 @pytest.mark.parametrize("offset,expected", [(-1, 1), (1, 0)])

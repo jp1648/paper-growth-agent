@@ -31,8 +31,8 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     """Reproduce an explicit bridge; selected adjustments remain reviewable assumptions."""
     bridge = NormalizationBridge.model_validate(bridge).model_dump(mode="json")
     proxy = annual_cash_flow(source, period_end, cutoff)
-    sbc = annual_facts(source, period_end, cutoff, [("StockBasedCompensation", "USD")])[
-        "StockBasedCompensation"
+    sbc = annual_facts(source, period_end, cutoff, [("ShareBasedCompensation", "USD")])[
+        "ShareBasedCompensation"
     ]
     baseline = next(iter(proxy["facts"].values()))
     if any(sbc[k] != baseline[k] for k in ("start", "end", "accn", "filed", "form")):
@@ -174,7 +174,7 @@ def cash_flow_diagnostics(source, period_end, cutoff):
     """Historical accounting arithmetic, never a normalized forecast or approval."""
     proxy = annual_cash_flow(source, period_end, cutoff)
     tags = (
-        "StockBasedCompensation",
+        "ShareBasedCompensation",
         "PaymentsForRepurchaseOfCommonStock",
         "PaymentsOfDividendsCommonStock",
         "IncomeTaxesPaidNet",

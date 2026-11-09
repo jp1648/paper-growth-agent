@@ -333,7 +333,7 @@ def test_accounting_diagnostics_keep_cash_tax_and_sbc_distinctions():
 
     source = {"id": "original", "content": {"facts": financial_facts()}}
     tags = {
-        "StockBasedCompensation": 50,
+        "ShareBasedCompensation": 50,
         "PaymentsForRepurchaseOfCommonStock": 480,
         "PaymentsOfDividendsCommonStock": 40,
         "IncomeTaxesPaidNet": 80,
@@ -350,7 +350,7 @@ def test_accounting_diagnostics_keep_cash_tax_and_sbc_distinctions():
     assert result["cash_taxes_paid_net_usd"] == "80"
     assert result["missing_facts"] == []
     assert source == original
-    source["content"]["facts"]["StockBasedCompensation"]["USD"][0]["accn"] = "0000000001-26-000009"
+    source["content"]["facts"]["ShareBasedCompensation"]["USD"][0]["accn"] = "0000000001-26-000009"
     with pytest.raises(ValueError, match="filing basis"):
         cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
 
@@ -382,15 +382,15 @@ def test_accounting_diagnostic_optional_input_is_not_silently_trusted(fault):
 
     source = {"id": "original", "content": {"facts": financial_facts()}}
     record = {**source["content"]["facts"][CFO]["USD"][0], "val": 50}
-    source["content"]["facts"]["StockBasedCompensation"] = {"USD": [record]}
+    source["content"]["facts"]["ShareBasedCompensation"] = {"USD": [record]}
     if fault == "negative":
         record["val"] = -50
     elif fault == "conflict":
-        source["content"]["facts"]["StockBasedCompensation"]["USD"].append({**record, "val": 60})
+        source["content"]["facts"]["ShareBasedCompensation"]["USD"].append({**record, "val": 60})
     elif fault == "future":
         record["filed"] = "2026-10-21"
     elif fault == "currency":
-        source["content"]["facts"]["StockBasedCompensation"] = {"EUR": [record]}
+        source["content"]["facts"]["ShareBasedCompensation"] = {"EUR": [record]}
     else:
         record["start"] = "2025-10-01"
     if fault in {"negative", "conflict"}:
@@ -398,7 +398,7 @@ def test_accounting_diagnostic_optional_input_is_not_silently_trusted(fault):
             cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
     else:
         result = cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
-        assert "StockBasedCompensation" in result["missing_facts"]
+        assert "ShareBasedCompensation" in result["missing_facts"]
         assert result["sbc_deduction_sensitivity_usd"] is None
 
 
