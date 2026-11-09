@@ -53,8 +53,9 @@ to pass the cohort; separately test bounded document access or honest abstention
   Development run `annual-dev-20261107-2` collected Apple outputs: the complete
   case mechanically passed with WATCH; the missing-evidence variant failed.
   Jay's independent Apple review requires changes and rejects completed-research
-  acceptance while retaining temporary WATCH. The missing-evidence case remains
-  failed. See `docs/apple-review-remediation.md` and `docs/live-readiness.md`.
+  acceptance while retaining temporary WATCH. The missing-evidence case later completed in `missing-dev-20261108-3` and
+  its abstention reasoning was approved by an independent delegated AI reviewer;
+  that does not approve the rejected sufficient-evidence case. See `docs/apple-review-remediation.md` and `docs/live-readiness.md`.
 - Two companies and two sufficient cases are a starter cohort, not enough to meet
   the release gate. Expand the declared universe/regimes with independently
   reviewed unseen cases before any promotion; retain the >=90% completion target
@@ -65,7 +66,7 @@ to pass the cohort; separately test bounded document access or honest abstention
 
 ## Separate semantic reviews
 
-The current scoring contract is `financial-provenance-v5`. A candidate's embedded
+The current scoring contract is `financial-provenance-v7`. A candidate's embedded
 `human_review` is rejected; a model output cannot approve itself. A reviewer must
 supply a separate JSON file to `paper-agent evaluate --reviews reviews.json`
 alongside the existing `--suite`, `--responses`, `--output` and `--run-id` options.

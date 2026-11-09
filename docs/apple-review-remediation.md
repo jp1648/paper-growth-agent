@@ -11,7 +11,8 @@ agent transcribed the user-message verdict and bound it to retained hashes. Jay
 explicitly did not independently attest those hashes or mechanical checks from
 the HTML. Rescoring rejects semantic acceptance (`human_review_failed`); mechanical
 completion is not approved investment research. The missing-data case subsequently completed in run `missing-dev-20261108-3`;
-independent acceptance of that abstention is pending.
+its abstention reasoning was approved on November 8 by the delegated independent
+AI reviewer. This is not a human attestation or approval of the rejected complete case.
 
 ## Required revised result and evidence
 
@@ -22,7 +23,7 @@ independent acceptance of that abstention is pending.
 | Normalization | Source-bound numerical bridge with explicit equity/enterprise basis, SBC/share treatment, taxes/escrow, reinvestment and financing; no unsupported zero adjustments or double deductions | Historical bridges documented; explicit numerical normalization is deployed paused and supported by the tools and frozen replay. Apple's recurring-tax, reinvestment and forward-share forecasts remain incomplete. No normalized valuation accepted |
 | Scenarios | Connect business drivers to growth/margins/reinvestment; identify 10% as a chosen hurdle unless cost of equity is established; explain post-year-five economics and show separate growth/multiple sensitivities | Arithmetic sensitivity implemented; economic rationale still pending |
 | Decision/review | Measurable triggers, review periods and valuation effects; reconcile holding/valuation horizons; distinguish confidence in abstention from value/performance confidence | Revised report and independent review pending |
-| Failure recovery | Rerun the missing-capex/filing case after offline checks; complete WATCH with an explicit material gap and no fabricated value | Real run missing-dev-20261108-3 completed WATCH/zero shares with all four reports; independent review pending |
+| Failure recovery | Rerun the missing-capex/filing case after offline checks; complete WATCH with an explicit material gap and no fabricated value | Real run missing-dev-20261108-3 completed WATCH/zero shares with all four reports; independent AI reasoning review approved, with corrected packet hash binding |
 
 ## Arithmetic correction
 
@@ -127,7 +128,7 @@ model. The subsequent real-model rerun is recorded below; independent review
 remains pending. Neither test resolves the supported-valuation/normalization
 requirements.
 
-## Completed missing-evidence result awaiting review
+## Completed missing-evidence result — independent AI abstention review approved
 
 `missing-dev-20261108-3` ran the deployed 156277c image with a fresh stable ID
 and a $3.75 cap after settlement/daily/credit/pause checks. It completed all four
@@ -145,10 +146,36 @@ completed final evaluation, and no errors. Cost settled with zero unknown calls.
 November 8 total for three attempts: $4.281305, below $6/day. No more paid run
 was made in this turn.
 
-Mechanical checks pass; independent semantic review is pending. A private HTML
+Mechanical checks pass. Independent AI review approved the abstention reasoning
+on November 8; the corrected `review-manifest-v2.json` preserves the original
+packet while fixing its case-hash binding. This is not human approval or approval
+of complete-evidence valuation. A private HTML
 packet with unmodified reports, full frozen facts and hash identifiers is at
 `state/evaluations/missing-dev-20261108-3/review-for-jay.html`. Implementation-agent
 checks of citations and selected financial inputs are labeled as such; they are
 not Jay's approval. The packet explicitly separates the fictional $100,000 cash
 portfolio from the actual paused paper account holding one AAPL share. Original
 recording/suite bytes are retained. Jay was asked to review this abstention only.
+
+
+## Next sufficient-evidence development run — prepared, not executed
+
+The original complete Apple case is retained unchanged in
+`state/evaluations/planned-apple-normalized-20261109/suite.json`; its plan records
+parent/subset/case hashes, scoring v7, current prompt and relevant source hashes.
+Stable planned run ID: `annual-normalized-dev-20261109-1`. Microsoft is excluded.
+The original reconstructed November 1, 2025 cutoff and hypothetical $200 price
+remain; this does not become a current-price investigation or point-in-time backtest.
+
+Earliest execution is November 9 New York, after fresh ledger, settled-charge,
+remaining daily allowance, confirmed credit/buffer, pause, deployed-source and
+run-ID checks. Maximum is $5 for the run within the existing $6 daily cap and
+available credit less $10 buffer; these are ceilings, not preflight proof of funds.
+Do not execute if budget is insufficient, and do not retry automatically.
+The plan itself creates no reservation or provider call and grants no extra spend.
+
+Use the existing `evaluate-run` path only, with this single-case suite, stable ID,
+new output directory and the preflight-bounded cap. Retain the full four-role
+output and traces, then obtain independent semantic review against every requirement
+in this document. Complete API execution and WATCH alone cannot approve normalized
+valuation. Preserve rejected outputs and all costs regardless of outcome.

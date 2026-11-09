@@ -3374,3 +3374,21 @@ cloud failover or a transfer authorization. No actual ownership/VM/pause changes
 orders, paid model calls or production deployments occurred.
 Independent review approved exact script/test hashes and independently passed all
 49 focused tests. Evidence: `state/independent-review-20261108/target-handover-review.json`.
+
+
+### Next sufficient-evidence research packet prepared — November 8, 2026
+
+Frozen an unchanged single-case Apple development subset and a planned—not
+executed—run manifest for `annual-normalized-dev-20261109-1`. It binds original
+case/parent suite, scoring v7, prompt and research-source hashes. Microsoft holdout
+is excluded. Fresh runtime/spend/credit/pause/identity checks are mandatory before
+execution on a later NY day; this plan is not a budget reservation. Source and
+prompt changes require a new plan version, not silent reuse. Corrected outdated
+cohort/remediation status text so the approved missing-evidence abstention cannot
+be confused with the still-rejected sufficient-evidence research.
+No model calls, broker actions, runtime changes or new acceptance claims.
+The independent reviewer approved the immutable plan/source bindings for planning
+only, with no spending or research-acceptance claim. Review:
+`state/independent-review-20261108/next-apple-plan-review.json`. Its nonblocking
+finding identified two further stale pending-review passages; those passages were
+subsequently corrected to the narrow independent-AI abstention approval.
