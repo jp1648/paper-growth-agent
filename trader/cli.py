@@ -86,6 +86,9 @@ def main(argv=None):
         "preview-benchmark-purchase", help="Offline hypothetical ETF purchase arithmetic"
     )
     benchmark.add_argument("--input", required=True)
+    benchmark_ledger = sub.add_parser("build-benchmark-ledger", help="Offline hypothetical ETF ledger")
+    benchmark_ledger.add_argument("--input", required=True)
+    benchmark_ledger.add_argument("--output", required=True)
     inventory = sub.add_parser("reconcile-paper-marks", help="Offline inventory to common raw marks")
     inventory.add_argument("capture")
     inventory.add_argument("--input", required=True)
@@ -120,6 +123,11 @@ def main(argv=None):
     entitlement.add_argument("directory")
     entitlement.add_argument("--input", required=True)
     args = parser.parse_args(argv)
+    if args.command == "build-benchmark-ledger":
+        from .benchmark import build_file
+
+        print(dumps(build_file(args.input, args.output)))
+        return 0
     if args.command == "preview-benchmark-purchase":
         from .benchmark import preview
 

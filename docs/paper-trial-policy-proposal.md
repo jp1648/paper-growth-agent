@@ -233,3 +233,39 @@ need a supported fee calculation before use; an unexplained zero is not valid.
 The independent review ran 11 focused tests plus 2,000 affordability and cash-
 conservation checks. Full entitlement/split/payment ledger, revised daily return
 chain, collector integration and activation remain incomplete.
+
+## Offline session ledger — November 8, 2026
+
+`paper-agent build-benchmark-ledger --input ledger.json --output ledger-result.json`
+replays a supplied complete session list, preserving the original capital denominator
+for the first observation. It carries prior-share ordinary-dividend entitlements,
+separate rounded gross/withholding/fee amounts, net receivables, full payments,
+verified-ratio splits that fit the quantity grid, explicit cash interest, and
+availability-aware reinvestment. Cash from later-confirmed payments stays locked
+when another dividend becomes reinvestable. Initial costs, receipt and payment
+are not counted twice. Output files are exclusive-create with an input-byte hash;
+corrections require a new complete input/output pair, never an overwritten record.
+
+Input version 1 declares USD SPY/QQQ, opening_capital, order_fee, fractional,
+slippage_bps, fee_evidence_sha256, calendar_evidence, action_coverage_evidence,
+investor_terms_evidence, fee_evidence and coverage_complete. expected_sessions must
+match every sessions row in order, starting with the opening date. Each row supplies
+date, timezone-aware close, mark, price_sha256, interest_cash, interest_evidence,
+external_deposits, external_withdrawals and events. Every price hash is validated,
+including days without purchases. All money/rates use decimal strings.
+
+Events have a unique id, kind and evidence. Ordinary dividend events are on the
+ex-date and supply gross_per_share, withholding_per_share and fee_per_share; rates
+apply to pre-purchase shares. Payment events supply dividend_id, payment_date,
+available_at and net_cash matching the full net entitlement. Split events provide
+numerator and denominator. The result contains purchases, daily balances/returns,
+entitlement balances, split audit and unresolved unpaid entitlements. Output is a
+restated diagnostic ledger, not an assertion that late evidence was available at
+the economic date. Only purchase eligibility uses confirmation availability.
+
+Remaining before actual trial use: connect authentic captures and account terms,
+handle non-session payment dates, partial/reversed payments, reviewed cash-in-lieu
+and special actions, integrate portfolio/all-cost paired return reporting and
+freeze the opening manifest. Unsupported events currently stop calculation;
+supplied coverage/evidence claims are not independent certification. These explicit
+limits are incomplete trial requirements, not a reduction of the readiness goal.
