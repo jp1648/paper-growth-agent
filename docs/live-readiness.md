@@ -3351,3 +3351,26 @@ orders, pause changes or live authorization occurred.
 Independent review approved the final hashes after 20 process tests, four final
 accepted-stage reruns and 25 backup tests. Record:
 `state/independent-review-20261108/submit-lost-ack-review.json`.
+
+
+### Replacement identity recheck before ownership transfer — November 8, 2026
+
+The transfer CLI previously rechecked only source shutdown immediately before
+publishing the owner record. A replacement target could have stopped or been
+recreated after its initial inspection, yet the CLI would publish the old target
+identity and report success. The pinned runtime identity would still reject a
+replacement instance, but the handover result would be stale and unavailable.
+
+The CLI now rechecks the target's immutable instance ID, RUNNING status and zone
+before the final source shutdown check and generation-conditional publication.
+Target replacement, stop, changed zone or a read timeout all prevent the write.
+Four regressions failed before the fix and pass afterward; all 49 transfer,
+ownership and checkpoint tests pass, with Ruff and whitespace checks clean.
+
+Cloud VM lifecycle and object publication are not a single atomic transaction;
+changes after these reads still require runtime fencing/reconciliation and the
+combined-failure proof. This patch is an operator-tool safeguard, not proof of
+cloud failover or a transfer authorization. No actual ownership/VM/pause changes,
+orders, paid model calls or production deployments occurred.
+Independent review approved exact script/test hashes and independently passed all
+49 focused tests. Evidence: `state/independent-review-20261108/target-handover-review.json`.

@@ -29,6 +29,7 @@ def cloud(monkeypatch):
             "zone": "projects/123/zones/us-east1-b",
         },
         "source_reads": 0,
+        "target_reads": 0,
     }
 
     def call(*args):
@@ -49,9 +50,23 @@ def cloud(monkeypatch):
                 state["source_reads"] += 1
             if old and state.get("source_timeout"):
                 raise subprocess.TimeoutExpired(args, 60)
+            if not old:
+                state["target_reads"] += 1
             status = state["source_status"] if old else state["target_status"]
             if old and state.get("restart") and state["source_reads"] > 1:
                 status = "RUNNING"
+            if not old and state["target_reads"] > 1 and state.get("target_change"):
+                if state["target_change"] == "timeout":
+                    raise subprocess.TimeoutExpired(args, 60)
+                return json.dumps(
+                    {
+                        "id": "333" if state["target_change"] == "identity" else "222",
+                        "status": "TERMINATED" if state["target_change"] == "stopped" else status,
+                        "zone": "wrong-zone"
+                        if state["target_change"] == "zone"
+                        else "https://www.googleapis.com/compute/v1/projects/project-a/zones/us-east1-b",
+                    }
+                )
             return json.dumps(
                 {
                     "id": state["source_id"] if old else "222",
@@ -170,3 +185,12 @@ def test_owner_changed_after_commit_is_not_reported_as_success(cloud, monkeypatc
     assert cloud["writes"] == 1
     assert cloud["owner"]["instance_id"] == "333"
     assert cloud["generation"] == "12"
+
+
+@pytest.mark.parametrize("failure", ["identity", "stopped", "zone", "timeout"])
+def test_target_drift_before_publication_cannot_receive_ownership(cloud, failure):
+    cloud["target_change"] = failure
+    with pytest.raises((ValueError, subprocess.TimeoutExpired)):
+        run(apply=True, expected_generation="10")
+    assert cloud["writes"] == 0
+    assert cloud["owner"]["instance_id"] == "111"

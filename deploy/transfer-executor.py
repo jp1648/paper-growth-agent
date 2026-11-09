@@ -110,7 +110,15 @@ def transfer(bucket, project, zone, name, *, apply=False, expected_generation=No
         path = Path(directory) / "owner.json"
         path.write_text(json.dumps(candidate, indent=2) + "\n")
         path.chmod(0o600)
-        # Recheck immediately before publication; timeout/unknown state is never permission to take over.
+        # Recheck both endpoints; lifecycle changes are not an atomic GCS transaction.
+        current_target = instance(project, zone, name)
+        if (
+            str(current_target["id"]) != candidate["instance_id"]
+            or current_target["status"] != "RUNNING"
+            or current_target["zone"] != target["zone"]
+        ):
+            raise ValueError("Target identity or running state changed before transfer")
+        # Keep the source shutdown check last; unknown state is never permission to take over.
         source = instance(owner["project_id"], owner["zone"].split("/")[-1], owner["instance_name"])
         if str(source["id"]) != owner["instance_id"] or source["status"] != "TERMINATED":
             raise ValueError("Source shutdown changed before transfer")
