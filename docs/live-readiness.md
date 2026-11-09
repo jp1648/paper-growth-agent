@@ -17,7 +17,7 @@ readiness. The prospective trial remains `predeclared_not_started`.
 | 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
-| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Draft bundle now integrates retained bindings, study identity and sensitivity inventory; substantiate cash terms, complete costs and independent evidence; finish special-action handling and remaining metrics; resolve the three-symbol/five-symbol mismatch and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
+| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Draft bundle now integrates retained bindings, study identity and sensitivity inventory; substantiate cash terms, complete costs and independent evidence; finish special-action handling and remaining metrics; resolve the three-symbol/five-symbol mismatch using the [pending scope decision](prospective-scope-decision.md) and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
 | 7. Live gate | Separate draft contract and paper-only endpoint boundary remain. | No live account eligibility/settled-funds evidence, capital/exposure release approval or proven investment edge. Explicit account-specific release and approval remain mandatory. |
 
 No automatic trial activation follows from these changes. Safe engineering work
@@ -3541,3 +3541,25 @@ changed after the reviewed plan revision. No run or reservation was created.
 Earliest date remains November 9 NY; fresh funding, $6/day/$5/run, pause and
 unused-ID checks are mandatory. The original v2/v7 plan remains explicitly blocked.
 No paid research or orders occurred in this release; no trial/live activation.
+
+
+### Prospective scope/funding feasibility review
+
+Independent review approved `docs/prospective-scope-decision.md` as a pending
+operator decision, not an activation. Current three-company configuration cannot
+meet five prospective reviewed-company minimum without an explicit scope decision.
+The draft separates research-only expansion from trading-universe expansion and
+preserves current thresholds/configuration while the operator response is pending.
+
+A proposed 36-opportunity, twelve-week calendar leaves limited failure capacity:
+if all attempts are sufficient-evidence cases, at least 33 completions are required
+by the separate 90% rule, in addition to the 30 independently reviewed completed-
+investigation minimum. Classifications and additional safety-review inclusion must
+be frozen before outcomes; no missing-evidence padding or retrospective exclusions.
+Maximum-use model scenario is $180, not a cost forecast or spending approval.
+Partly used $100 credit expiring November29 does not prove funding through twelve
+weeks; actual available credit and all provider/infra costs remain prerequisites.
+
+Billing metadata at 02:10 UTC still reports zero rows; no cost query or zero-cost
+claim. Review retained in `state/independent-review-20261108/scope-feasibility-review.json`.
+No new code, deployment, paid research, trades, scope or budget changes in this step.

@@ -87,3 +87,9 @@ returned no rows. Retained result:
 Infrastructure costs remain unknown, not zero or provider-reconciled. No export
 configuration or billing-account change was made. Await population; repeatedly
 querying an empty table does not improve cost completeness.
+
+### Metadata-only recheck — November 9, 2026, 02:10 UTC
+
+Retained `table-20261109T0210Z.json`: detailed export metadata reports 0 rows and
+0 bytes. No cost query was issued on this check. Population and cost reconciliation
+remain outstanding; the metadata result does not establish zero incurred charges.
