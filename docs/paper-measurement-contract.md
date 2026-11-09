@@ -492,3 +492,37 @@ separately identified. Do not label this full implementation shortfall. Paper fi
 still apply. Existing effective activities include approved revisions; no original
 fill or trading history is changed by reporting. Prospective-window collection,
 complete broker contract and live execution-quality evidence remain separate.
+
+
+## Account cash terms and paper simulation boundary (November 8, 2026)
+
+The current [Alpaca paper specification](https://docs.alpaca.markets/us/docs/paper-trading)
+explicitly excludes dividends and regulatory fees from simulation. Therefore an
+unchanged paper cash balance, missing DIV activity or missing fee debit cannot
+prove that the economically comparable amount is zero. Keep broker reconciliation
+unchanged; supported economic overlays remain separate, and must avoid duplicating
+any amount the broker actually books. Existing receivable/liability input support
+is arithmetic, not proof that all applicable amounts have been collected.
+
+The [High-Yield Cash description](https://alpaca.markets/blog/alpaca-launches-high-yield-cash-program-for-trading-api-users-enabling-growth-on-deposits/)
+requires enrollment/eligibility and describes a variable rate. It does not identify
+this user's enrollment, the paper environment's interest treatment or the rate
+applicable to hypothetical comparator balances. Do not substitute its advertised
+APY for account evidence or assume that lack of enrollment proves every fee/yield
+component is zero. No enrollment, account change or live API request was made.
+Retained public HTML and hashes: `state/account-terms-20261108/manifest.json`.
+
+Before implementing the cash comparator's accrual/settlement rules, retain:
+
+- Account/product identity and environment; enrollment status with effective dates.
+- Applicable rate history, tiers, eligibility, accrual basis and rounding, posting
+  schedule, withholding and fees, including evidence for explicit zeros.
+- Applicability to the proposed all-cash and ETF residual balances; actual interest
+  earned on the agent's different cash balance is not a comparator rate.
+- Treatment of unposted earned interest, weekend/holiday accrual, rate changes,
+  payment corrections and available-to-reinvest cash, without double counting.
+- Source retrieval time, covered dates and independent review. Public product
+  documentation alone does not authenticate account-specific terms.
+
+The cash baseline remains unresolved pending this evidence. No zero-yield default
+or silently omitted comparator is permitted in an accepted trial report.

@@ -77,3 +77,13 @@ with a 10 MB maximum-billed-bytes bound. It returned no rows; initial export/bac
 is still pending. Query, table metadata and empty result are retained under
 `state/billing-export-20261108/`. Credits are summed per usage row before grouping
 to avoid multiplying base cost. No zero-cost inference or trial acceptance.
+
+
+### Recheck — November 9, 2026, 01:24 UTC
+
+The same bounded project/window query again validated at zero processed bytes and
+returned no rows. Retained result:
+`state/billing-export-20261108/result-20261109T0124Z.json`.
+Infrastructure costs remain unknown, not zero or provider-reconciled. No export
+configuration or billing-account change was made. Await population; repeatedly
+querying an empty table does not improve cost completeness.

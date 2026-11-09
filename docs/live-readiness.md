@@ -3315,3 +3315,14 @@ diff checks passed. Independent review approved exact hashes after 121 focused
 tests, 26 final tests and eight additional mismatch checks. Evidence:
 `state/independent-review-20261108/shared-comparison-review.json`.
 No deployment, paid calls, orders, pause changes or prospective activation.
+
+
+### External cost/account evidence check — November 8, 2026
+
+The bounded billing export recheck at November 9 01:24 UTC remains empty. Current
+public Alpaca documentation confirms omitted paper dividends/regulatory fees and
+account-dependent cash-yield enrollment; it cannot establish this account's terms.
+Retained sources and the concrete cash-evidence requirements are documented in
+`paper-measurement-contract.md`. Operator enrollment clarification is pending.
+Do not infer zero cost/yield from missing simulated activity. No live requests,
+account changes, paid research, orders or trial activation occurred.
