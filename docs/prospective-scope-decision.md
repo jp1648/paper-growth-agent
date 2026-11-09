@@ -106,3 +106,44 @@ claim fair budget access across five companies. Before trial activation, freeze
 and implement the calendar/rotation with explicit treatment of safety reviews;
 keep current monitoring priority for held-position safety. Enabling five research
 symbols does not complete scheduling, activate the trial or resume trading.
+
+## Offline schedule draft
+
+`paper-agent draft-paper-schedule --input schedule-input.json --output schedule-draft.json`
+produces a reviewable calendar/rotation artifact without loading broker credentials,
+calling providers, writing to the ledger or enabling the runner. The input contains
+`study_id` (bounded lowercase letters/digits/hyphens), `start_session` (a future
+canonical date), and `calendar` (retained broker rows with date/open/close).
+The output binds the complete input with SHA-256 and refuses to overwrite a file.
+Calendar authenticity and completeness still require source review.
+
+The proposed deterministic selection is first, middle (index floor(n/2)), and last
+regular session in each of twelve seven-day blocks anchored on the starting
+session. A four-session holiday week uses its first, third and fourth sessions;
+a three-session week uses all three. A block with fewer than three supplied
+sessions is rejected for explicit exception review. NY timestamps retain early
+closes and daylight-saving offsets. Rotate AAPL/MSFT/AMZN/PG/CAT across the 36 slots:
+AAPL has eight and each other company seven, fixed before candidate outcomes.
+
+The observation window ends at the later of session 60 and the first session at
+or after start plus 84 days, as already declared in `forward-paper-v1`. The 36
+scheduled investigations occupy the first twelve seven-day blocks; observation
+continues through the precomputed endpoint. Holidays cannot silently shorten the
+minimum window, and later outcome insufficiency cannot extend it automatically.
+
+Missed, failed and safety-displaced slots remain in the record; no automatic
+rescheduling or extra paid catchup is implied. Safety reviews retain priority and
+must be recorded separately, under the same daily budget. This builder does not
+classify evidence sufficiency, authorize funding or implement runner dispatch.
+Its output is always `draft_not_activated`. Authenticate the actual calendar,
+review/freeze the exact dates and classification, implement dispatch/accounting,
+and approve the complete opening manifest before activation. No actual study
+start date has been selected by adding this command.
+
+Any observation tail beyond the twelve scheduling blocks has monitoring and
+safety reviews but no additional scheduled investigations. AAPL's eighth slot is
+a predeclared unequal convenience allocation, not a representative or randomized
+sample; per-company coverage must remain visible in reporting. Before dispatch
+integration, freeze the invocation time and missed-slot cutoff, the treatment of
+safety attempts in each denominator, and the sufficiency classification rules.
+The slot list itself proves none of those semantic decisions.

@@ -93,6 +93,11 @@ def main(argv=None):
     paper_bundle = sub.add_parser("build-paper-bundle", help="Offline draft evidence bundle; no activation")
     paper_bundle.add_argument("--input", required=True)
     paper_bundle.add_argument("--output", required=True)
+    paper_schedule = sub.add_parser(
+        "draft-paper-schedule", help="Offline calendar/rotation draft; no activation"
+    )
+    paper_schedule.add_argument("--input", required=True)
+    paper_schedule.add_argument("--output", required=True)
     benchmark = sub.add_parser(
         "preview-benchmark-purchase", help="Offline hypothetical ETF purchase arithmetic"
     )
@@ -162,6 +167,11 @@ def main(argv=None):
         return 0
     if args.command == "build-paper-bundle":
         from .paper_bundle import build_file
+
+        print(dumps(build_file(args.input, args.output)))
+        return 0
+    if args.command == "draft-paper-schedule":
+        from .paper_schedule import build_file
 
         print(dumps(build_file(args.input, args.output)))
         return 0

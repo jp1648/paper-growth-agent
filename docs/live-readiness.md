@@ -3728,3 +3728,21 @@ open. No production code, deployment, provider request, spending or order change
 Evidence: `state/validation-20261109/combined-recovery-tests.log`. Independent AI
 review approved this local fixture scope and independently passed all 27 process
 recovery cases; hash-bound review: `state/validation-20261109/replacement-cancel-review.json`.
+
+## November 9: independently reviewed offline schedule builder
+
+Added `draft-paper-schedule` to materialize the selected five-company rotation
+against a supplied future broker calendar. It preserves the declared later-of-60-
+sessions/84-days endpoint, assigns 36 distinct slots across twelve start-anchored
+weeks, retains early closes/NY offsets and hashes the supplied input. Invalid or
+insufficient calendars fail before output; existing outputs cannot be overwritten.
+The command returns before broker configuration and never activates a trial.
+
+Verification: 48 schedule/bundle/analysis tests pass, including 17 schedule tests;
+Ruff and diff checks pass. Independent AI review approved offline planning only,
+including extra start-day, year-boundary, session-count and DST checks. Review:
+`state/validation-20261109/paper-schedule-review.json`.
+No actual study calendar/start was chosen, paid call made or production release
+changed. Authentic calendar, frozen dispatch/cutoff/denominator policies, runner
+integration and all substantive opening prerequisites remain required. See
+[the scope and schedule contract](prospective-scope-decision.md#offline-schedule-draft).
