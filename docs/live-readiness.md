@@ -3257,7 +3257,26 @@ seven isolated PostgreSQL-backed dashboard tests and all 12 browser tests. New
 browser coverage exercises legacy/measured/incomplete/no-fill states and mobile
 overflow; retained desktop/mobile screenshots were visually checked. Disposable
 local test database was removed afterward; production data was not seeded.
-This UI/publisher change is not deployed yet and does not activate trading.
+This UI/publisher change was subsequently deployed as recorded below; trading remains paused.
 Independent review approved final code/test hashes, reran 24 Python tests and
 TypeScript compilation, and inspected both screenshots. Review record:
 `state/independent-review-20261108/execution-ui-review.json`.
+
+
+### Execution panel production verification — November 8, 2026
+
+Reviewed source `8b803c0` is deployed to both the executor and existing Cloud Run
+dashboard. CI passed 968 backend tests (one opted-in test skipped), 87% branch
+coverage, and dashboard/browser, safety-mutation and secret checks. All 32 executor
+source files matched the reviewed revision inside the image and running container.
+Fresh reconciliation passed; experiment, document counts, one AAPL paper share,
+configuration/spending hashes and pause were preserved. Rollback backup retained.
+
+Cloud Run traffic was explicitly moved from the pinned older revision to
+`trader-dashboard-00012-j5j`. Password login, unauthenticated API rejection,
+authenticated current snapshot, logout, desktop/mobile panel and overflow checks
+passed against the deployed service. The current single paper fill reports
+$344.33 notional, $0.02 worse than its retained quote, or +0.58087 bps. This is
+quote-relative paper execution evidence, not full implementation shortfall or
+proof of live quality. No model investigations or trades were initiated.
+Evidence and immutable image digests: `state/release-8b803c0/receipt.json`.
