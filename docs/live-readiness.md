@@ -13,7 +13,7 @@ readiness. The prospective trial remains `predeclared_not_started`.
 | Goal | Verified state | Remaining requirement / next action |
 |---|---|---|
 | 1. Costs | 33 model-spend records settled using retained provider evidence. Detailed Google Cloud billing export configured; its table exists but bounded project queries still return no rows. | Authenticate/allocate all operating costs before trial activation. Empty export is not zero cost; Flovia unknown operations remain preserved and blocked. |
-| 2. Release | Paused runtime revision 8b803c0 source-verified across 32 Python files; exact-commit CI 42544172308 passed 968 tests/one skipped, 87% branch coverage. Existing Cloud Run dashboard execution panel is deployed and authenticated checks passed. Fresh reconciliation and unchanged experiment/position/configuration/spending/pause verified. | Preserve this release receipt and repeat exact-artifact checks for future changes; deployment is not trial activation. |
+| 2. Release | Paused runtime revision d55f473 source-verified across 32 Python files; exact-commit CI 42546222647 passed 979 tests/one skipped, 87% branch coverage. Existing Cloud Run dashboard execution panel is deployed and authenticated checks passed. Fresh reconciliation and unchanged experiment/position/configuration/spending/pause verified. | Preserve this release receipt and repeat exact-artifact checks for future changes; deployment is not trial activation. |
 | 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
@@ -3392,3 +3392,22 @@ only, with no spending or research-acceptance claim. Review:
 `state/independent-review-20261108/next-apple-plan-review.json`. Its nonblocking
 finding identified two further stale pending-review passages; those passages were
 subsequently corrected to the narrow independent-AI abstention approval.
+
+
+### Paused comparison-tool release — November 8, 2026
+
+Source `d55f473759bbb6ff2c3c524961f82d99357156e9` deployed using scoped build
+`35e22257-468b-4d9b-a904-b31980a1ccc4`, immutable executor image
+`sha256:c4184d0b3aa4db957bbc8b87f3a2ee67733b67b6f8089de5410522c8e1ad6380`.
+Exact CI 42546222647 passed 979 tests with one opt-in skipped, 87% branch coverage,
+safety mutations, dashboard/browser and secret checks. All 32 Python source hashes
+matched the image and running container; planned Apple research/scoring hashes
+also matched. The dashboard deployment was unchanged.
+
+Container started November 9 01:39:06 UTC; reconciliation passed afterward at
+01:39:14 UTC. Original experiment, document counts, one AAPL paper share,
+configuration/spending hashes and trading pause were preserved. Service active,
+container running with read-only root filesystem; rollback backup retained.
+Receipt: `state/release-d55f473/receipt.json`. No research calls, orders or trial
+activation. This deploys comparison arithmetic, not authenticated source/cash
+baseline completion or accepted sufficient-evidence research.
