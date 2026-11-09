@@ -3243,3 +3243,21 @@ paid research, orders or pause changes occurred.
 Independent reviewer approved the corrected final hashes, reran 80 focused tests
 and verified weighting with different reference prices. Exact review retained at
 `state/independent-review-20261108/execution-quality-review.json`.
+
+### Dashboard execution evidence panel — November 8, 2026
+
+The snapshot publisher now includes the reviewed execution-quality summary. The
+Overview panel shows reference coverage, filled notional and aggregate USD/bps,
+with explicit incomplete/no-fill states and a fallback for older snapshots. Limits
+remain accessible in a native disclosure; positive/negative sign and basis-point
+meaning are explained. No server secrets, action controls or auth changes added.
+
+Verified 24 focused Python tests, TypeScript checking, production Next.js build,
+seven isolated PostgreSQL-backed dashboard tests and all 12 browser tests. New
+browser coverage exercises legacy/measured/incomplete/no-fill states and mobile
+overflow; retained desktop/mobile screenshots were visually checked. Disposable
+local test database was removed afterward; production data was not seeded.
+This UI/publisher change is not deployed yet and does not activate trading.
+Independent review approved final code/test hashes, reran 24 Python tests and
+TypeScript compilation, and inspected both screenshots. Review record:
+`state/independent-review-20261108/execution-ui-review.json`.

@@ -52,6 +52,7 @@ def publish_snapshot(service):
                 "cash",
                 "total_pnl",
                 "economic_result",
+                "execution_quality",
                 "unrealized_pnl",
                 "reserved_for_buys",
                 "model_cost_usd_estimate",

@@ -300,3 +300,62 @@ test("long trace loads every event and full details require authentication", asy
     ).status(),
   ).toBe(400);
 });
+
+test("execution evidence distinguishes measured, missing and empty coverage", async ({
+  page,
+}) => {
+  test.skip(!password, "Requires isolated fixture dashboard");
+  await page.goto("/login");
+  await page.getByLabel("Workspace password").fill(password!);
+  await page.getByRole("button", { name: "Enter observatory" }).click();
+  await expect(page.getByRole("button", { name: /Refresh/ })).toBeVisible();
+  const data = await (await page.request.get("/api/data")).json();
+  await page.route("**/api/data*", (route) => route.fulfill({ json: data }));
+  const panel = page.getByRole("region", { name: "Paper execution evidence" });
+  await expect(panel.getByText(/unavailable in this snapshot/)).toBeVisible();
+  data.snapshot.portfolio.execution_quality = {
+    fill_count: 2,
+    referenced_fill_count: 2,
+    reference_coverage_complete: true,
+    fill_notional_usd: "996",
+    aggregate_slippage_usd: "-4",
+    aggregate_slippage_bps: "-40",
+    referenced_slippage_usd: "-4",
+    scope: "Current experiment, not a prospective window",
+    limitations: ["Paper fills do not establish live execution quality."],
+  };
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(panel.getByText("-40.00 bps")).toBeVisible();
+  await expect(
+    panel.getByText("2 of 2 fills have quote references."),
+  ).toBeVisible();
+  await panel.getByText("Measurement limits").click();
+  await expect(
+    panel.getByText("Paper fills do not establish live execution quality."),
+  ).toBeVisible();
+  await panel.screenshot({ path: "../state/execution-quality-desktop.png" });
+  Object.assign(data.snapshot.portfolio.execution_quality, {
+    referenced_fill_count: 1,
+    reference_coverage_complete: false,
+    aggregate_slippage_usd: null,
+    aggregate_slippage_bps: null,
+  });
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(panel.getByText("Unknown", { exact: true })).toHaveCount(2);
+  await expect(panel.getByText(/Quote evidence is incomplete/)).toBeVisible();
+  Object.assign(data.snapshot.portfolio.execution_quality, {
+    fill_count: 0,
+    referenced_fill_count: 0,
+    fill_notional_usd: "0",
+    referenced_slippage_usd: null,
+  });
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(panel.getByText(/No fills to measure yet/)).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await panel.screenshot({ path: "../state/execution-quality-mobile.png" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});

@@ -40,6 +40,17 @@ export interface Snapshot {
     reconciliation: { ok: boolean } | null;
     equity: Amount;
     total_pnl: Amount;
+    execution_quality?: {
+      fill_count: number;
+      referenced_fill_count: number;
+      reference_coverage_complete: boolean;
+      fill_notional_usd: Amount;
+      aggregate_slippage_usd: Amount;
+      aggregate_slippage_bps: Amount;
+      referenced_slippage_usd: Amount;
+      scope: string;
+      limitations: string[];
+    };
     economic_result?: {
       broker_pnl_usd: Amount;
       recorded_operating_cost_usd_estimate: Amount;

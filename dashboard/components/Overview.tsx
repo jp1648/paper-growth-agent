@@ -126,6 +126,69 @@ export default function Overview({
           </p>
         )}
       </section>
+      <section className="panel" aria-label="Paper execution evidence">
+        <div className="panel-title">
+          <div>
+            <h2>Paper execution evidence</h2>
+            <p>Fill prices compared with the retained submission quote</p>
+          </div>
+        </div>
+        {p.execution_quality ? (
+          <>
+            <p>
+              {p.execution_quality.referenced_fill_count} of{" "}
+              {p.execution_quality.fill_count} fills have quote references.
+            </p>
+            <div className="metrics">
+              <div className="metric">
+                <span>Filled notional</span>
+                <strong>{money(p.execution_quality.fill_notional_usd)}</strong>
+              </div>
+              <div className="metric">
+                <span>Total quote-relative slippage</span>
+                <strong>
+                  {p.execution_quality.aggregate_slippage_usd == null
+                    ? "Unknown"
+                    : money(p.execution_quality.aggregate_slippage_usd, 4)}
+                </strong>
+              </div>
+              <div className="metric">
+                <span>Weighted slippage</span>
+                <strong>
+                  {p.execution_quality.aggregate_slippage_bps == null
+                    ? "Unknown"
+                    : `${Number(p.execution_quality.aggregate_slippage_bps).toFixed(2)} bps`}
+                </strong>
+              </div>
+            </div>
+            {!p.execution_quality.reference_coverage_complete && (
+              <p className="notice">
+                {p.execution_quality.fill_count === 0
+                  ? "No fills to measure yet. This is not evidence of zero execution cost."
+                  : `Quote evidence is incomplete. Measured subset: ${money(p.execution_quality.referenced_slippage_usd, 4)}; total slippage remains unknown.`}
+              </p>
+            )}
+            <p className="muted">
+              Positive slippage is worse than the reference; negative is
+              improvement. 1 basis point (bps) = 0.01%.
+            </p>
+            <p className="muted">{p.execution_quality.scope}</p>
+            <details>
+              <summary>Measurement limits</summary>
+              <ul className="muted">
+                {p.execution_quality.limitations.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            </details>
+          </>
+        ) : (
+          <p className="muted">
+            Execution evidence is unavailable in this snapshot. Missing data
+            does not mean zero slippage.
+          </p>
+        )}
+      </section>
       <section className="panel x-credits">
         <div className="panel-title">
           <div>

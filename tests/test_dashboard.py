@@ -143,3 +143,12 @@ def test_run_cost_view_includes_failed_evaluations_without_double_counting(env):
     assert report["pnl_after_recorded_costs_usd_estimate"] == dec("-3.25")
     assert report["unresolved_research_runs"] == 2 and report["complete"] is False
     assert broker.submits == 0
+
+
+def test_snapshot_includes_execution_coverage_without_inventing_zero(env):
+    service, _, _ = env
+    quality = publish_snapshot(service)["portfolio"]["execution_quality"]
+    assert quality["fill_count"] == 0
+    assert quality["aggregate_slippage_usd"] is None
+    assert quality["aggregate_slippage_bps"] is None
+    assert not quality["reference_coverage_complete"]
