@@ -553,3 +553,137 @@ def test_partial_payments_preserve_receivable_and_lock_each_tranche(ledger_input
     second["net_cash"] = "0"
     with pytest.raises(ValueError, match="positive"):
         build_ledger(d)
+
+
+def test_payment_reversal_restores_receivable_without_erasing_receipt(ledger_input):
+    from trader.benchmark import build_ledger
+
+    d = ledger_input
+    d["sessions"][1]["events"] = [
+        {
+            "id": "d1",
+            "kind": "dividend",
+            "evidence": "issuer",
+            "gross_per_share": "1",
+            "withholding_per_share": "0",
+            "fee_per_share": "0",
+        }
+    ]
+    d["sessions"][2]["events"] = [
+        {
+            "id": "p1",
+            "kind": "payment",
+            "evidence": "paid",
+            "dividend_id": "d1",
+            "payment_date": "2026-11-11",
+            "available_at": "2026-11-11T22:00:00Z",
+            "net_cash": "9",
+        }
+    ]
+    reversal = {
+        "id": "r1",
+        "kind": "payment_reversal",
+        "evidence": "debit-with-claim-preserved",
+        "dividend_id": "d1",
+        "payment_id": "p1",
+        "reversal_date": "2026-11-12",
+        "available_at": "2026-11-12T15:00:00Z",
+        "net_cash": "9",
+        "entitlement_remains_due": True,
+    }
+    d["sessions"][3]["events"] = [reversal]
+    result = build_ledger(d)
+    claim = result["entitlements"]["d1"]
+    assert Decimal(claim["received"]) == 0 and not claim["paid"]
+    assert claim["payments"][0]["net_cash"] == "9"
+    assert claim["payments"][0]["reversals"][0]["id"] == "r1"
+    assert len(result["purchases"]) == 1
+    assert result["balances"][-1]["cash"] == "99.55"
+    assert Decimal(result["balances"][-1]["net_receivable"]) == 9
+    assert Decimal(result["balances"][-1]["nav"]) == Decimal("999.55")
+    reversal["net_cash"] = "4"
+    result = build_ledger(d)
+    assert result["balances"][-1]["shares"] == "10"
+    assert Decimal(result["balances"][-1]["net_receivable"]) == 4
+    reversal["net_cash"] = "10"
+    with pytest.raises(ValueError, match="remaining receipt"):
+        build_ledger(d)
+    reversal["net_cash"] = "9"
+    reversal["entitlement_remains_due"] = False
+    with pytest.raises(ValueError, match="entitlement"):
+        build_ledger(d)
+
+    reversal["entitlement_remains_due"] = True
+    d["sessions"][3]["events"] = []
+    last = dict(d["sessions"][3], date="2026-11-13", close="2026-11-13T21:00:00Z", events=[reversal])
+    reversal.update(reversal_date="2026-11-13", available_at="2026-11-13T15:00:00Z")
+    d["sessions"].append(last)
+    d["expected_sessions"].append(last["date"])
+    result = build_ledger(d)
+    assert result["balances"][-1]["shares"] == "10"
+    assert result["balances"][-1]["cash"] == "0.50"
+    assert Decimal(result["balances"][-1]["net_receivable"]) == 9
+    assert len(result["purchases"]) == 2
+    d["sessions"][3]["mark"] = "100"
+    with pytest.raises(ValueError, match="unavailable cash"):
+        build_ledger(d)
+
+
+@pytest.mark.parametrize("reverse_input", [False, True])
+def test_weekend_reversal_cannot_borrow_later_payment(ledger_input, reverse_input):
+    from trader.benchmark import build_ledger
+
+    d = ledger_input
+    d["order_fee"] = "1"
+    dividend = {
+        "id": "d1",
+        "kind": "dividend",
+        "evidence": "issuer",
+        "gross_per_share": "1",
+        "withholding_per_share": "0",
+        "fee_per_share": "0",
+    }
+    payment = {
+        "id": "p1",
+        "kind": "payment",
+        "evidence": "paid",
+        "dividend_id": "d1",
+        "payment_date": "2026-11-11",
+        "available_at": "2026-11-11T22:00:00Z",
+        "net_cash": "9",
+    }
+    d["sessions"][1]["events"] = [dividend]
+    d["sessions"][2]["events"] = [payment]
+    d["sessions"][3]["events"] = [dict(dividend, id="d2")]
+    later = dict(
+        payment, id="p2", dividend_id="d2", payment_date="2026-11-15", available_at="2026-11-15T15:00:00Z"
+    )
+    reversal = {
+        "id": "r1",
+        "kind": "payment_reversal",
+        "evidence": "debit",
+        "dividend_id": "d1",
+        "payment_id": "p1",
+        "reversal_date": "2026-11-14",
+        "available_at": "2026-11-14T15:00:00Z",
+        "net_cash": "9",
+        "entitlement_remains_due": True,
+    }
+    events = [later, reversal] if reverse_input else [reversal, later]
+    d["sessions"].append(
+        dict(d["sessions"][3], date="2026-11-16", close="2026-11-16T21:00:00Z", events=events)
+    )
+    d["expected_sessions"].append("2026-11-16")
+    with pytest.raises(ValueError, match="unavailable cash"):
+        build_ledger(d)
+    reversal["reversal_date"] = "2026-11-15"
+    reversal["available_at"] = "2026-11-15T16:00:00Z"
+    with pytest.raises(ValueError, match="Same-date"):
+        build_ledger(d)
+    d["sessions"][2]["events"].append(dict(dividend, id="d2"))
+    later.update(payment_date="2026-11-12", available_at="2026-11-16T15:00:00Z")
+    d["sessions"][3]["events"] = [later]
+    reversal.update(reversal_date="2026-11-14", available_at="2026-11-14T15:00:00Z")
+    d["sessions"][-1]["events"] = [reversal]
+    with pytest.raises(ValueError, match="another payment lock"):
+        build_ledger(d)

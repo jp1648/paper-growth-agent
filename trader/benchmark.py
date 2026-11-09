@@ -198,7 +198,19 @@ def _build_ledger(document):
             raise TypeError("Require an explicit event list")
         if sum(e.get("kind") in {"split", "dividend"} for e in events) > 1:
             raise ValueError("Same-date action ordering requires separate review")
-        for event in events:
+
+        def economic_date(event, session_day=day):
+            if event["kind"] == "payment":
+                return event["payment_date"]
+            if event["kind"] == "payment_reversal":
+                return event["reversal_date"]
+            return session_day
+
+        payment_days = {economic_date(e) for e in events if e["kind"] == "payment"}
+        reversal_days = {economic_date(e) for e in events if e["kind"] == "payment_reversal"}
+        if payment_days & reversal_days:
+            raise ValueError("Same-date payment/reversal ordering requires separate review")
+        for event in sorted(events, key=economic_date):
             identifier = event["id"]
             evidence(identifier)
             evidence(event["evidence"])
@@ -263,27 +275,82 @@ def _build_ledger(document):
                     {
                         "id": identifier,
                         "net_cash": str(paid),
+                        "reversed": "0",
+                        "reversals": [],
                         "payment_date": payment_day,
                         "evidence": event["evidence"],
                         "available_at": event["available_at"],
                         "reinvest_on": reinvestment_session(payment_day, event["available_at"], rows),
                     }
                 )
+            elif kind == "payment_reversal":
+                entitlement = entitlements[event["dividend_id"]]
+                payment = next((p for p in entitlement["payments"] if p["id"] == event["payment_id"]), None)
+                if payment is None or event.get("entitlement_remains_due") is not True:
+                    raise ValueError("Require original receipt and evidence entitlement remains due")
+                reversal_day = date.fromisoformat(event["reversal_date"]).isoformat()
+                if (
+                    reversal_day != event["reversal_date"]
+                    or reversal_day <= payment["payment_date"]
+                    or not index
+                    or not rows[index - 1]["date"] < reversal_day <= day
+                ):
+                    raise ValueError("Require later-date reversal on its first regular session")
+                if dt(event["available_at"]).astimezone(
+                    ZoneInfo("America/New_York")
+                ).date() < date.fromisoformat(reversal_day):
+                    raise ValueError("Reversal confirmation cannot predate debit")
+                debit = amount(event["net_cash"], cents=True)
+                remaining = dec(payment["net_cash"]) - dec(payment["reversed"])
+                if not 0 < debit <= remaining:
+                    raise ValueError("Reversal must be positive and within remaining receipt")
+                if debit > cash:
+                    raise ValueError("Reversal needs unavailable cash; borrowing or sale requires review")
+                cash -= debit
+                received = dec(entitlement["received"]) - debit
+                entitlement.update(received=str(received), paid=False)
+                payment["reversed"] = str(dec(payment["reversed"]) + debit)
+                locked_at_debit = sum(
+                    (
+                        dec(p["net_cash"]) - dec(p["reversed"])
+                        for claim in entitlements.values()
+                        for p in claim["payments"]
+                        if p["reinvest_on"] is None or p["reinvest_on"] >= reversal_day
+                    ),
+                    Decimal(0),
+                )
+                if cash < locked_at_debit:
+                    raise ValueError("Reversal would consume another payment lock; funding requires review")
+                payment["reversals"].append(
+                    {
+                        "id": identifier,
+                        "net_cash": str(debit),
+                        "date": reversal_day,
+                        "available_at": event["available_at"],
+                        "evidence": event["evidence"],
+                    }
+                )
             else:
                 raise ValueError("Unsupported corporate action")
         cash += interest
         payments = [(key, payment) for key, claim in entitlements.items() for payment in claim["payments"]]
-        due_payments = [(key, payment) for key, payment in payments if payment["reinvest_on"] == day]
+        due_payments = [
+            (key, payment)
+            for key, payment in payments
+            if payment["reinvest_on"] == day and dec(payment["net_cash"]) > dec(payment["reversed"])
+        ]
         due = list(dict.fromkeys(key for key, _ in due_payments))
+        locked = sum(
+            (
+                dec(payment["net_cash"]) - dec(payment["reversed"])
+                for _, payment in payments
+                if payment["reinvest_on"] is None or payment["reinvest_on"] > day
+            ),
+            Decimal(0),
+        )
+        if cash < locked:
+            raise ValueError("Reversal would consume another payment lock; funding requires review")
         if index == 0 or due:
-            locked = sum(
-                (
-                    dec(payment["net_cash"])
-                    for _, payment in payments
-                    if payment["reinvest_on"] is None or payment["reinvest_on"] > day
-                ),
-                Decimal(0),
-            )
             result = preview(
                 {
                     "version": 1,
@@ -347,7 +414,7 @@ def _build_ledger(document):
         "limitations": [
             "Evidence and coverage are supplied claims, not independently certified.",
             "Restated economic-date ledger; late payment knowledge cannot generate retroactive purchases.",
-            "Reversed payments, cash in lieu and ambiguous actions require review.",
+            "Entitlement cancellations, unfunded reversals, cash in lieu and ambiguous actions require review.",
             "Not trial activation or completed after-cost portfolio comparison.",
         ],
     }

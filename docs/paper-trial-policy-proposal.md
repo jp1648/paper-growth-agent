@@ -274,7 +274,7 @@ restated diagnostic ledger, not an assertion that late evidence was available at
 the economic date. Only purchase eligibility uses confirmation availability.
 
 Remaining before actual trial use: connect authentic captures and account terms,
-handle reversed payments, reviewed cash-in-lieu
+handle entitlement cancellations, unfunded/same-day reversals, reviewed cash-in-lieu
 and special actions, integrate portfolio/all-cost paired return reporting and
 freeze the opening manifest. Unsupported events currently stop calculation;
 supplied coverage/evidence claims are not independent certification. These explicit
@@ -296,3 +296,26 @@ Without `--capture`, that binding is null and the result remains unbound diagnos
 arithmetic. Even a valid binding is not independent source authenticity or action
 coverage certification, and cannot by itself activate a trial. Tests exercise the
 real capture validator with retained mock HTTP pages, including the DST boundary.
+
+
+### Receipt reversals
+
+A `payment_reversal` identifies the original dividend and payment, positive
+`net_cash` debit, canonical `reversal_date`, `available_at` confirmation, evidence,
+and explicit `entitlement_remains_due: true`. It restores the receivable only
+under that evidenced continuing-entitlement claim. A cancellation or revised tax
+obligation cannot use this event. Retain the original payment amount, cumulative
+reversed amount and every reversal record; replacement receipts use new IDs.
+
+Place a later-date reversal on the first regular session on or after its economic
+date. Same-day payment/debit ordering requires separate review. Net receipt cash
+remaining determines eligibility and locks; a fully reversed receipt cannot trigger
+a purchase. Already completed purchases remain in history. If the debit requires
+borrowing, selling shares or consuming another receipt's locked cash, calculation
+stops pending a reviewed funding rule. This remains a restated diagnostic ledger,
+not a claim that late correction evidence was known at the economic date.
+Events mapped from multiple non-session dates are processed in economic-date
+order, regardless of input order. A debit cannot use a later receipt or cash
+whose reinvestment release is on/after the debit date. Payment and reversal events
+on the same economic date require explicit ordering review rather than assuming
+that one funded the other.

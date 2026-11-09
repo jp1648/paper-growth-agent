@@ -3146,3 +3146,23 @@ measurement implementation. No deployment, broker action or paid research occurr
 Independent review approved the final code, test and policy hashes, reran 70 focused
 checks and separately exercised negative/duplicate/excess/post-settlement receipts.
 Evidence: `state/independent-review-20261108/partial-payment-review.json`.
+
+### Evidence-backed receipt reversals — November 8, 2026
+
+Added hypothetical receipt reversal records that preserve original receipts,
+restore receivables only with an explicit continuing-entitlement evidence claim,
+and limit cumulative debits to the original receipt. Full reversals suppress future
+reinvestment; funded reversals after a purchase preserve that purchase. Insufficient
+cash, borrowing, forced sales, entitlement cancellation and ambiguous same-day
+payment/debit ordering stop calculation.
+
+Independent review found a chronological funding bypass in the first implementation:
+a later weekend receipt could fund an earlier debit when both mapped to Monday.
+The correction processes economic dates in order and checks other receipt locks
+at the debit boundary, including releases later on that same day. Permanent tests
+exercise both input orders and cross-receipt locked-cash funding. Full offline
+suite: 956 passed, seven external checks skipped; focused suite: 73 passed.
+No production deployment, paid research, broker actions or trial activation.
+Independent reviewer approved the corrected implementation after reproducing and
+rejecting future funding, temporary lock use and same-day ambiguity. Retained
+review: `state/independent-review-20261108/payment-reversal-review.json`.
