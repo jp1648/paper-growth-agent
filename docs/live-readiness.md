@@ -5,27 +5,25 @@ approve live activation or real-money orders. Preserve paper experiment/history,
 reservations, current deployment and approved spending limits. Local changes are
 not deployment evidence. Do not claim an investment edge from operational tests.
 
-## Current seven-goal audit — November 8, 06:48 UTC
+## Current seven-goal audit — November 8, 2026 (New York)
 
-This is a gate audit, not a claim of live readiness. Fresh read-only production
-records are retained in `state/goal-audit-20261108/runtime.jsonl`; the requirement
-ledger and chronological entries below retain the fuller evidence and limitations.
+This summarizes the requirement ledger and dated evidence below; it is not live
+readiness. The prospective trial remains `predeclared_not_started`.
 
 | Goal | Verified state | Remaining requirement / next action |
 |---|---|---|
-| 1. Unknown API charges | 33 model-spend records, all settled. Original uncapped run reconciled to $1.92903470, baseline timeout allocation to $1.49436290, two October holds to zero using retained provider exports and audited receipts. | Provider allocations can be corrected later; they are not per-request invoices. Flovia's separate blocked/unknown operations and missing full infrastructure allocation are not declared resolved by this model-spend audit. |
-| 2. Deploy safety fixes | Paused runtime source 2ea0ff5, immutable image verified against 30 Python files; release CI 42454901215/42454905238 passed. Fresh reconciliation is healthy, original experiment and one AAPL share preserved; configuration/spend hashes unchanged. | New price-capture, integrity, inventory and liability tools are local/branch changes, not part of that image. Deploy only after their CI/release checks; no reason to resume autonomous execution. |
-| 3. Independent research | Original sufficient-evidence Apple result remains rejected by Jay. Arithmetic/filing follow-up and numerical normalization support exist; missing-evidence run completed but independent review is pending. | Finish economically supported scenarios, measurable triggers and revised normalized research; preserve unseen Microsoft outputs. New full-team research awaits adequate daily allowance: November 8 spent $4.281305 of $6. Pending human review cannot be replaced by implementation-agent approval. |
-| 4. Combined execution failures | Actual local SIGKILL, partial-fill/cancel races, delayed activity, repeated unavailable transport and restored-checkpoint tests exist; separate two-host fencing and paused takeover evidence exists. A later cross-host drill restored an actual pre-POST GCS checkpoint after source SIGKILL and reconciled replayed partial/full fills with one submission. | Full in-flight replacement-host recovery after original-disk loss/network partition and broker correction/bust contracts remain unproved. Do not aggregate separate tests into proof of this combined case. |
-| 5. Operations | Two-hour PostgreSQL outage/backlog recovery, independent host-outage alerts, recovery notifications and fresh-host snapshot drill have retained evidence. | Disk exhaustion can lose telemetry; broader fault/load combinations and in-flight replacement recovery remain. No claim of lossless traces under every failure. |
-| 6. Prospective trial | Protocol is predeclared_not_started. Raw SIP access/capture, integrity/revision checks and offline NAV/marking helpers are available. Historical fee/mark audit demonstrates existing daily reports are not finalized trial observations. | Complete end-to-end benchmark entitlements/holdings, closing inventory verification, late-posting/restatement policy and all cost allocation; obtain frozen-manifest approval. Then collect at least 60 regular sessions AND 12 weeks prospectively. No backdating, forced trades or fabricated observations. |
-| 7. Live gate | Separate draft contract requires account eligibility, settled funds, exact artifact/account binding, capital/exposure/loss limits, shutdown/recovery and explicit user approval. Application remains paper-only. | Account-specific release evidence and approval do not exist. Drafting the contract does not satisfy live activation requirements. |
+| 1. Costs | 33 model-spend records settled using retained provider evidence. Detailed Google Cloud billing export configured; its table exists but bounded project queries still return no rows. | Authenticate/allocate all operating costs before trial activation. Empty export is not zero cost; Flovia unknown operations remain preserved and blocked. |
+| 2. Release | Paused runtime revision 6e51d89 source-verified across 32 Python files; exact-commit CI 42542650155 passed 963 tests/one skipped, 87% branch coverage. Fresh reconciliation and unchanged experiment/position/configuration/spending/pause verified. | Preserve this release receipt and repeat exact-artifact checks for future changes; deployment is not trial activation. |
+| 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
+| 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
+| 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
+| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | Authenticate real portfolio/payment/account terms and costs; finish special-action/correction handling, secondary comparisons and remaining metrics; freeze/approve future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
+| 7. Live gate | Separate draft contract and paper-only endpoint boundary remain. | No live account eligibility/settled-funds evidence, capital/exposure release approval or proven investment edge. Explicit account-specific release and approval remain mandatory. |
 
-Pending external inputs remain the independent research reviews and a usable
-infrastructure billing export/table or approved export setup. No new request for
-the same input is implied by this audit. Safe engineering work remains, so the
-overall goal is active rather than complete or blocked. No paid calls, orders,
-billing changes or trial activation were made during this audit.
+No automatic trial activation follows from these changes. Safe engineering work
+remains; the overall goal is active, neither complete nor blocked. Keep independent
+AI review separate from human attestation. Consult dated release receipts below
+for exact deployment state rather than historical test counts in older entries.
 
 ## Historical milestone: economic-NAV observation builder
 
@@ -3191,3 +3189,20 @@ terms, complete cost reconciliation and trial activation remain unverified.
 No deployment, paid research, broker orders or pause changes occurred.
 Independent reviewer approved the corrected final hashes and separately ran 97
 focused tests. Review: `state/independent-review-20261108/paired-binding-review.json`.
+
+
+### Paused measurement release — November 8, 2026
+
+Deployed source `6e51d89cee766440177681fd61769a735f8fdbb3` via scoped build
+`e890e629-0556-4034-9fe1-ccaac58ebb48`, immutable image
+`sha256:900b407bdf8ddde81da07e83da2f626278cdd320ad06f19b2483c47022027c6c`.
+Exact-commit CI 42542650155 passed 963 backend tests/one opt-in skipped with 87%
+branch coverage, safety mutations, dashboard/browser tests and secrets scan.
+All 32 Python files matched reviewed source in image and running container.
+Reconciliation succeeded November 9 00:58:16 UTC; original experiment, all document
+counts, one AAPL share, spending/configuration hashes and pause were preserved.
+Read-only container root and active service verified. Rollback retained privately.
+
+Receipt: `state/release-6e51d89/receipt.json`. This deploys reviewed non-session,
+partial and funded-reversal benchmark payments and paired-return evidence binding.
+No model calls, order submissions, trial activation or live-money authorization.
