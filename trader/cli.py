@@ -89,6 +89,7 @@ def main(argv=None):
     benchmark_ledger = sub.add_parser("build-benchmark-ledger", help="Offline hypothetical ETF ledger")
     benchmark_ledger.add_argument("--input", required=True)
     benchmark_ledger.add_argument("--output", required=True)
+    benchmark_ledger.add_argument("--capture", help="Validate all marks against a retained raw SIP capture")
     inventory = sub.add_parser("reconcile-paper-marks", help="Offline inventory to common raw marks")
     inventory.add_argument("capture")
     inventory.add_argument("--input", required=True)
@@ -126,7 +127,7 @@ def main(argv=None):
     if args.command == "build-benchmark-ledger":
         from .benchmark import build_file
 
-        print(dumps(build_file(args.input, args.output)))
+        print(dumps(build_file(args.input, args.output, capture=args.capture)))
         return 0
     if args.command == "preview-benchmark-purchase":
         from .benchmark import preview

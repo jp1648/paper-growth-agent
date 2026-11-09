@@ -362,3 +362,97 @@ def test_ledger_direct_and_file_use_same_money_precision(ledger_input, tmp_path)
     source = tmp_path / "source.json"
     source.write_text(json.dumps(d))
     assert build_file(source, tmp_path / "out.json")["balances"] == result["balances"]
+
+
+@pytest.fixture
+def sourced_ledger(ledger_input, tmp_path, monkeypatch):
+    import json
+    from datetime import UTC, datetime
+
+    import httpx
+    from test_price_capture import bars, provider
+
+    from trader.price_capture import capture_prices, validate_prices
+
+    monkeypatch.setattr("trader.price_capture.now", lambda: datetime(2026, 11, 8, tzinfo=UTC))
+    calendar = tmp_path / "calendar.json"
+    calendar.write_text(
+        json.dumps([{"date": d, "open": "09:30", "close": "16:00"} for d in ("2026-10-30", "2026-11-02")])
+    )
+    capture = tmp_path / "capture"
+    capture_prices(
+        provider(lambda req: httpx.Response(200, json={"bars": {"SPY": bars()}, "next_page_token": None})),
+        ["SPY"],
+        calendar,
+        capture,
+    )
+    prices = validate_prices(capture)
+    d = ledger_input
+    d.update(
+        price_manifest_sha256=prices["manifest_sha256"],
+        calendar_sha256=prices["calendar_sha256"],
+        expected_sessions=["2026-10-30", "2026-11-02"],
+    )
+    d["sessions"] = d["sessions"][:2]
+    for row, day, close, price in zip(
+        d["sessions"], d["expected_sessions"], ["20:00", "21:00"], ["100", "101"], strict=True
+    ):
+        row.update(date=day, close=f"{day}T{close}:00Z", mark=price, price_sha256=prices["manifest_sha256"])
+    return capture, d
+
+
+def test_retained_capture_binding_and_cli(sourced_ledger, tmp_path, capsys):
+    import json
+
+    from trader.cli import main
+
+    capture, d = sourced_ledger
+    source = tmp_path / "ledger.json"
+    output = tmp_path / "result.json"
+    source.write_text(json.dumps(d))
+    assert (
+        main(
+            [
+                "build-benchmark-ledger",
+                "--input",
+                str(source),
+                "--output",
+                str(output),
+                "--capture",
+                str(capture),
+            ]
+        )
+        == 0
+    )
+    result = json.loads(output.read_text())
+    assert result["retained_price_binding"]["price_manifest_sha256"] == d["price_manifest_sha256"]
+    assert result["balances"][1]["nav"] == "1008.55"
+    assert result["retained_price_binding"]["request"]["adjustment"] == "raw"
+    assert not result["retained_price_binding"]["source_authenticity_verified"]
+
+
+@pytest.mark.parametrize(
+    "fault", ["mark", "close", "calendar", "manifest", "row_hash", "symbol", "missing_session", "page_tamper"]
+)
+def test_retained_capture_rejects_mismatched_evidence(sourced_ledger, fault):
+    from trader.benchmark import bind_prices
+
+    capture, d = sourced_ledger
+    if fault == "mark":
+        d["sessions"][1]["mark"] = "999"
+    elif fault == "close":
+        d["sessions"][0]["close"] = "2026-10-30T21:00:00Z"
+    elif fault == "calendar":
+        d["calendar_sha256"] = "a" * 64
+    elif fault == "manifest":
+        d["price_manifest_sha256"] = "a" * 64
+    elif fault == "row_hash":
+        d["sessions"][1]["price_sha256"] = "a" * 64
+    elif fault == "symbol":
+        d["symbol"] = "QQQ"
+    elif fault == "missing_session":
+        d["expected_sessions"].pop()
+    else:
+        (capture / "page-001.json").write_text("{}")
+    with pytest.raises(ValueError):
+        bind_prices(capture, d)

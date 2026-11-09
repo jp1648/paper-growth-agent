@@ -269,3 +269,20 @@ and special actions, integrate portfolio/all-cost paired return reporting and
 freeze the opening manifest. Unsupported events currently stop calculation;
 supplied coverage/evidence claims are not independent certification. These explicit
 limits are incomplete trial requirements, not a reduction of the readiness goal.
+
+### Retained mark/calendar binding
+
+Add `--capture PATH` to `build-benchmark-ledger` to validate the entire raw SIP
+capture through `validate_prices` before ledger construction. The input must bind
+price_manifest_sha256 and calendar_sha256, cover its exact complete session list,
+and use each retained close price and broker-calendar closing timestamp (with New
+York DST). Each row's price_sha256 identifies that same complete capture manifest,
+which transitively binds its pages. Mark mismatches, calendar mismatches, unknown
+symbols and tampered source pages fail before output is created. Additional
+symbols in the capture are permitted, but the selected ETF must be complete.
+
+The result records retained_price_binding, request parameters and capture time.
+Without `--capture`, that binding is null and the result remains unbound diagnostic
+arithmetic. Even a valid binding is not independent source authenticity or action
+coverage certification, and cannot by itself activate a trial. Tests exercise the
+real capture validator with retained mock HTTP pages, including the DST boundary.

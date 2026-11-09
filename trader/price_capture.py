@@ -205,6 +205,7 @@ def validate_prices(directory):
         "status": "retained_matrix_validated",
         "manifest_sha256": hashlib.sha256(raw_manifest).hexdigest(),
         "calendar_sha256": manifest["calendar_sha256"],
+        "calendar": json.loads(calendar),
         "params": params,
         "finished_at": manifest["finished_at"],
         "marks": [{"symbol": s, "date": d, "bar": bar} for (s, d), bar in sorted(records.items())],

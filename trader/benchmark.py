@@ -1,6 +1,6 @@
 """Deterministic hypothetical purchases; no broker access or source certification."""
 
-from datetime import date
+from datetime import date, datetime, time
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 from zoneinfo import ZoneInfo
 
@@ -339,7 +339,43 @@ def _build_ledger(document):
     }
 
 
-def build_file(source, output):
+def bind_prices(capture, document):
+    from .price_capture import validate_prices
+
+    prices = validate_prices(capture)
+    if document.get("price_manifest_sha256") != prices["manifest_sha256"]:
+        raise ValueError("Benchmark must bind the exact retained price manifest")
+    if document.get("calendar_sha256") != prices["calendar_sha256"]:
+        raise ValueError("Benchmark calendar hash differs from capture")
+    calendar = prices["calendar"]
+    if document["expected_sessions"] != [r["date"] for r in calendar]:
+        raise ValueError("Benchmark must include the entire captured session matrix")
+    marks = {r["date"]: r["bar"] for r in prices["marks"] if r["symbol"] == document["symbol"]}
+    if set(marks) != set(document["expected_sessions"]):
+        raise ValueError("Benchmark symbol missing from price capture")
+    if len(document["sessions"]) != len(calendar):
+        raise ValueError("Benchmark sessions differ from retained calendar")
+    for row, day in zip(document["sessions"], calendar, strict=True):
+        close = datetime.combine(
+            date.fromisoformat(day["date"]), time.fromisoformat(day["close"]), ZoneInfo("America/New_York")
+        )
+        if (
+            row["date"] != day["date"]
+            or dt(row["close"]) != close
+            or dec(row["mark"]) != dec(marks[day["date"]]["c"])
+            or row["price_sha256"] != prices["manifest_sha256"]
+        ):
+            raise ValueError("Benchmark date, close, mark or source hash differs from retained capture")
+    return {
+        "price_manifest_sha256": prices["manifest_sha256"],
+        "calendar_sha256": prices["calendar_sha256"],
+        "request": prices["params"],
+        "capture_finished_at": prices["finished_at"],
+        "source_authenticity_verified": False,
+    }
+
+
+def build_file(source, output, *, capture=None):
     import hashlib
     import json
     from pathlib import Path
@@ -347,7 +383,10 @@ def build_file(source, output):
     from .models import dumps
 
     raw = Path(source).read_bytes()
-    result = build_ledger(json.loads(raw))
+    document = json.loads(raw)
+    binding = bind_prices(capture, document) if capture is not None else None
+    result = build_ledger(document)
+    result["retained_price_binding"] = binding
     result["input_sha256"] = hashlib.sha256(raw).hexdigest()
     with Path(output).open("x") as stream:
         stream.write(dumps(result) + "\n")
