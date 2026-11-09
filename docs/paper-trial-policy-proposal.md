@@ -359,3 +359,21 @@ acceptance. Comparisons must use the same portfolio series, window and cost
 allocation in the eventual frozen report. Cash comparison remains unsupported
 until its actual account interest/fee terms and economic ledger are supplied;
 an unverified zero yield is not a substitute.
+
+
+### Cross-comparison consistency check
+
+`paper-agent compare-paper-inputs --primary spy-nav.json --secondary qqq-nav.json
+--output comparisons.json` recomputes both descriptive comparisons from the original
+NAV claims and refuses different input versions, currencies, flow policies,
+expected dates, allocation descriptions, opening date/portfolio or daily portfolio
+and flow claims. Portfolio equality includes all supplied evidence and cost fields;
+format differences should be corrected at the source, not tolerated as unexplained
+residuals. SPY and QQQ must occupy their declared primary/secondary positions.
+
+The immutable output retains each exact input hash and recomputed observations and
+performance. Supplied derived performance is ignored. Benchmark source manifests
+and benchmark methods may differ because they describe different ETFs. This is a
+claims-consistency diagnostic, not authenticated source comparison, retained-price
+binding or frozen-study eligibility. Those remain required independently, along
+with the cash comparator. It cannot promote QQQ to primary or approve trading.

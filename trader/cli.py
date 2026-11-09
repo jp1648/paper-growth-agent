@@ -84,6 +84,12 @@ def main(argv=None):
     paper_observations.add_argument("--output", required=True)
     paper_observations.add_argument("--benchmark-input")
     paper_observations.add_argument("--benchmark-capture")
+    paper_comparison = sub.add_parser(
+        "compare-paper-inputs", help="Offline consistency check and recomputed SPY/QQQ comparisons"
+    )
+    paper_comparison.add_argument("--primary", required=True)
+    paper_comparison.add_argument("--secondary", required=True)
+    paper_comparison.add_argument("--output", required=True)
     benchmark = sub.add_parser(
         "preview-benchmark-purchase", help="Offline hypothetical ETF purchase arithmetic"
     )
@@ -150,6 +156,11 @@ def main(argv=None):
             else compare_prices(args.before, args.after)
         )
         print(dumps(result))
+        return 0
+    if args.command == "compare-paper-inputs":
+        from .paper_observations import compare_inputs
+
+        print(dumps(compare_inputs(args.primary, args.secondary, args.output)))
         return 0
     if args.command == "build-paper-observations":
         from .paper_observations import build_file

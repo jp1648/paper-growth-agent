@@ -249,3 +249,87 @@ def test_descriptive_returns_drawdown_and_primary_boundary(document, symbol):
     document["benchmark"] = "CASH"
     with pytest.raises(ValueError, match="SPY or"):
         build_observations(document)
+
+
+def test_combined_comparison_recomputes_and_requires_same_portfolio(document, tmp_path):
+    from trader.paper_observations import compare_inputs
+
+    secondary = copy.deepcopy(document)
+    secondary["benchmark"] = "QQQ"
+    secondary["benchmark_method"] = "Distinct QQQ holdings"
+    secondary["source_manifest_sha256"] = "b" * 64
+    secondary["observations"][-1]["benchmark"] = claim("110")
+    secondary["performance"] = {"net_excess_return": "999"}  # Never trust pasted results.
+    primary_path, secondary_path, output = [tmp_path / name for name in ("spy.json", "qqq.json", "out.json")]
+    primary_path.write_text(json.dumps(document))
+    secondary_path.write_text(json.dumps(secondary))
+    assert (
+        main(
+            [
+                "--config",
+                "absent.toml",
+                "compare-paper-inputs",
+                "--primary",
+                str(primary_path),
+                "--secondary",
+                str(secondary_path),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    result = json.loads(output.read_text())
+    assert result["shared_portfolio_claims_verified"]
+    assert Decimal(result["comparisons"]["QQQ"]["performance"]["net_excess_return"]) == Decimal("-.1")
+    assert result["comparisons"]["SPY"]["performance"]["net_excess_return"] == "0"
+    assert result["comparisons"]["QQQ"]["comparison_role"] == "secondary_descriptive_only"
+    saved = output.read_bytes()
+    with pytest.raises(FileExistsError):
+        compare_inputs(primary_path, secondary_path, output)
+    assert output.read_bytes() == saved
+    with pytest.raises(ValueError, match="order"):
+        compare_inputs(secondary_path, primary_path, tmp_path / "wrong.json")
+    for fault in (
+        "allocation",
+        "opening",
+        "portfolio",
+        "evidence",
+        "cost",
+        "flow_evidence",
+        "version",
+        "window",
+        "opening_date",
+    ):
+        changed = copy.deepcopy(secondary)
+        if fault == "allocation":
+            changed["cost_allocation_method"] = "different"
+        elif fault == "opening":
+            changed["opening"]["portfolio"] = claim("99")
+        elif fault == "portfolio":
+            changed["observations"][-1]["portfolio"] = claim("101")
+        elif fault == "evidence":
+            changed["observations"][-1]["portfolio"]["evidence"] = "another-source"
+        elif fault == "cost":
+            changed["observations"][-1]["portfolio"]["cumulative_external_costs"]["model"]["amount"] = "1"
+        elif fault == "flow_evidence":
+            changed["observations"][-1]["flow_evidence"] = "another-flow-proof"
+        elif fault == "window":
+            changed["expected_sessions"][-1] = "2026-01-07"
+            changed["observations"][-1]["date"] = "2026-01-07"
+        elif fault == "opening_date":
+            changed["opening"]["date"] = "2025-12-31"
+        else:
+            changed["version"] = 2
+            for row in [changed["opening"], *changed["observations"]]:
+                for side in ("portfolio", "benchmark"):
+                    row[side]["accrued_liabilities_not_in_equity"] = {
+                        "amount": "0",
+                        "status": "final",
+                        "evidence": "none",
+                    }
+        secondary_path.write_text(json.dumps(changed))
+        destination = tmp_path / (fault + ".json")
+        with pytest.raises(ValueError, match="different"):
+            compare_inputs(primary_path, secondary_path, destination)
+        assert not destination.exists()

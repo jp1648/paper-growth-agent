@@ -297,3 +297,41 @@ def _bind_benchmark(document, benchmark_document):
         "unpaid_entitlements": ledger["unpaid_entitlements"],
         "source_authenticity_verified": False,
     }
+
+
+def compare_inputs(primary_source, secondary_source, output):
+    """Recompute two comparisons only after their shared portfolio claims match."""
+    raw = [Path(source).read_bytes() for source in (primary_source, secondary_source)]
+    primary, secondary = [json.loads(value) for value in raw]
+    if primary.get("benchmark") != "SPY" or secondary.get("benchmark") != "QQQ":
+        raise ValueError("Require primary SPY and secondary QQQ inputs in that order")
+    results = [build_observations(document) for document in (primary, secondary)]
+    for key in ("version", "currency", "flow_policy", "expected_sessions", "cost_allocation_method"):
+        if primary[key] != secondary[key]:
+            raise ValueError(f"Comparisons have different shared input: {key}")
+    for key in ("date", "portfolio"):
+        if primary["opening"][key] != secondary["opening"][key]:
+            raise ValueError(f"Comparisons have different opening {key}")
+    for left, right in zip(primary["observations"], secondary["observations"], strict=True):
+        for key in ("date", "portfolio", "flow_evidence", "external_deposits", "external_withdrawals"):
+            if left[key] != right[key]:
+                raise ValueError(f"Comparisons have different {key} at {left['date']}")
+    result = {
+        "version": 1,
+        "status": "diagnostic_only",
+        "shared_portfolio_claims_verified": True,
+        "comparisons": {
+            symbol: report | {"input_sha256": hashlib.sha256(value).hexdigest()}
+            for symbol, report, value in zip(("SPY", "QQQ"), results, raw, strict=True)
+        },
+        "limitations": [
+            "Exact supplied portfolio, costs and flow claims match; external source authenticity is not verified.",
+            "Returns are recomputed from NAV inputs; supplied derived outputs are not trusted.",
+            "Separate benchmark source manifests may differ; retained price/ledger binding is still required before acceptance.",
+            "Cash comparison, frozen trial identity and prospective eligibility are not verified here.",
+            "QQQ is descriptive only; neither result authorizes trial activation or live trading.",
+        ],
+    }
+    with Path(output).open("x") as stream:
+        stream.write(json.dumps(result, indent=2, allow_nan=False) + "\n")
+    return result

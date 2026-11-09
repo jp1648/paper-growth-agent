@@ -3298,3 +3298,20 @@ skipped), Ruff clean. Independent review approved exact source hashes after
 No production deployment, provider/model calls, orders or trial activation.
 The combined frozen report must still enforce common portfolio/window/cost inputs
 across baselines; the cash comparator and its verified account terms remain open.
+
+
+### Shared comparator input validation — November 8, 2026 (local)
+
+`compare-paper-inputs` recomputes primary SPY and descriptive QQQ observations and
+requires identical shared portfolio, cost/allocation, opening date, session and
+flow claims, including supplied evidence fields. Pasted performance is ignored;
+output records both original input hashes and refuses overwrite. Different
+benchmark manifests are permitted because benchmark sources differ. This closes
+the arithmetic consistency check only: authenticated sources, retained ledger
+binding, common frozen study identity, cash baseline and trial acceptance remain.
+
+Verification: 966 full offline tests passed, seven opt-in tests skipped; Ruff and
+diff checks passed. Independent review approved exact hashes after 121 focused
+tests, 26 final tests and eight additional mismatch checks. Evidence:
+`state/independent-review-20261108/shared-comparison-review.json`.
+No deployment, paid calls, orders, pause changes or prospective activation.
