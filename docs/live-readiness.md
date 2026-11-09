@@ -17,7 +17,7 @@ readiness. The prospective trial remains `predeclared_not_started`.
 | 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
-| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Draft bundle now integrates retained bindings, study identity and sensitivity inventory; substantiate cash terms, complete costs and independent evidence; finish special-action handling and remaining metrics; resolve the three-symbol/five-symbol mismatch using the [pending scope decision](prospective-scope-decision.md) and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
+| 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Draft bundle now integrates retained bindings, study identity and sensitivity inventory; substantiate cash terms, complete costs and independent evidence; finish special-action handling and remaining metrics; use the [selected research-only scope](prospective-scope-decision.md) and finish its frozen schedule and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
 | 7. Live gate | Separate draft contract and paper-only endpoint boundary remain. | No live account eligibility/settled-funds evidence, capital/exposure release approval or proven investment edge. Explicit account-specific release and approval remain mandatory. |
 
 No automatic trial activation follows from these changes. Safe engineering work
@@ -3595,3 +3595,27 @@ query for November1–10 UTC returned no rows. No zero-cost or final-cost claim.
 The scope and final-context changes are local until a new release receipt confirms
 deployment. Cash-account evidence, funded prospective schedule, independent
 research acceptance and prospective time/information thresholds remain gates.
+
+### November 9 paused release — scope separation and final synthesis
+
+Source `53d8376` is deployed in immutable image
+`sha256:562575c57b38cd8502a6dc9c5622541c1b48873da1f17c0727b5d0e0afcfab6e`.
+CI 42653540178 passed all jobs; local offline suite passed 994 tests (six external
+checks skipped, one paper test deselected). Independent review approved scope
+separation and final-context compaction, with 107 focused tests for the latter.
+The retained request's unchanged-envelope estimate falls from $5.1378275 to
+$4.7565275 including next-call reserve; this is not a newly completed model run.
+
+All 33 Python source hashes matched the running image. Container started
+16:23:44 UTC; broker reconciliation succeeded at 16:24:03 UTC. Experiment,
+document counts, one AAPL paper share, spending and pause were unchanged.
+Configuration changed only by adding PG/CAT research-only entries; the original
+execution universe and $6/day/$5/run caps are unchanged. Read-only root verified.
+Rollback retains prior image configuration, ledger backup and control files;
+rollback now leaves service stopped if the pause precondition is missing.
+Private release receipt: `state/release-53d8376/receipt.json`.
+
+The failed Apple attempt now has a separate hash-bound independent AI semantic
+review. Offline scoring records one reviewed failure, no pending reviews and zero
+accepted decisions. Original recording/results remain unchanged. No additional
+paid research, orders, trial activation or live release occurred.

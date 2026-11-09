@@ -73,3 +73,8 @@ cik = "789019"
 [universe.AMZN]
 sector = "Consumer Discretionary"
 cik = "1018724"
+
+# Optional research coverage with no order eligibility; do not overlap [universe].
+# [research_only_universe.PG]
+# sector = "Consumer Staples"
+# cik = "80424"
