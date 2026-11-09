@@ -223,3 +223,29 @@ four-item narrative limit so supporting sources are not discarded arbitrarily.
 This is an offline retrieval improvement, not a completed forecast, accepted report,
 new paid run or permission to substitute assumptions for missing evidence. Retained
 original cases and Microsoft holdout outputs are not changed or tuned.
+
+### Independent normalization review — historical accuracy versus forecast uncertainty
+
+A further independent check of the retained November9 failure found a factual
+arithmetic error: FY2024 operating asset/liability changes sum to +$3.651bn,
+not the business report's +$8.651bn. The six signed lines are
+-3.788 -1.356 -1.046 -11.731 +6.020 +15.552. FY2025 sums to -$25.000bn.
+The original report remains preserved as failed; the next result must reconcile
+these historical inputs rather than repeat the incorrect sum.
+
+A supported conditional forecast does not require future tax, capex or share
+outcomes to be known as facts. Independent acceptance requires source-verified
+historical starting values, explicit quantified forward assumptions with economic
+rationales, separate sensitivities for material uncertainty, reconciled cash and
+claims without double counting, and conclusions limited to what the scenarios
+support. Unknown historical classification or an unbounded material claim remains
+a gap. Confidence in temporary abstention is not confidence in fair value.
+
+The frozen annual filing supports a $85.904bn CFO-minus-capex-minus-SBC historical
+sensitivity and dated share evidence, not a uniquely demonstrated recurring-tax
+addback. Zero adjustment deltas may represent an explicitly justified repeat-year
+stress convention; they are not default proof of normalized earnings. Separate
+supplemental evidence mentioned in analyst notes must not silently enter the
+frozen annual-only evaluation. A revised report needs independent review against
+all original requirements; this clarification does not accept the failed run or
+remove unresolved-gap BUY/ADD controls.

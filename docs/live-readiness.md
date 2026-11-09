@@ -3641,3 +3641,23 @@ paid investigation, orders or deployment in this step. Deploy only after CI for
 the exact revision passes, preserving pause and the prior release's scope/config.
 Any future model attempt needs a fresh plan binding the changed prompt/source
 hashes; do not reuse the prior reviewed plan or failed stable ID.
+
+### November 9 paused navigation deployment
+
+Reviewed source `088e5be` is deployed in immutable image
+`sha256:42b61a729d9a5db795725b7a33793da6d10a2dab3e88a0c56cae80d98a662189`.
+CI 42686873754 passed backend, dashboard and secret jobs; scoped build
+f365f9d7-796b-403f-b050-d9cf0fb0b758 succeeded. All 33 Python source hashes
+matched both candidate image and running container. Container started 19:52:38
+UTC; fresh broker reconciliation passed at 19:52:45 UTC. Original experiment,
+document counts, one AAPL paper share, configuration, settled spending and pause
+matched before/after. Read-only root verified; rollback is retained. Receipt:
+`state/release-088e5be/receipt.json`.
+
+No paid model run or broker order occurred. Independent economic review clarified
+that conditional forecasts require explicit, justified assumptions and sensitivities,
+not knowledge of future outcomes. It also found the failed business report's
+FY2024 working-capital sum wrong: +$3.651bn, not +$8.651bn. The correction and
+source limits are preserved in `apple-review-remediation.md`; no original result
+or acceptance was rewritten. The next investigation still requires corrected
+historical reconciliation, complete material analysis and independent acceptance.
