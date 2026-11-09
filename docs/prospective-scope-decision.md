@@ -1,6 +1,6 @@
 # Prospective study scope and funding decision — draft
 
-Status: research-only expansion selected under the user’s November 9 delegation; trial not activated.
+Status: research-only expansion selected under the user’s November 9 delegation and explicitly confirmed by the user; trial not activated.
 This resolves feasibility before the opening manifest is frozen. The existing
 protocol remains five distinct reviewed companies, 30 independently reviewed
 completed investigations, ten closed position episodes, and at least 60 regular

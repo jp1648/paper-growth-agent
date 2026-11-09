@@ -5,16 +5,16 @@ approve live activation or real-money orders. Preserve paper experiment/history,
 reservations, current deployment and approved spending limits. Local changes are
 not deployment evidence. Do not claim an investment edge from operational tests.
 
-## Current seven-goal audit — November 8, 2026 (New York)
+## Current seven-goal audit — November 9, 2026 (New York)
 
 This summarizes the requirement ledger and dated evidence below; it is not live
 readiness. The prospective trial remains `predeclared_not_started`.
 
 | Goal | Verified state | Remaining requirement / next action |
 |---|---|---|
-| 1. Costs | 33 model-spend records settled using retained provider evidence. Detailed Google Cloud billing export configured; its table exists but bounded project queries still return no rows. | Authenticate/allocate all operating costs before trial activation. Empty export is not zero cost; Flovia unknown operations remain preserved and blocked. |
-| 2. Release | Paused runtime revision 64ced33 source-verified across 33 Python files; exact-commit CI 42548737133 passed 995 tests/one skipped, 87% branch coverage. Existing Cloud Run dashboard execution panel is deployed and authenticated checks passed. Fresh reconciliation and unchanged experiment/position/configuration/spending/pause verified. | Preserve this release receipt and repeat exact-artifact checks for future changes; deployment is not trial activation. |
-| 3. Research | Independent missing-evidence Apple review approved WATCH/zero; Microsoft source arithmetic reviewed without generating a candidate. Historical-versus-normalized scoring conflict fixed/versioned. | Original sufficient-evidence Apple remains rejected. Need complete normalized, economically supported research with independent semantic review; Microsoft source approval is not research acceptance. Nov8 model spend $4.281305 of $6 leaves insufficient allowance for another full-team attempt. |
+| 1. Costs | Retained model-spend records are settled; November 9 estimated model spend is $3.6508275. Detailed Cloud billing export exists and the project is linked to the matching billing account; its eight exported rows cover older October 13 usage, with zero trader-attributed rows. | Authenticate/allocate all operating costs before trial activation. Missing trader rows are not zero cost; preserve blocked Flovia unknown operations. |
+| 2. Release | Paused runtime 4847027 verified across 33 Python files; both exact-head CI runs passed. Local full suite: 1003 passed, six skipped, one deselected. Fresh startup reconciliation passed; experiment, position, configuration, spending and pause unchanged. Existing authenticated Cloud Run dashboard remains deployed. | Preserve exact-artifact receipts; deployment is not research acceptance or trial activation. |
+| 3. Research | November 9 Apple attempt failed the final-call budget guard; independent semantic review also rejected material coverage and normalization gaps, including a historical sum error. Final-context reduction, paginated filing navigation and exact signed cash-flow sums are now deployed and independently reviewed. | One separately identified Apple development attempt is planned for November 10 or later, with fresh funding/ledger checks, $5 run/$6 daily ceilings and independent outcome review. No further paid retry November 9. Microsoft holdout remains ungenerated. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
 | 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Draft bundle now integrates retained bindings, study identity and sensitivity inventory; substantiate cash terms, complete costs and independent evidence; finish special-action handling and remaining metrics; use the [selected research-only scope](prospective-scope-decision.md) and finish its frozen schedule and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
@@ -3675,3 +3675,31 @@ review approved exact hashes after 129 tests; full offline suite passed 1003 tes
 Review: `state/validation-20261109/cash-flow-sum-review.json`. No new provider call,
 trade or deployment occurred in this step. CI, paused release verification and a
 fresh reviewed source/prompt-bound later-day plan precede any paid validation.
+
+## November 9: signed cash-flow arithmetic release and confirmed research scope
+
+User explicitly confirmed research coverage AAPL/MSFT/AMZN/PG/CAT, while order
+eligibility remains AAPL/MSFT/AMZN. Trading remains paused; no trial activation.
+The exact signed-sum tool preserves original citation identifiers and rejects
+unknown citations, malformed amounts and future periods. It verifies arithmetic,
+not economic classification or normalization. Conditional forecast guidance does
+not relax the independent investment-research acceptance requirements.
+
+Source `4847027fa2209dd640bfe80f80c5d076815c8b85` passed CI runs
+42688361478 and 42688349225. Cloud Build
+`1bd52c71-c4de-46a8-b6db-0a14097195c4` produced digest
+`sha256:b51bb736811f139f4b73830078466c473a5351dcca2806876be9bc6ea37c918d`.
+All 33 running Python sources matched; root filesystem is read-only. Startup at
+20:03:20 UTC was followed by successful reconciliation at 20:03:27 UTC. Original
+experiment, document counts, AAPL paper quantity one, spending digest, configuration
+and pause were preserved. Receipt: `state/release-4847027/receipt.json`.
+
+The independently reviewed next-day plan is
+`state/evaluations/planned-apple-coverage-20261110/manifest.json`, stable ID
+`annual-coverage-v3-dev-20261110-1`. Its separate runtime binding records this
+release; fresh launch preflight, funding and unused-ID checks remain mandatory.
+No reservation or paid model call was made during this release.
+
+Read-only billing diagnosis found eight export rows, all older October 13 usage,
+and no trader-attributed or unattributed rows. Billing linkage matches the export
+account. This establishes incomplete cost evidence, not zero infrastructure cost.
