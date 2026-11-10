@@ -4351,3 +4351,36 @@ opening approval remain separate. A read-only paper broker snapshot at
 2026-11-10T04:36:28Z reports cash99655.66, one AAPL share at344.33 average entry,
 zero open orders and next regular open2026-11-10T09:30:00-05:00. It is preopening
 evidence, not an opening-close valuation or a new fill.
+
+### Microsoft holdout failure and correction-dispatch repair
+
+The untouched Microsoft pair finished with zero accepted/two reviewed failures,
+$4.3975025 settled estimates and zero unknown charges. Both stopped before final
+Decision: the complete case's next lead reservation exceeded$5 after corrected
+valuation; the missing-evidence case inherited only the cohort's remaining
+allowance. Missing-source abstention reasoning was sound, but no final output
+means failed completion. Original results and case labels remain preserved;
+Microsoft is now observed and cannot be presented as a new unseen validation.
+
+The reviewed cash matrix release73a4d44 is deployed,37 source hashes verified,
+with original configuration/pause/spend/experiment/history preserved. Fresh
+04:44UTC readback shows reconciliation and monitoring current, no breached loss
+limit, and AAPL's held-position review still overdue. Remaining installed funding
+allocation is$19.0012625, with unchanged buffer/baseline/expiry.
+
+A generic offline correction repair now uses the same guarded deterministic
+specialist dispatch as the initial phase: one explicit lead-authorized correction,
+original report snapshots retained, required downstream reports and fresh critique
+rebuilt in order, then substantive lead judgment. Every delegation remains metered;
+no budget, quota or evidence gate is relaxed. The full-graph regression requires
+two lead model calls and seven delegated tasks for its three-role correction,
+instead of lead routing calls between known prerequisites. Failed evaluation
+records also retain local ResearchLimit details without copying arbitrary provider
+exception text.139 focused tests pass; independent review and real validation
+remain pending. A new independent unseen cohort is being frozen before generation.
+
+Independent code review found no concrete blocker in deterministic correction
+dispatch or local limit diagnostics. Shared counters, outside-lock dispatch,
+partial-error propagation, fresh-critique validation and original audits remain.
+Full suite1183 passed,7 skipped. This is offline evidence; the observed Microsoft
+failure is not converted into a passing or unseen result.

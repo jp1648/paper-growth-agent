@@ -1270,7 +1270,7 @@ class ResearchDesk:
     def correction_tool(self):
         @tool
         def request_correction(role: str, report_sha256: str, reason: str) -> dict:
-            """Request the investigation's one correction cycle after all reports. Name business, catalysts or valuation, its current report hash, and the specific material defect. Re-delegate invalidated reports in order; a fresh critique is required. No budget is reset."""
+            """Request the investigation's one correction cycle after all reports. Name business, catalysts or valuation, its current report hash, and the specific material defect. Rebuild invalidated reports in fixed prerequisite order, including a fresh critique. No budget is reset."""
             with self.lock:
                 if (
                     self.correction is not None
@@ -1326,24 +1326,24 @@ class ResearchDesk:
                     self.report_dependencies.pop(name, None)
                     if name in self.reused:
                         self.reused.remove(name)
-                return {
-                    "invalidated": invalidated,
-                    "tool_allocations": allocations,
-                    "instruction": "Re-delegate these reports in order. Original reports remain audited; remaining shared budgets still apply.",
-                }
+            self.dispatch_roles(invalidated, "correction")
+            return {
+                "invalidated": invalidated,
+                "tool_allocations": allocations,
+                "instruction": "Required corrected reports and fresh critique are rebuilt. Review their reasoning before deciding; rebuilding is not acceptance. Original reports remain audited; remaining shared budgets still apply.",
+            }
 
         request_correction.handle_tool_error = True
         return request_correction
 
-    def run(self):
+    def dispatch_roles(self, order, phase):
         # Prerequisites are fixed; reserve model reasoning for research and the final decision.
         dispatch = Guard(self.budget, "research_lead", {"task"}, self.reports)
-        order = ("catalysts", "business", "valuation", "adversarial") if self.targeted else tuple(ROLES)
         for role in order:
             request = ToolCallRequest(
                 tool_call={
                     "name": "task",
-                    "id": f"initial-{role}",
+                    "id": f"{phase}-{role}",
                     "args": {
                         "subagent_type": role,
                         "description": "Complete your assigned research using original evidence and the available prior reports.",
@@ -1364,6 +1364,12 @@ class ResearchDesk:
                     tool_call_id=req.tool_call["id"],
                 ),
             )
+        if any(role not in self.reports for role in order):
+            raise ValueError(f"{phase.capitalize()} research omitted a required specialist")
+
+    def run(self):
+        order = ("catalysts", "business", "valuation", "adversarial") if self.targeted else tuple(ROLES)
+        self.dispatch_roles(order, "initial")
         if set(self.reports) != set(ROLES):
             raise ValueError("Initial research omitted a required specialist")
         subagents = [
@@ -1379,7 +1385,7 @@ class ResearchDesk:
             Decision,
             "You are the research lead and portfolio manager. The required initial specialist reports are complete. "
             "Review their reasoning and contrary evidence before your final decision. "
-            "If the completed critique exposes a material correctable defect, use request_correction once with the current report hash and a specific reason, then re-delegate invalidated specialists. This uses only remaining budgets. Otherwise finalize honestly; never treat unresolved gaps as resolved. "
+            "If the completed critique exposes a material correctable defect, use request_correction once with the current report hash and a specific reason. It rebuilds the required specialists and fresh critique in prerequisite order. Review those corrected reports before finalizing. This uses only remaining budgets. Otherwise finalize honestly; never treat unresolved gaps as resolved. "
             "Use your assigned auxiliary planning/source allowance when enforced; reserve delegation for all four specialists. Delegate evidence gaps rather than browsing exhaustively yourself. Compare with existing holdings and cash, resolve conflicts, "
             "then propose BUY/ADD/HOLD/REDUCE/SELL/WATCH. The critique is mandatory. Use quantity zero for "
             "HOLD/WATCH and numeric limit_price zero (never N/A). Use holding_period_days zero for WATCH when no holding is proposed; other actions require 1–730 days. Keep the final decision concise (under 600 words), including at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Use whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "

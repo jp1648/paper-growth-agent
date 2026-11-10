@@ -16,6 +16,32 @@ def inputs():
     return suite, recording
 
 
+def test_limit_diagnostic_survives_recording_without_inventing_a_decision(tmp_path, monkeypatch):
+    from trader.config import Settings
+    from trader.evaluation import run_case
+    from trader.research_team import ResearchDesk, ResearchLimit
+    from trader.store import Store
+
+    case = inputs()[0]["cases"][0]
+    message = "Research model-call, context or estimated cost limit reached: role=research_lead, estimated_total_with_next_call=5.8/5"
+
+    def stopped(self):
+        raise ResearchLimit(message)
+
+    monkeypatch.setattr(ResearchDesk, "run", stopped)
+    cfg = Settings(database=str(tmp_path / "ledger.sqlite"))
+    store = Store(cfg.database)
+    try:
+        result = run_case(cfg, store, case, None, "diagnostic-only")
+        assert result["failure_category"] == "ResearchLimit"
+        assert result["limit_detail"] == message
+        assert result["decision"] is None
+        assert result["metrics"]["model_calls"] == 0
+        assert store.get("diagnostic-only", "evaluation_case")["limit_detail"] == message
+    finally:
+        store.db.close()
+
+
 def test_frozen_suite_has_development_holdout_and_all_required_cases():
     suite, recording = inputs()
     assert len(suite["cases"]) == 16

@@ -459,7 +459,7 @@ def run_case(cfg, store, case, model, run_key):
 
     from .models import dumps
     from .observability import span
-    from .research_team import Budget, ResearchDesk
+    from .research_team import Budget, ResearchDesk, ResearchLimit
 
     provider = FrozenEvidence(case)
     context = {
@@ -479,12 +479,14 @@ def run_case(cfg, store, case, model, run_key):
         cfg, provider, context, provider.get(context["symbol"]), budget, model, evaluation_at=case["cutoff"]
     )
     start = time.monotonic()
-    output, error = None, None
+    output, error, limit_detail = None, None, None
     try:
         with span("evaluation.case", {"run_key": run_key, "case_id": case["id"]}, store.scope) as traced:
             output = desk.run()
             traced["output"] = output
     except Exception as exc:  # noqa: BLE001 - record failed cases and continue the evaluation cohort
+        if isinstance(exc, ResearchLimit):
+            limit_detail = str(exc)
         if "cited unknown evidence" in str(exc):
             error = "unknown_citation"
         elif "Timeout" in type(exc).__name__:
@@ -551,6 +553,7 @@ def run_case(cfg, store, case, model, run_key):
         "metrics": metrics,
         "stages": stages,
         "failure_category": error,
+        "limit_detail": limit_detail,
         "events": events,
         "sources": list(desk.sources.values()),
         "inputs_hash": fingerprint(model_inputs(case)),

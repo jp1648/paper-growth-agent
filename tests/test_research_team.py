@@ -1738,7 +1738,7 @@ def test_larger_configured_tool_pool_reaches_specialists_with_lead_reserve():
     assert guard.lead_allowance == 4
 
 
-def test_correction_invalidates_dependents_preserves_originals_and_rejects_replay():
+def test_correction_invalidates_dependents_preserves_originals_and_rejects_replay(monkeypatch):
     import copy
     import hashlib
 
@@ -1754,6 +1754,7 @@ def test_correction_invalidates_dependents_preserves_originals_and_rejects_repla
     desk.report_times = {name: now().isoformat() for name in ROLES}
     desk.calculations["original"] = {"value": "retained"}
     before = copy.deepcopy(desk.reports)
+    monkeypatch.setattr(desk, "dispatch_roles", lambda order, phase: None)
     tool = desk.correction_tool()
     assert isinstance(
         tool.invoke({"role": "business", "report_sha256": "stale", "reason": "Missing concentration"}), str
@@ -1806,7 +1807,7 @@ def test_recreated_guard_does_not_reset_role_tool_allowance():
 @pytest.mark.parametrize(
     "spent,expected", [(48, {"valuation": 7, "adversarial": 7}), (62, {"valuation": 0, "adversarial": 0})]
 )
-def test_correction_reallocates_only_remaining_shared_tools(spent, expected):
+def test_correction_reallocates_only_remaining_shared_tools(spent, expected, monkeypatch):
     import hashlib
     from types import SimpleNamespace
 
@@ -1823,6 +1824,7 @@ def test_correction_reallocates_only_remaining_shared_tools(spent, expected):
     )
     desk.reports = {name: {"value": name} for name in ROLES}
     original_guard = Guard(budget, "valuation", {"read_source"})
+    monkeypatch.setattr(desk, "dispatch_roles", lambda order, phase: None)
     result = desk.correction_tool().invoke(
         {
             "role": "valuation",
@@ -1902,16 +1904,11 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
                         },
                     )
                     self._phase = 1
-                elif 1 <= self._phase <= 3:
-                    role = ["business", "valuation", "adversarial"][self._phase - 1]
-                    request = (
-                        "task",
-                        {"subagent_type": role, "description": "Address concentration correction"},
-                    )
-                    self._phase += 1
-                elif self._phase == 4:
+                elif self._phase == 1:
                     assert not kwargs["tools"]
                     assert context["correction_valuation_provenance"]["calculation_inputs_unchanged"] is True
+                    assert set(context["reports"]) == {"business", "catalysts", "valuation", "adversarial"}
+                    self._phase = 2
                 if request:
                     message = AIMessage(
                         content="",
@@ -1932,7 +1929,11 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
     research.model = CorrectingLead(decision=original.decision)
     result = build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "correct-once"})
     assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
-    assert research.model._phase == 4
+    assert research.model._phase == 2
+    costs = [event["body"] for event in env[0].store.events("model_cost")]
+    assert sum(cost["stage"] == "research_lead" for cost in costs) == 2
+    delegations = [event["body"] for event in env[0].store.events("research_tool_result")]
+    assert sum(call["name"] == "task" and call["role"] == "research_lead" for call in delegations) == 7
 
 
 def test_decimal_product_is_exact_audited_and_not_primary_evidence():
