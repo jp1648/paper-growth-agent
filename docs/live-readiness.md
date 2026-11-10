@@ -4000,3 +4000,22 @@ but only four of six known successful Astra calls and no timed-out call. Provide
 usage remains incomplete; no unknown-cost settlement or new paid retry occurred.
 An unanswered user question about whether API credits are shared remains relevant
 to autonomous allocation; do not infer account exclusivity from the local ledger.
+
+### November 9 bounded unattended funding capability
+
+Added the independently reviewed optional allocation path in `funding_gate`.
+The default 30-minute/unchanged-ledger rule remains. Explicit allocations require
+fresh initial approval, valid evidence references, account/project binding,
+exclusive-account-use evidence, expiry covering the entire maximum run, the $10
+buffer, and an immutable complete settled baseline. Every subsequent global
+settled cost or active reservation counts against the allocation. Unknown costs
+and malformed/mutated baseline records block new work. Reservation checks remain
+inside the existing SQLite write transaction; simultaneous connections were tested
+against both allocation and daily limits. No receipt was installed and no account
+exclusivity was assumed. The user question about shared API usage remains pending.
+
+Full offline suite: **1129 passed, 7 skipped**; Ruff and diff checks pass.
+Independent review approved this code capability, not funding or activation.
+Operational schema and preserved-history limitations are in `docs/always-on.md`.
+This change is not deployed yet. The existing $20 unknown hold is unchanged;
+research acceptance, held-position review and study activation remain incomplete.

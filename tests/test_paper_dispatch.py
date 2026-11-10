@@ -346,3 +346,177 @@ def test_graph_requires_durable_matching_claim_and_consumes_invocation_once(env,
         assert model.calls == 1
         assert len(service.store.items("paper_invocation")) == 1
     assert broker.submits == 0
+
+
+@pytest.fixture
+def allocated_runtime(runtime):
+    runner, _, _, _, funding = runtime
+    funding.update(account_id="fixture-account", project_id="fixture-project", evidence_sha256="a" * 64)
+    funding["allocation"] = {
+        "status": "operator_approved",
+        "approved_by": "fixture-only",
+        "approved_at": AT.isoformat(),
+        "valid_until": (AT + timedelta(days=2)).isoformat(),
+        "account_id": funding["account_id"],
+        "project_id": funding["project_id"],
+        "exclusive_account_use_evidence_sha256": "b" * 64,
+        "funding_evidence_sha256": funding["evidence_sha256"],
+        "spending_baseline": {},
+        "usd": "15",
+    }
+    runner.store.put("confirmed", funding, "research_funding", scope="global")
+    return runtime
+
+
+def test_allocation_survives_settlement_and_subtracts_all_experiments(allocated_runtime):
+    from trader.paper_dispatch import funding_gate
+
+    runner, _, _, _, _ = allocated_runtime
+    later = AT + timedelta(days=1)
+    # Current receipt would have expired under the legacy 30-minute path.
+    assert funding_gate(runner.store, runner.cfg, later) is None
+    runner.store.put(
+        "other-experiment",
+        {"day": AT.date().isoformat(), "usd": "8", "status": "reserved"},
+        "research_spend",
+        scope="global",
+    )
+    assert funding_gate(runner.store, runner.cfg, later) is None
+    runner.store.put(
+        "testing",
+        {"day": AT.date().isoformat(), "usd": "3", "status": "settled", "testing_budget_override": True},
+        "research_spend",
+        scope="global",
+    )
+    assert "cannot fund" in funding_gate(runner.store, runner.cfg, later)
+    # Settlement replaces the cap in the same record; never charge both.
+    runner.store.put(
+        "other-experiment",
+        {"day": AT.date().isoformat(), "usd": "2", "status": "settled"},
+        "research_spend",
+        scope="global",
+    )
+    assert funding_gate(runner.store, runner.cfg, later) is None
+    runner.store.put(
+        "testing",
+        {"day": AT.date().isoformat(), "usd": "3", "status": "unknown"},
+        "research_spend",
+        scope="global",
+    )
+    assert funding_gate(runner.store, runner.cfg, later) == "unresolved model charge"
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "exclusive",
+        "account",
+        "future_approval",
+        "stale_approval",
+        "expiry",
+        "overallocate",
+        "negative",
+        "nan",
+        "malformed",
+        "baseline_deleted",
+        "baseline_changed",
+        "pending_renewal",
+        "malformed_id",
+        "malformed_hash",
+        "blank_approver",
+    ],
+)
+def test_allocations_reject_invalid_approval_or_ledger(allocated_runtime, fault):
+    from trader.paper_dispatch import funding_gate
+
+    runner, _, _, _, funding = allocated_runtime
+    a = funding["allocation"]
+    if fault == "malformed_id":
+        a["account_id"] = funding["account_id"] = 123
+    elif fault == "malformed_hash":
+        a["exclusive_account_use_evidence_sha256"] = "not-a-hash"
+    elif fault == "blank_approver":
+        a["approved_by"] = " "
+    elif fault == "exclusive":
+        a.pop("exclusive_account_use_evidence_sha256")
+    elif fault == "account":
+        a["account_id"] = "wrong"
+    elif fault == "future_approval":
+        a["approved_at"] = (AT + timedelta(seconds=1)).isoformat()
+    elif fault == "stale_approval":
+        funding["observed_at"] = (AT - timedelta(minutes=31)).isoformat()
+    elif fault == "expiry":
+        a["valid_until"] = (AT + timedelta(seconds=runner.cfg.research_max_seconds)).isoformat()
+    elif fault == "overallocate":
+        a["usd"] = "91"
+    elif fault in {"negative", "nan"}:
+        a["usd"] = "-1" if fault == "negative" else "NaN"
+    elif fault == "malformed":
+        a["spending_baseline"] = []
+    else:
+        runner.store.put(
+            "baseline",
+            {
+                "day": AT.date().isoformat(),
+                "status": "reserved" if fault == "pending_renewal" else "settled",
+                "usd": "1",
+            },
+            "research_spend",
+            scope="global",
+        )
+        records = list(
+            runner.store.db.execute(
+                "SELECT key,body FROM documents WHERE scope='global' AND kind='research_spend' ORDER BY key"
+            )
+        )
+        a["spending_baseline"] = dict(records)
+        funding["spending_sha256"] = fingerprint(records)
+        if fault == "baseline_deleted":
+            runner.store.db.execute("DELETE FROM documents WHERE scope='global' AND kind='research_spend'")
+        elif fault == "baseline_changed":
+            runner.store.put(
+                "baseline",
+                {"day": AT.date().isoformat(), "status": "settled", "usd": "0"},
+                "research_spend",
+                scope="global",
+            )
+    runner.store.put("confirmed", funding, "research_funding", scope="global")
+    assert funding_gate(runner.store, runner.cfg, AT) is not None
+
+
+@pytest.mark.parametrize("allocation_usd,daily_limit", [("5", "20"), ("15", "6")])
+def test_concurrent_reservations_obey_allocation_and_daily_caps(
+    allocated_runtime, monkeypatch, allocation_usd, daily_limit
+):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    from trader.spending import DailyBudgetExceeded, DailyReservation
+    from trader.store import Store
+
+    runner, study, _, _, funding = allocated_runtime
+    monkeypatch.setattr("trader.spending.now", lambda: AT)
+    runner.cfg.research_daily_cost_usd = dec(daily_limit)
+    funding["allocation"]["usd"] = allocation_usd
+    runner.store.put("confirmed", funding, "research_funding", scope="global")
+    runner.store.put("active", study, "paper_study")
+    barrier = Barrier(2)
+
+    def reserve(index):
+        other = Store(runner.store.path)
+        try:
+            barrier.wait(timeout=5)
+            try:
+                DailyReservation(other, runner.cfg, f"concurrent-{index}")
+                return True
+            except DailyBudgetExceeded:
+                return False
+        finally:
+            other.db.close()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(reserve, [1, 2])) == [False, True]
+    rows = runner.store.db.execute(
+        "SELECT body FROM documents WHERE scope='global' AND kind='research_spend'"
+    ).fetchall()
+    assert len(rows) == 1 and dec(json.loads(rows[0][0])["usd"]) == 5

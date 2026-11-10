@@ -1,7 +1,10 @@
 """Dispatch an explicitly approved study; absence of approval never enables it."""
 
 import hashlib
+import json
+import re
 from datetime import timedelta
+from decimal import DecimalException
 from pathlib import Path
 
 from .lifecycle import effective_end
@@ -23,12 +26,22 @@ def source_fingerprint():
 
 
 def funding_gate(store, cfg, current):
+    try:
+        return _funding_gate(store, cfg, current)
+    except (KeyError, TypeError, ValueError, AttributeError, DecimalException):
+        return "malformed funding evidence or spending ledger"
+
+
+def _funding_gate(store, cfg, current):
     funding = store.get("confirmed", "research_funding", scope="global")
     if not funding or funding.get("basis") != "provider_confirmed_available_credit":
         return "fresh provider credit evidence required"
     if not funding.get("evidence_sha256") or not funding.get("verified_by"):
         return "funding evidence identity missing"
-    if not timedelta(0) <= current - dt(funding["observed_at"]) <= timedelta(minutes=30):
+    allocation = funding.get("allocation")
+    if allocation is None and not timedelta(0) <= current - dt(funding["observed_at"]) <= timedelta(
+        minutes=30
+    ):
         return "funding evidence stale or future-dated"
     if dt(funding["expires_at"]) <= current + timedelta(seconds=cfg.research_max_seconds):
         return "funding expires before bounded run can finish"
@@ -37,13 +50,76 @@ def funding_gate(store, cfg, current):
             "SELECT key,body FROM documents WHERE scope='global' AND kind='research_spend' ORDER BY key"
         )
     )
-    if fingerprint(records) != funding["spending_sha256"]:
+    if allocation is None and fingerprint(records) != funding["spending_sha256"]:
         return "spending changed since funding verification"
-    import json
-
-    if any(json.loads(body).get("status") != "settled" for _, body in records):
+    allowed_status = {"settled", "reserved"} if allocation is not None else {"settled"}
+    if any(
+        json.loads(body).get("status") not in allowed_status or json.loads(body).get("unknown_total")
+        for _, body in records
+    ):
         return "unresolved model charge"
-    if dec(funding["available_usd"]) - dec(funding["buffer_usd"]) < cfg.research_max_cost_usd:
+    available = dec(funding["available_usd"]) - dec(funding["buffer_usd"])
+    if allocation is not None:
+        identities = [
+            funding.get("verified_by"),
+            funding.get("account_id"),
+            funding.get("project_id"),
+            allocation.get("approved_by"),
+            allocation.get("account_id"),
+            allocation.get("project_id"),
+        ]
+        evidence = [
+            funding.get("evidence_sha256"),
+            allocation.get("funding_evidence_sha256"),
+            allocation.get("exclusive_account_use_evidence_sha256"),
+        ]
+        if any(not isinstance(v, str) or not v.strip() for v in identities) or any(
+            not isinstance(v, str) or re.fullmatch(r"[0-9a-f]{64}", v) is None for v in evidence
+        ):
+            return "allocation evidence or identity malformed"
+        observed, approved = dt(funding["observed_at"]), dt(allocation["approved_at"])
+        valid_until = dt(allocation["valid_until"])
+        if not observed <= approved <= min(current, observed + timedelta(minutes=30)):
+            return "allocation was not approved against fresh provider evidence"
+        if (
+            not current + timedelta(seconds=cfg.research_max_seconds)
+            < valid_until
+            <= dt(funding["expires_at"])
+        ):
+            return "allocation cannot fund the entire bounded run"
+        if (
+            allocation.get("status") != "operator_approved"
+            or not allocation.get("approved_by")
+            or not allocation.get("exclusive_account_use_evidence_sha256")
+            or allocation.get("funding_evidence_sha256") != funding["evidence_sha256"]
+            or not funding.get("account_id")
+            or not funding.get("project_id")
+            or allocation.get("account_id") != funding["account_id"]
+            or allocation.get("project_id") != funding["project_id"]
+        ):
+            return "allocation identity or exclusive-account approval missing"
+        baseline = allocation["spending_baseline"]
+        if fingerprint(sorted(baseline.items())) != funding["spending_sha256"]:
+            return "allocation baseline differs from provider verification"
+        current_records = dict(records)
+        if any(
+            current_records.get(key) != body or json.loads(body).get("status") != "settled"
+            for key, body in baseline.items()
+        ):
+            return "allocation baseline changed or was not settled"
+        allocated = dec(allocation["usd"])
+        if not 0 < allocated <= available:
+            return "allocation exceeds confirmed credit after buffer"
+        subsequent = dec(0)
+        # shortcut: subsequent charges rely on preserved ledger history; attest append-only writes before adding external ledger writers.
+        for key, body in records:
+            amount = dec(json.loads(body)["usd"])
+            if amount < 0:
+                return "negative model spending requires reconciliation"
+            if key not in baseline:
+                subsequent += amount
+        available = allocated - subsequent
+    if available < cfg.research_max_cost_usd:
         return "confirmed credit cannot fund full capped run and buffer"
     if dec(funding["buffer_usd"]) < 10:
         return "funding buffer below reviewed minimum"
