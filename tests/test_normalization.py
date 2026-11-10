@@ -9,6 +9,7 @@ from test_research_team import Evidence
 from trader.config import Settings
 from trader.evaluation import score
 from trader.financials import MissingAnnualFact, normalized_cash_flow
+from trader.models import dec
 from trader.research_team import Budget, ResearchDesk, Valuation
 
 
@@ -161,8 +162,9 @@ def test_invalid_normalization_is_not_a_supported_value(normalization, fault):
 
 
 @pytest.mark.parametrize("explicit_compensation", [False, True])
+@pytest.mark.parametrize("financial_reinvestment", [False, True])
 def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
-    normalization, explicit_compensation
+    normalization, explicit_compensation, financial_reinvestment
 ):
     desk, source, bridge = normalization
     if explicit_compensation:
@@ -174,6 +176,17 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
         }
     per_share = "5.312500" if explicit_compensation else "5.562500"
     present_value = "4.83" if explicit_compensation else "5.06"
+    if financial_reinvestment:
+        bridge["adjustments"].append(
+            {
+                "category": "financial_asset_reinvestment",
+                "annual_delta_usd": "-40",
+                "rationale": "Synthetic incremental lending cash deployment outside consolidated CFO/PPE; no funding netting",
+                "evidence_ids": ["assumptions"],
+            }
+        )
+        per_share = "4.812500" if explicit_compensation else "5.062500"
+        present_value = "4.38" if explicit_compensation else "4.60"
     tools = {t.name: t for t in desk.tools()}
     args = {
         "financial_source_id": source["id"],
@@ -207,6 +220,11 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
     valuation.update({key: calc[key] for key in ("calculation_id", "bear_value", "base_value", "bull_value")})
     candidate["calculations"] = {calc["calculation_id"]: calc}
     assert score(case, candidate)["acceptance"] == "pending_human_review"
+    if financial_reinvestment:
+        calc["inputs"]["normalization_bridge"]["adjustments"][-1]["annual_delta_usd"] = "-41"
+        assert "unverified_financial_provenance" in score(case, candidate)["failures"]
+        calc["inputs"]["normalization_bridge"]["adjustments"][-1]["annual_delta_usd"] = "-40"
+        assert score(case, candidate)["acceptance"] == "pending_human_review"
     # The baseline stays frozen even when a supported bridge changes forecast input.
     case["expected"]["cash_flow_per_share"] = per_share
     assert "unsupported_cash_flow_input" in score(case, candidate)["failures"]
@@ -428,3 +446,73 @@ def test_existing_canonical_calculation_and_diagnostic_payloads_are_byte_stable(
     )
     assert "compensation_source_tag" not in normalized["assumptions"]
     assert "allocated_compensation_expense_fact" not in diagnostic
+
+
+@pytest.mark.parametrize("amount,expected", [("-40", "405"), ("20", "465"), ("0", "445")])
+def test_optional_financial_reinvestment_is_incremental_signed_and_once(normalization, amount, expected):
+    desk, source, bridge = normalization
+    before = copy.deepcopy((source, bridge))
+    legacy = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    bridge["adjustments"].append(
+        {
+            "category": "financial_asset_reinvestment",
+            "annual_delta_usd": amount,
+            "rationale": "Consolidated net lending deployment/release outside the starting CFO/PPE baseline; reconcile operating reclassifications, no lease/funding overlap",
+            "evidence_ids": ["assumptions"],
+        }
+    )
+    result = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    assert result["bridge_version"] == 3
+    assert result["financial_asset_reinvestment_usd"] == amount
+    assert result["bridged_equity_cash_flow_usd"] == expected
+    assert dec(result["adjustments_total_usd"]) == dec(legacy["adjustments_total_usd"]) + dec(amount)
+    assert result["historical_provenance"] == legacy["historical_provenance"]
+    bridge["adjustments"][3]["annual_delta_usd"] = "10"
+    bridge["adjustments"][3]["rationale"] = "Separate net debt funding assumption, not lending income"
+    with_funding = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    assert dec(with_funding["bridged_equity_cash_flow_usd"]) == dec(expected) + 10
+    assert source == before[0]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "duplicate",
+        "missing_core",
+        "unknown_category",
+        "missing_evidence",
+        "future_evidence",
+        "blank_rationale",
+        "nonfinite",
+    ],
+)
+def test_financial_reinvestment_keeps_category_and_source_guards(normalization, fault):
+    desk, source, bridge = normalization
+    row = {
+        "category": "financial_asset_reinvestment",
+        "annual_delta_usd": "-40",
+        "rationale": "Synthetic additional consolidated lending investment, outside baseline",
+        "evidence_ids": ["finance-assumptions"],
+    }
+    desk.sources["finance-assumptions"] = {
+        "id": "finance-assumptions",
+        "source": "SEC EDGAR filing passage",
+        "content": "Synthetic consolidated cash lending deployment, not source valuation endorsement",
+    }
+    bridge["adjustments"].append(row)
+    if fault == "duplicate":
+        bridge["adjustments"].append(copy.deepcopy(row))
+    elif fault == "missing_core":
+        bridge["adjustments"].pop(0)
+    elif fault == "unknown_category":
+        row["category"] = "finance_debt_income"
+    elif fault == "missing_evidence":
+        row["evidence_ids"] = ["unknown-evidence"]
+    elif fault == "future_evidence":
+        desk.sources["finance-assumptions"]["available_at"] = "2027-01-01T00:00:00Z"
+    elif fault == "blank_rationale":
+        row["rationale"] = " "
+    else:
+        row["annual_delta_usd"] = "NaN"
+    with pytest.raises(ValueError):
+        normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
