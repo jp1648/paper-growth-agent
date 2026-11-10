@@ -10,7 +10,12 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from .financials import annual_cash_flow, normalization_supported, normalized_cash_flow
+from .financials import (
+    annual_cash_flow,
+    capital_expenditure_selection,
+    normalization_supported,
+    normalized_cash_flow,
+)
 from .models import Decision
 from .research_team import Catalysts, Critique, Research, Valuation
 
@@ -173,9 +178,18 @@ def score(case, candidate, review=None):
             try:
                 inputs = calc["inputs"]
                 source_id = inputs["financial_source_id"]
-                provenance = annual_cash_flow(
-                    originals[source_id], inputs["financial_period_end"], timestamp(case["cutoff"])
+                capex_source = capital_expenditure_selection(
+                    inputs.get("capital_expenditure_source"), inputs.get("normalization_bridge")
                 )
+                provenance = annual_cash_flow(
+                    originals[source_id],
+                    inputs["financial_period_end"],
+                    timestamp(case["cutoff"]),
+                    capex_source,
+                    verified_sources,
+                )
+                if capex_source and not set(capex_source["evidence_ids"]).issubset(valuation["evidence_ids"]):
+                    failures.append("unverified_capital_expenditure_evidence")
                 bridge = None
                 if inputs.get("normalization_bridge") is not None:
                     bridge = normalized_cash_flow(

@@ -136,3 +136,18 @@ context; the diagnostic does not automatically schedule a correction or guarante
 that remaining capacity is spent on repair. Missing evidence may still produce honest WATCH/abstention. Frozen
 replay candidates, original-case economics and the v8 scoring rubric are unchanged;
 this is a runtime diagnostic and execution gate, not a new economic score.
+
+An explicit `capital_expenditure_source` may select the original
+`PaymentsToAcquireProductiveAssets` fact when its cited SEC filing passage and
+rationale identify the cash-purchase line. The default remains
+`PaymentsToAcquirePropertyPlantAndEquipment`; no automatic alias or fallback is
+used. Original taxonomy, USD annual period, accession, filing basis and supporting
+passage are retained. The same selection must reach the historical proxy and any
+normalization bridge; conflicting tool/bridge selections fail. Explicit selection
+uses bridge version 5, while omitted selections preserve existing canonical
+payloads and calculation IDs. SEC cache schema 7 refreshes older caches that did
+not retain the additional original tag. Gross purchases are not silently netted
+against proceeds, acquisitions, financing principal, noncash lease additions or
+unpaid asset balances. Selection and exact arithmetic do not certify semantic
+support, normalized earnings or investment acceptance. Independent replay applies
+the unchanged v8 financial-provenance criteria to the retained selected tag.

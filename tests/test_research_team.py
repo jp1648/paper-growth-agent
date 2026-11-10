@@ -761,6 +761,8 @@ def test_request_accounting_deducts_only_unambiguous_mirrors_without_changing_pr
 def test_prior_source_bodies_are_not_repeated_in_every_prompt():
     prior = {
         "research_sources": [{"id": "old", "content": "x" * 200000}],
+        "team_reports": {"valuation": {"method": "old valuation"}, "business": {"analysis": "x" * 15000}},
+        "valuation": {"method": "old valuation"},
         "decision": {"action": "WATCH"},
         "execution": {"status": "no_order", "reasons": [], "evidence": "x" * 200000},
     }
@@ -770,6 +772,9 @@ def test_prior_source_bodies_are_not_repeated_in_every_prompt():
     assert desk.prior is prior and context["portfolio"]["prior_thesis"] is prior
     assert len(prior["research_sources"][0]["content"]) == 200000
     assert "research_sources" not in desk.context["portfolio"]["prior_thesis"]
+    assert "team_reports" not in desk.context["portfolio"]["prior_thesis"]
+    assert len(desk.prior["team_reports"]["business"]["analysis"]) == 15000
+    assert desk.context["portfolio"]["prior_thesis"]["valuation"] == prior["team_reports"]["valuation"]
     assert desk.context["portfolio"]["prior_thesis"]["decision"] == prior["decision"]
     assert desk.context["portfolio"]["prior_thesis"]["execution"] == {"status": "no_order", "reasons": []}
     assert len(prior["execution"]["evidence"]) == 200000
@@ -781,14 +786,14 @@ def test_specialist_tool_allowance_stops_retrieval_and_preserves_budget():
 
     from trader.research_team import Guard
 
-    budget = Budget(Settings())
+    budget = Budget(Settings(research_max_tool_calls=64))
     guard = Guard(budget, "business", {"read_source"})
     req = SimpleNamespace(tool_call={"name": "read_source", "id": "source-call"})
     calls = []
-    for _ in range(10):
+    for _ in range(guard.specialist_allowance):
         guard.wrap_tool_call(req, lambda r: calls.append(r))
     reply = guard.wrap_tool_call(req, lambda r: calls.append(r))
-    assert len(calls) == 10 and budget.tools == 10
+    assert len(calls) == guard.specialist_allowance and budget.tools == guard.specialist_allowance
     assert "missing evidence" in reply.content
     assert reply.tool_call_id == "source-call"
 
@@ -805,7 +810,7 @@ def test_lead_browsing_cannot_spend_required_specialist_slots():
     called = []
     for _ in range(30):
         lead.wrap_tool_call(source, lambda request: called.append(request))
-    assert len(called) == 4
+    assert len(called) == 2
     for role in ROLES:
         request = SimpleNamespace(tool_call={"name": "task", "id": role, "args": {"subagent_type": role}})
 
@@ -820,7 +825,7 @@ def test_lead_browsing_cannot_spend_required_specialist_slots():
             request, lambda request: pytest.fail("Repeated delegation must reuse saved report")
         )
     assert set(reports) == set(ROLES)
-    assert budget.tools == 48 and not budget.failed
+    assert budget.tools == 34 and not budget.failed
 
 
 def test_lead_prerequisites_and_permissions_do_not_disappear_at_quota():
@@ -918,6 +923,7 @@ def test_full_graph_bounds_exhaustive_specialists_before_lead_review(env, decisi
     service.cfg.input_cost_per_million = dec("1")
     service.cfg.output_cost_per_million = dec("1")
     service.cfg.research_max_model_calls = 40
+    service.cfg.research_max_tool_calls = 64
     proposal = decision.model_copy(update={"evidence_ids": ["fixture-sec"]})
     model = ExhaustiveModel(decision=proposal.model_dump(mode="json"))
     worker = DeepResearchTeam(service.cfg, service.store, Evidence(), model)
@@ -1822,9 +1828,9 @@ def test_larger_configured_tool_pool_reaches_specialists_with_lead_reserve():
 
     budget = Budget(Settings(research_max_tool_calls=100))
     guard = Guard(budget, "valuation", {"read_document"})
-    assert guard.specialist_allowance == 23
-    assert len(ROLES) * (guard.specialist_allowance + 1) + guard.lead_allowance == 100
-    assert guard.lead_allowance == 4
+    assert guard.specialist_allowance == 20
+    assert len(ROLES) * (guard.specialist_allowance + 1) + guard.lead_allowance + 14 == 100
+    assert guard.lead_allowance == 2
 
 
 def test_correction_invalidates_dependents_preserves_originals_and_rejects_replay(monkeypatch):
@@ -1886,7 +1892,7 @@ def test_recreated_guard_does_not_reset_role_tool_allowance():
     original = Guard(budget, "valuation", {"read_source"})
     original.tool_calls = original.specialist_allowance
     revised = Guard(budget, "valuation", {"read_source"})
-    assert revised.tool_calls == revised.specialist_allowance == 14
+    assert revised.tool_calls == revised.specialist_allowance == 11
     reply = revised.wrap_tool_call(
         SimpleNamespace(tool_call={"name": "read_source", "id": "x"}), lambda _: pytest.fail("No quota reset")
     )
@@ -1894,7 +1900,7 @@ def test_recreated_guard_does_not_reset_role_tool_allowance():
 
 
 @pytest.mark.parametrize(
-    "spent,expected", [(48, {"valuation": 7, "adversarial": 7}), (62, {"valuation": 0, "adversarial": 0})]
+    "spent,expected", [(48, {"valuation": 9, "adversarial": 5}), (54, {"valuation": 6, "adversarial": 2})]
 )
 def test_correction_reallocates_only_remaining_shared_tools(spent, expected, monkeypatch):
     import hashlib
@@ -1940,7 +1946,9 @@ def test_correction_reallocates_only_remaining_shared_tools(spent, expected, mon
         budget.tool()
 
 
-@pytest.mark.parametrize("role,spent", [("valuation", 63), ("business", 62)])
+@pytest.mark.parametrize(
+    "role,spent", [("valuation", 55), ("business", 52), ("valuation", 63), ("business", 62)]
+)
 def test_impossible_correction_preserves_completed_reports(role, spent):
     import copy
     import hashlib
@@ -2168,3 +2176,164 @@ def test_correction_provenance_distinguishes_report_changes_inputs_and_missing_c
     desk.reports.pop("valuation")
     assert desk.correction_valuation_provenance()["calculation_inputs_unchanged"] is None
     assert desk.correction == original
+
+
+@pytest.mark.parametrize("repair_role", ["business", "catalysts", "valuation"])
+def test_exhausted_initial_guards_retain_complete_repair_capacity(repair_role, monkeypatch):
+    import copy
+    import hashlib
+    from types import SimpleNamespace
+
+    from trader.models import dumps
+    from trader.research_team import CORRECTION_TOOLS, ROLES, Guard
+
+    cfg = Settings(research_max_tool_calls=64)
+    budget = Budget(cfg)
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    lead = Guard(budget, "research_lead", {"read_source", "request_correction"}, desk.reports)
+    source = SimpleNamespace(tool_call={"name": "read_source", "id": "source"})
+    for _ in range(lead.lead_allowance):
+        lead.wrap_tool_call(source, lambda _: None)
+    assert lead.tool_calls == lead.lead_allowance == 2
+
+    def specialist(role, task):
+        guard = Guard(budget, role, {"read_source"})
+        remaining = guard.specialist_allowance - guard.tool_calls
+        for _ in range(remaining):
+            guard.wrap_tool_call(source, lambda _: None)
+        desk.reports[role] = {"phase": "corrected" if desk.correction else "initial", "role": role}
+        return {"messages": [AIMessage(content=dumps(desk.reports[role]))]}
+
+    monkeypatch.setattr(desk, "specialist", specialist)
+    desk.dispatch_roles(ROLES, "initial")  # Four real Guard-metered delegations.
+    before = copy.deepcopy(desk.reports)
+    assert budget.tools == 50 and sum(budget.role_tool_calls[r] for r in ROLES) == 44
+    tool = desk.correction_tool()
+    args = {
+        "role": repair_role,
+        "report_sha256": hashlib.sha256(dumps(before[repair_role]).encode()).hexdigest(),
+        "reason": "Inspect missing original disclosure and rebuild dependents",
+    }
+    request = SimpleNamespace(tool_call={"name": "request_correction", "id": "repair", "args": args})
+    result = lead.wrap_tool_call(
+        request, lambda _: ToolMessage(content=dumps(tool.invoke(args)), tool_call_id="repair")
+    )
+    assert "Required corrected reports" in result.content
+    assert budget.tools == 64 and not budget.failed
+    assert lead.tool_calls == 2  # Correction is global work, not a second auxiliary charge.
+    assert desk.correction["reports"] == before
+    assert set(desk.reports) == set(ROLES)
+    for role in desk.correction["invalidated"]:
+        assert desk.reports[role]["phase"] == "corrected"
+        assert desk.correction["tool_allocations"][role] >= CORRECTION_TOOLS[role]
+    assert isinstance(tool.invoke(args), str)  # One repair cycle, never automatic retries.
+
+
+@pytest.mark.parametrize("unrestricted", [False, True])
+def test_small_pool_correction_preserves_reports_or_explicit_unrestricted_mode(unrestricted, monkeypatch):
+    import copy
+    import hashlib
+
+    from trader.models import dumps
+    from trader.research_team import ROLES
+
+    cfg = Settings(research_max_tool_calls=4)
+    budget = Budget(cfg, unrestricted_research=unrestricted)
+    budget.tools = 4
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    desk.reports = {r: {"role": r} for r in ROLES}
+    before = copy.deepcopy(desk.reports)
+    monkeypatch.setattr(desk, "dispatch_roles", lambda *args: None)
+    result = desk.correction_tool().invoke(
+        {
+            "role": "business",
+            "report_sha256": hashlib.sha256(dumps(before["business"]).encode()).hexdigest(),
+            "reason": "Inspect disclosure",
+        }
+    )
+    if unrestricted:
+        assert result["tool_allocations"] == {"business": 2, "valuation": 6, "adversarial": 2}
+        assert desk.correction["reports"] == before
+    else:
+        assert "insufficient remaining" in result and desk.reports == before
+        assert desk.correction is None and budget.correction_tool_limits == {}
+
+
+@pytest.mark.parametrize("kind", ["source", "calculation", "arithmetic"])
+def test_source_pagination_advertises_complete_offsets_without_recomputation(kind, monkeypatch):
+    provider = Evidence()
+    cfg = Settings()
+    budget = Budget(cfg)
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    if kind == "source":
+        handle = "long-source"
+        desk.sources[handle] = {"id": handle, "content": "x" * 12001}
+        expected = desk.sources[handle]["content"]
+    elif kind == "calculation":
+        handle = "derived-test"
+        expected = {"explanation": "x" * 12001}
+        desk.calculations[handle] = expected
+    else:
+        handle = "derived-arithmetic-history"
+        expected = [{"result": "x" * 12001}]
+        monkeypatch.setattr(desk, "arithmetic_records", lambda: expected)
+    tool = next(t for t in desk.tools() if t.name == "read_source")
+    offset = 0
+    pieces = []
+    while True:
+        page = tool.invoke({"source_id": handle, "offset": offset})
+        pieces.append(page["content"])
+        assert page["offset"] == offset and len(page["content"]) <= 6000
+        assert page["total_chars"] > 12000
+        if not page["truncated"]:
+            assert page["next_offset"] is None
+            break
+        assert page["next_offset"] == offset + 6000
+        offset = page["next_offset"]
+    assert json.loads("".join(pieces)) == expected
+    assert budget.models == budget.tools == 0
+
+
+def test_model_keeps_correction_tool_after_lead_auxiliary_exhaustion(monkeypatch):
+    from types import SimpleNamespace
+
+    from langchain_core.messages import HumanMessage
+
+    from trader.research_team import ROLES, Guard
+
+    budget = Budget(
+        Settings(research_max_tool_calls=64, input_cost_per_million="1", output_cost_per_million="1")
+    )
+    guard = Guard(
+        budget,
+        "research_lead",
+        {"read_source", "request_correction"},
+        {name: {} for name in ROLES},
+        lambda: {"reports": "complete"},
+        lambda: True,
+    )
+    guard.tool_calls = guard.lead_allowance
+    monkeypatch.setattr(guard, "trace", lambda *args: None)
+    request = SimpleNamespace(
+        messages=[HumanMessage(content="Decide")],
+        tools=[{"name": "read_source"}, {"name": "request_correction"}],
+        system_message=None,
+        response_format=SimpleNamespace(schema_spec=SimpleNamespace(json_schema={})),
+        override=lambda **kwargs: SimpleNamespace(**kwargs),
+    )
+
+    def inspect_without_provider_call(updated):
+        assert [t["name"] for t in updated.tools] == ["request_correction"]
+        raise RuntimeError("offline model boundary reached")
+
+    with pytest.raises(RuntimeError, match="offline model boundary"):
+        guard.wrap_model_call(request, inspect_without_provider_call)
+    assert guard.tool_calls == guard.lead_allowance and budget.tools == 0

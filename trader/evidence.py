@@ -102,7 +102,7 @@ class EvidenceProvider:
         cached = self.store.get(symbol, "evidence_cache")
         if (
             cached
-            and cached.get("sec_schema") == 6
+            and cached.get("sec_schema") == 7
             and not fresh
             and timedelta(0)
             <= now() - dt(cached["fetched_at"])
@@ -128,6 +128,7 @@ class EvidenceProvider:
             "WeightedAverageNumberOfDilutedSharesOutstanding",
             "NetCashProvidedByUsedInOperatingActivities",
             "PaymentsToAcquirePropertyPlantAndEquipment",
+            "PaymentsToAcquireProductiveAssets",
             "CashAndCashEquivalentsAtCarryingValue",
             "LongTermDebtCurrent",
             "LongTermDebtNoncurrent",
@@ -216,7 +217,7 @@ class EvidenceProvider:
                 }
             )
         bundle = {
-            "sec_schema": 6,
+            "sec_schema": 7,
             "symbol": symbol,
             "fetched_at": started_at.isoformat(),
             "sources": sources,

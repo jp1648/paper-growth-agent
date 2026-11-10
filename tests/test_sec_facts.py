@@ -67,7 +67,7 @@ def test_legacy_unverified_cache_is_refetched(env, monkeypatch):
     legacy["sec_schema"] = 4
     source.store.put("ACME", legacy, "evidence_cache")
     bundle = source.get("ACME")
-    assert bundle["sec_schema"] == 6
+    assert bundle["sec_schema"] == 7
     assert bundle["sources"][0]["content"]["cik"] == "0000000001"
 
 
@@ -315,7 +315,7 @@ def test_fetch_keeps_verified_same_day_filing_but_excludes_date_only_facts(env, 
     assert [s["published_at"] for s in bundle["sources"] if s["id"].startswith("news-")] == [
         (AT - timedelta(seconds=1)).isoformat()
     ]
-    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 6
+    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 7
 
 
 @pytest.mark.parametrize("offset,expected", [(-1, 1), (1, 0)])
@@ -375,7 +375,7 @@ def test_old_schema_cache_refreshes_to_retain_allocated_compensation(env, monkey
 
     monkeypatch.setattr(source, "request", request)
     bundle = source.get("ACME", fresh=False)
-    assert bundle["sec_schema"] == 6 and len(requests) == 2
+    assert bundle["sec_schema"] == 7 and len(requests) == 2
     content = bundle["sources"][0]["content"]
     assert content["facts"]["AllocatedShareBasedCompensationExpense"]["USD"][0]["val"] == 25
     assert content["fact_taxonomies"]["AllocatedShareBasedCompensationExpense"] == "us-gaap"
@@ -385,5 +385,29 @@ def test_old_schema_cache_refreshes_to_retain_allocated_compensation(env, monkey
         source, "fetch", lambda symbol: pytest.fail("Upgraded fresh cache should be reusable")
     )
     cached = source.get("ACME", fresh=False)
-    assert cached["sec_schema"] == 6
+    assert cached["sec_schema"] == 7
     assert cached["sources"][0]["content"] == content
+
+
+def test_productive_assets_retained_as_original_tag_without_alias(env, monkeypatch):
+    source = provider(env, monkeypatch)
+    request = source.request
+
+    def original_response(url):
+        raw = request(url).json()
+        if "companyfacts" in url:
+            raw["facts"]["us-gaap"]["PaymentsToAcquireProductiveAssets"] = {
+                "units": {"USD": [{"val": 100, "filed": "2026-01-01"}]}
+            }
+            raw["facts"]["custom"]["PaymentsToAcquireProductiveAssets"] = {
+                "units": {"USD": [{"val": 999, "filed": "2026-01-01"}]}
+            }
+        return httpx.Response(200, json=raw)
+
+    monkeypatch.setattr(source, "request", original_response)
+    bundle = source.fetch("ACME")
+    original = bundle["sources"][0]["content"]
+    assert original["facts"]["PaymentsToAcquireProductiveAssets"]["USD"][0]["val"] == 100
+    assert original["fact_taxonomies"]["PaymentsToAcquireProductiveAssets"] == "us-gaap"
+    assert "PaymentsToAcquirePropertyPlantAndEquipment" not in original["facts"]
+    assert bundle["sec_schema"] == 7

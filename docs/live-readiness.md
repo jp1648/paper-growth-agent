@@ -4527,3 +4527,60 @@ outputs/IDs replay byte-identically. The combined offline suite passes 1302 test
 with seven opt-in checks skipped. This source-only extension does not certify a
 company valuation; noncommon-equity attribution and dated-claim investigation
 remain separate work.
+
+### November 10: deployed claim checks, funding and two bounded validations
+
+Release `b0891dd` is deployed with 38 verified source files and unchanged ordinary
+$6 run/day limits. Testing-admission separation, optional noncommon-equity cash
+adjustments and explicit dated claim coverage are installed. Unresolved claims
+block BUY/ADD, including cached decisions; a complete schema does not certify the
+economics. Offline validation passed 1369 tests with seven opt-in checks skipped.
+
+The user confirmed that only Trader uses the API balance. Authenticated provider
+credit and minute-level usage evidence supports a replacement $40 allocation with
+a $15 buffer, expiring November 29. The original spending baseline, prior receipts
+and costs remain intact. This finite allocation does not fund the full trial or
+authorize purchases; ordinary funding checks continue to fail closed on depletion,
+expiry or unknown usage.
+
+The fourth observed PG regression completed all reports in 368 seconds for an
+estimated $4.986865, settled without unknown calls. Independent review verified
+dated common/preferred shares, original passages and arithmetic, but still rejected
+economic completion: broader legacy awards remain unreconciled and the NCI
+earnings deduction lacks supported cash/terminal attribution or a quantified
+alternative. WATCH/zero shares is appropriate temporary abstention, not acceptance.
+The original failed results and unchanged scoring contract are preserved.
+
+A separate current held-AAPL investigation stopped at its context guard:
+241732 bytes against 240000, after six model calls, costing $1.155130. The dedicated
+supervisor restored the exact original pause and ordinary listener. Broker checks
+confirmed one AAPL share, zero open orders and unchanged intent/order records.
+There is no completed held-position review or new execution. Remaining allocated
+research capacity after these attempts is $33.858005; gross November 10 estimated
+model charges are $21.9970975, including explicitly authorized testing.
+
+Offline diagnosis is required before another paid attempt. PG's correction used
+its remaining capacity without recalculating the newly discovered claim mismatch;
+the held investigation exposed context pressure absent from the frozen case.
+Fresh broker evidence also still reports November 6 as the balance date where the
+November 10 daily-loss guard requires November 9. No baseline is substituted.
+The precreated November 10 schedule remains only a draft: approval must precede
+the regular-session open and all substantive opening gates must pass. No study
+activation or automatic trading follows from funding or mechanical completion.
+
+Offline fixes now remove duplicated prior specialist reports only from prompt
+copies, preserving the saved thesis and targeted reuse. Exact replay reduces the
+held run's rejected request from 241732 to 226917 bytes; later context growth is
+still subject to the unchanged guard. The single correction cycle now reserves
+14 of the existing 64 tool calls, with task-sized repair allowances and explicit
+source-page continuation metadata. Initial specialist capacity is consequently
+smaller; this change does not guarantee economic completion.
+
+Amazon's retained original filing identifies gross cash PPE purchases under
+`PaymentsToAcquireProductiveAssets`. An explicit evidence-backed selector now
+supports that original tag through diagnostics, normalization and replay, with
+same-filing provenance and report citation checks. There is no automatic alias or
+netting of proceeds, leases or acquisitions. Canonical calculation payloads remain
+unchanged. Independent reviews passed; the combined offline suite passed 1403
+tests with seven opt-in checks skipped. These changes are not yet deployment or
+successful paid validation evidence.

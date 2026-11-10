@@ -3,6 +3,7 @@
 import re
 from datetime import date
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field
 
@@ -32,6 +33,14 @@ class CompensationPolicy(Model):
     evidence_ids: list[str] = Field(min_length=1)
 
 
+class CapitalExpenditureSource(Model):
+    """Explicit original cash-purchase line selection; never a taxonomy alias."""
+
+    tag: Literal["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"]
+    rationale: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+
+
 class NormalizationBridge(Model):
     """Explicit equity cash-flow assumptions; arithmetic does not certify economics."""
 
@@ -45,12 +54,33 @@ class NormalizationBridge(Model):
         "ShareBasedCompensation"
     )
     compensation_policy: CompensationPolicy | None = None
+    capital_expenditure_source: CapitalExpenditureSource | None = None
+
+
+def capital_expenditure_selection(capital_expenditure_source=None, normalization_bridge=None):
+    """Keep one explicit selection across a tool request and its normalization bridge."""
+    selected = (
+        CapitalExpenditureSource.model_validate(capital_expenditure_source).model_dump(mode="json")
+        if capital_expenditure_source is not None
+        else None
+    )
+    if normalization_bridge is not None:
+        bridge = NormalizationBridge.model_validate(normalization_bridge)
+        nested = bridge.capital_expenditure_source
+        nested = nested.model_dump(mode="json") if nested is not None else None
+        if selected is not None and selected != nested:
+            raise ValueError(
+                "Conflicting capital-expenditure source selection; put the same policy in the bridge"
+            )
+        return nested
+    return selected
 
 
 def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     """Reproduce an explicit bridge; selected adjustments remain reviewable assumptions."""
     bridge = NormalizationBridge.model_validate(bridge).model_dump(mode="json", exclude_none=True)
-    proxy = annual_cash_flow(source, period_end, cutoff)
+    capex_selection = bridge.get("capital_expenditure_source")
+    proxy = annual_cash_flow(source, period_end, cutoff, capex_selection, sources)
     compensation_tag = bridge["compensation_source_tag"]
     if compensation_tag == "ShareBasedCompensation":
         bridge.pop("compensation_source_tag")  # Preserve existing canonical calculation payloads.
@@ -78,6 +108,8 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
             "Require each of the four core normalization categories exactly once, including zeros, and at most one of each optional financial_asset_reinvestment and noncommon_equity_cash_flows"
         )
     refs = set(bridge["share_evidence_ids"])
+    if capex_selection:
+        refs.update(capex_selection["evidence_ids"])
     policy = bridge.get("compensation_policy")
     if policy:
         if not policy["rationale"].strip() or not policy["legacy_award_treatment"].strip():
@@ -111,7 +143,8 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     if future_compensation < 0:
         raise ValueError("Future compensation cash cost must be nonnegative")
     cash = dec(proxy["facts"]["NetCashProvidedByUsedInOperatingActivities"]["val"])
-    capex = dec(proxy["facts"]["PaymentsToAcquirePropertyPlantAndEquipment"]["val"])
+    capex_tag = capex_selection["tag"] if capex_selection else "PaymentsToAcquirePropertyPlantAndEquipment"
+    capex = dec(proxy["facts"][capex_tag]["val"])
     adjustment = sum((dec(row["annual_delta_usd"]) for row in bridge["adjustments"]), dec(0))
     normalized = cash - capex - future_compensation + adjustment
     if normalized <= 0:
@@ -160,6 +193,11 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
         )
         result["limitations"].append(
             "Noncommon-equity cash flows are signed incremental attribution outside the starting consolidated cash stream, not accounting minority earnings. Negative removes other owners' cash entitlement; positive needs an explicit release/reversal or funding basis, not recurring income by label. Reconcile minority retained ownership and terminal claims. Preferred conversion in the denominator must not also incur the same preferred dividend/claim deduction; equity contributions, issuance and redemptions are capital transfers, not perpetual distributable earnings. Avoid overlap with debt, operating cash, financial assets and employee/legacy compensation. Free-text policy and arithmetic do not independently validate economic attribution."
+        )
+    if capex_selection:
+        result["bridge_version"] = 5
+        result["limitations"].append(
+            "Explicit source-tag selection retains the original gross cash-purchase fact; it does not net proceeds or add acquisitions, financial investments, noncash lease additions, unpaid asset stocks or lease principal. Any normalization of these items needs separate original support without double counting."
         )
     if compensation_tag == "AllocatedShareBasedCompensationExpense":
         result.update(
@@ -223,22 +261,58 @@ def annual_facts(source, period_end, cutoff, fields, *, optional=False):
     return selections
 
 
-def annual_cash_flow(source, period_end, cutoff):
+def annual_cash_flow(source, period_end, cutoff, capital_expenditure_source=None, sources=None):
+    selection = capital_expenditure_selection(capital_expenditure_source)
+    capex_tag = selection["tag"] if selection else "PaymentsToAcquirePropertyPlantAndEquipment"
     selections = annual_facts(
         source,
         period_end,
         cutoff,
         (
             ("NetCashProvidedByUsedInOperatingActivities", "USD"),
-            ("PaymentsToAcquirePropertyPlantAndEquipment", "USD"),
+            (capex_tag, "USD"),
             ("WeightedAverageNumberOfDilutedSharesOutstanding", "shares"),
         ),
     )
+    if selection:
+        if not selection["rationale"].strip():
+            raise ValueError("Capital-expenditure selection requires an original-line rationale")
+        if source["content"].get("fact_taxonomies", {}).get(capex_tag) != "us-gaap":
+            raise ValueError("Capital-expenditure selection requires original us-gaap taxonomy provenance")
+        baseline = selections[capex_tag]
+        for ref in selection["evidence_ids"]:
+            original = (sources or {}).get(ref, {})
+            url = urlsplit(original.get("url", ""))
+            if (
+                original.get("source") != "SEC EDGAR filing passage"
+                or original.get("original_source") is False
+                or original.get("available") is False
+                or not isinstance(original.get("content"), str)
+                or not original["content"].strip()
+                or url.scheme != "https"
+                or url.hostname != "www.sec.gov"
+                or url.port not in {None, 443}
+                or url.username is not None
+                or url.password is not None
+                or not re.fullmatch(
+                    r"/Archives/edgar/data/[0-9]+/"
+                    + baseline["accn"].replace("-", "")
+                    + r"/[A-Za-z0-9_.-]+\.(?:htm|html|txt)",
+                    url.path,
+                )
+                or original.get("form") != baseline["form"]
+            ):
+                raise ValueError(
+                    "Capital-expenditure selection requires a retained original passage from the same filing"
+                )
+            for key in ("available_at", "published_at"):
+                if original.get(key) and dt(original[key]) > cutoff:
+                    raise ValueError("Capital-expenditure selection cites future evidence")
     cash, capex, shares = [dec(r["val"]) for r in selections.values()]
     if capex < 0 or shares <= 0 or cash - capex <= 0:
         raise ValueError("Positive annual cash-flow proxy unavailable; use unsupported valuation")
     value = ((cash - capex) / shares).quantize(dec("0.000001"))
-    return {
+    result = {
         "cash_flow_per_share": str(value),
         "source_id": source["id"],
         "period_end": period_end,
@@ -250,10 +324,18 @@ def annual_cash_flow(source, period_end, cutoff):
         ],
     }
 
+    if selection:
+        result["capital_expenditure_source"] = selection
+        result["limitations"].append(
+            "Selected original cash-purchase line only; taxonomy name and registered evidence do not independently prove economic scope or normalized cash-flow treatment."
+        )
+    return result
 
-def cash_flow_diagnostics(source, period_end, cutoff):
+
+def cash_flow_diagnostics(source, period_end, cutoff, capital_expenditure_source=None, sources=None):
     """Historical accounting arithmetic, never a normalized forecast or approval."""
-    proxy = annual_cash_flow(source, period_end, cutoff)
+    selection = capital_expenditure_selection(capital_expenditure_source)
+    proxy = annual_cash_flow(source, period_end, cutoff, selection, sources)
     tags = (
         "ShareBasedCompensation",
         "PaymentsForRepurchaseOfCommonStock",
@@ -274,7 +356,8 @@ def cash_flow_diagnostics(source, period_end, cutoff):
         if dec(record["val"]) < 0:
             raise ValueError("Negative accounting diagnostic input requires separate review")
     cash = dec(proxy["facts"]["NetCashProvidedByUsedInOperatingActivities"]["val"])
-    capex = dec(proxy["facts"]["PaymentsToAcquirePropertyPlantAndEquipment"]["val"])
+    capex_tag = selection["tag"] if selection else "PaymentsToAcquirePropertyPlantAndEquipment"
+    capex = dec(proxy["facts"][capex_tag]["val"])
     result = {
         "source_id": source["id"],
         "period_end": period_end,
@@ -292,6 +375,8 @@ def cash_flow_diagnostics(source, period_end, cutoff):
             "Weighted-average shares are not a valuation-date or future diluted share base.",
         ],
     }
+    if selection:
+        result["capital_expenditure_source"] = selection
     if "AllocatedShareBasedCompensationExpense" in extra:
         result["allocated_compensation_expense_fact"] = extra["AllocatedShareBasedCompensationExpense"]
         result["limitations"].append(

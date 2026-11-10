@@ -34,9 +34,11 @@ from .alpaca import safe_error
 from .claims import ClaimsCoverage, claim_gaps, validate_claim_coverage
 from .evidence import EvidenceTooLarge
 from .financials import (
+    CapitalExpenditureSource,
     MissingAnnualFact,
     NormalizationBridge,
     annual_cash_flow,
+    capital_expenditure_selection,
     cash_flow_diagnostics,
     normalization_supported,
     normalized_cash_flow,
@@ -202,6 +204,11 @@ class UnknownEvidence(ValueError):
     pass
 
 
+# Worst repair: request + three delegations + prerequisite/valuation/critique reads.
+CORRECTION_TOOLS = {"business": 2, "catalysts": 2, "valuation": 6, "adversarial": 2}
+CORRECTION_RESERVE = 1 + 3 + 2 + 6 + 2
+
+
 class Budget:
     def __init__(self, cfg, limit=None, *, unrestricted_research=False):
         self.cfg = cfg
@@ -213,6 +220,9 @@ class Budget:
         self.models = self.tools = 0
         self.role_tool_calls = {}
         self.correction_tool_limits = {}
+        initial_pool = max(0, cfg.research_max_tool_calls - CORRECTION_RESERVE)
+        self.initial_specialist_allowance = max(0, (initial_pool - len(ROLES)) // len(ROLES))
+        self.lead_allowance = max(0, initial_pool - len(ROLES) * (1 + self.initial_specialist_allowance))
         self.reserved = dec(0)
         self.failed = False
         self.lock = threading.RLock()
@@ -280,13 +290,9 @@ class Guard(AgentMiddleware):
         self.final_context = final_context
         self.repair_available = repair_available
         self.running_tasks = set()
-        # Reserve one delegation per role before dividing the shared pool.
-        self.initial_specialist_allowance = max(
-            0, (budget.cfg.research_max_tool_calls - 2 * len(ROLES)) // len(ROLES)
-        )
-        self.lead_allowance = max(
-            0, budget.cfg.research_max_tool_calls - len(ROLES) * (1 + self.initial_specialist_allowance)
-        )
+        # Initial work cannot consume the shared one-cycle repair reserve.
+        self.initial_specialist_allowance = budget.initial_specialist_allowance
+        self.lead_allowance = budget.lead_allowance
 
     @property
     def specialist_allowance(self):
@@ -394,7 +400,11 @@ class Guard(AgentMiddleware):
             and self.role == "research_lead"
             and self.tool_calls >= self.lead_allowance
         ):
-            tools = [t for t in tools if (t.get("name") if isinstance(t, dict) else t.name) == "task"]
+            tools = [
+                t
+                for t in tools
+                if (t.get("name") if isinstance(t, dict) else t.name) in {"task", "request_correction"}
+            ]
         payload = {
             "messages": [m.model_dump() for m in messages],
             "system": request.system_message.model_dump() if request.system_message else None,
@@ -576,7 +586,7 @@ class Guard(AgentMiddleware):
                         tool_call_id=request.tool_call["id"],
                     )
                 self.running_tasks.add(delegated)
-            else:
+            elif not (self.role == "research_lead" and name == "request_correction"):
                 allowance = self.lead_allowance if self.role == "research_lead" else self.specialist_allowance
                 if not self.budget.unrestricted_research and self.tool_calls >= allowance:
                     return ToolMessage(
@@ -641,6 +651,7 @@ class ResearchDesk:
             prior_prompt = self.context["portfolio"]["prior_thesis"]
             prior_prompt.pop("research_sources", None)
             prior_prompt.pop("research_arithmetic_records", None)
+            prior_prompt.pop("team_reports", None)
             if "execution" in prior_prompt:
                 prior_prompt["execution"] = {
                     key: value
@@ -649,7 +660,7 @@ class ResearchDesk:
                 }
             prior_prompt["evidence_note"] = (
                 "Prior thesis evidence IDs are historical references, not current verified evidence. "
-                "Original sources remain in the saved thesis and are loaded when reports are reused; "
+                "Original reports and sources remain in the saved thesis and are loaded when reports are reused; "
                 "otherwise retrieve current supporting evidence."
             )
         times = self.prior.get("team_report_times", {})
@@ -742,7 +753,7 @@ class ResearchDesk:
 
         @tool
         def read_source(source_id: str, offset: int = 0) -> dict:
-            """Read original evidence or a derived calculation (including its inputs), 6000 characters/page. Only original source IDs may enter evidence_ids; calculations are not primary evidence."""
+            """Read original evidence or a derived calculation (including its inputs), 6000 characters/page; follow next_offset until null for complete content. Only original source IDs may enter evidence_ids; calculations are not primary evidence."""
             if offset < 0:
                 raise ValueError("Negative source offset")
             with self.lock:
@@ -755,6 +766,8 @@ class ResearchDesk:
                         "offset": offset,
                         "content": text[offset : offset + 6000],
                         "truncated": offset + 6000 < len(text),
+                        "next_offset": offset + 6000 if offset + 6000 < len(text) else None,
+                        "total_chars": len(text),
                     }
                 if source_id in self.calculations:
                     text = dumps(self.calculations[source_id])
@@ -766,6 +779,8 @@ class ResearchDesk:
                         "offset": offset,
                         "content": text[offset : offset + 6000],
                         "truncated": offset + 6000 < len(text),
+                        "next_offset": offset + 6000 if offset + 6000 < len(text) else None,
+                        "total_chars": len(text),
                     }
                 if source_id not in self.sources:
                     return {
@@ -780,6 +795,8 @@ class ResearchDesk:
                     "offset": offset,
                     "content": text[offset : offset + 6000],
                     "truncated": offset + 6000 < len(text),
+                    "next_offset": offset + 6000 if offset + 6000 < len(text) else None,
+                    "total_chars": len(text),
                 }
 
         @tool
@@ -899,17 +916,26 @@ class ResearchDesk:
             terminal_multiples: list[str],
             years: int,
             normalization_bridge: NormalizationBridge | None = None,
+            capital_expenditure_source: CapitalExpenditureSource | None = None,
         ) -> dict:
-            """Decimal DCF: annual per-share cash flows plus terminal cash-flow multiple. Three ordered bear/base/bull cases; rates are fractions. Justify inputs using cited evidence."""
+            """Decimal DCF: annual per-share cash flows plus terminal cash-flow multiple. Three ordered bear/base/bull cases; rates are fractions. Justify inputs using cited evidence. Alternative capex requires explicit original-tag selection with cited rationale; keep any bridge selection consistent."""
             with self.lock:
                 source = copy.deepcopy(self.sources.get(financial_source_id))
+                financial_sources = copy.deepcopy(self.sources)
                 target_sources = {item["id"] for item in self.companies[self.context["symbol"]]["sources"]}
             if not source:
                 raise ValueError("Unknown financial evidence")
             if financial_source_id not in target_sources:
                 raise ValueError("Financial evidence must belong to the company being valued")
+            selection = capital_expenditure_selection(capital_expenditure_source, normalization_bridge)
             try:
-                provenance = annual_cash_flow(source, financial_period_end, self.evaluation_at or now())
+                provenance = annual_cash_flow(
+                    source,
+                    financial_period_end,
+                    self.evaluation_at or now(),
+                    capital_expenditure_source=selection,
+                    sources=financial_sources,
+                )
             except MissingAnnualFact as exc:
                 return {
                     "available": False,
@@ -973,6 +999,8 @@ class ResearchDesk:
                     "years": years,
                 },
             }
+            if selection is not None:
+                result["inputs"]["capital_expenditure_source"] = selection
             if bridge_result is not None:
                 result["normalization_bridge"] = bridge_result
                 result["inputs"]["normalization_bridge"] = bridge_result["assumptions"]
@@ -987,13 +1015,16 @@ class ResearchDesk:
             financial_source_id: str,
             financial_period_end: str,
             normalization_bridge: NormalizationBridge | None = None,
+            capital_expenditure_source: CapitalExpenditureSource | None = None,
         ) -> dict:
-            """Historical accounting diagnostics, or exact arithmetic for an explicit provisional normalization bridge."""
+            """Historical accounting diagnostics, or exact arithmetic for an explicit provisional normalization bridge. Alternative capex requires an explicit cited original-tag selection; keep any bridge selection consistent."""
             with self.lock:
                 source = copy.deepcopy(self.sources.get(financial_source_id))
+                financial_sources = copy.deepcopy(self.sources)
                 target_sources = {item["id"] for item in self.companies[self.context["symbol"]]["sources"]}
             if source is None or financial_source_id not in target_sources:
                 raise ValueError("Financial evidence must belong to the company being valued")
+            selection = capital_expenditure_selection(capital_expenditure_source, normalization_bridge)
             try:
                 if normalization_bridge is not None:
                     with self.lock:
@@ -1005,7 +1036,13 @@ class ResearchDesk:
                         normalization_bridge,
                         bridge_sources,
                     )
-                return cash_flow_diagnostics(source, financial_period_end, self.evaluation_at or now())
+                return cash_flow_diagnostics(
+                    source,
+                    financial_period_end,
+                    self.evaluation_at or now(),
+                    capital_expenditure_source=selection,
+                    sources=financial_sources,
+                )
             except MissingAnnualFact as exc:
                 return {
                     "available": False,
@@ -1137,6 +1174,9 @@ class ResearchDesk:
             provenance = (calculation or {}).get("financial_provenance")
             if not provenance or provenance["source_id"] not in result["evidence_ids"]:
                 raise ValueError("Valuation must cite its financial input provenance")
+            selection = provenance.get("capital_expenditure_source")
+            if selection and not set(selection["evidence_ids"]).issubset(result["evidence_ids"]):
+                raise ValueError("Valuation must cite its capital-expenditure source evidence")
             if (
                 calculation
                 and calculation.get("normalization_bridge")
@@ -1200,7 +1240,7 @@ class ResearchDesk:
                 (
                     ""
                     if self.budget.unrestricted_research
-                    else f" You currently have at most {max(0, self.budget.correction_tool_limits.get(role, max(0, (self.cfg.research_max_tool_calls - 2 * len(ROLES)) // len(ROLES))) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
+                    else f" You currently have at most {max(0, self.budget.correction_tool_limits.get(role, self.budget.initial_specialist_allowance) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
                 )
                 + " Batch independent source searches, reads or arithmetic requests in one model turn when their inputs are already known; each operation still counts against the shared tool budget. Never guess a source ID or offset to batch a dependent lookup. Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
                 if role != "research_lead"
@@ -1347,19 +1387,19 @@ class ResearchDesk:
                 if role != "valuation":
                     invalidated.insert(1, "valuation")
                 with self.budget.lock:
-                    # Reassign unused shared capacity, retaining one delegation per invalidated role.
-                    if (
-                        not self.budget.unrestricted_research
-                        and self.cfg.research_max_tool_calls - self.budget.tools < len(invalidated)
-                    ):
+                    # The request itself is already metered by Guard. Retain every delegation
+                    # plus useful role-specific repair work before invalidating any report.
+                    minimum = {name: CORRECTION_TOOLS[name] for name in invalidated}
+                    remaining = self.cfg.research_max_tool_calls - self.budget.tools - len(invalidated)
+                    if not self.budget.unrestricted_research and remaining < sum(minimum.values()):
                         raise ToolException(
                             "Correction unavailable: insufficient remaining calls to rebuild required reports."
                         )
-                    remaining = max(
-                        0, self.cfg.research_max_tool_calls - self.budget.tools - len(invalidated)
-                    )
-                    share, extra = divmod(remaining, len(invalidated))
-                    allocations = {name: share + (i < extra) for i, name in enumerate(invalidated)}
+                    extra = max(0, remaining - sum(minimum.values()))
+                    share, remainder = divmod(extra, len(invalidated))
+                    allocations = {
+                        name: minimum[name] + share + (i < remainder) for i, name in enumerate(invalidated)
+                    }
                     self.budget.correction_tool_limits = {
                         name: self.budget.role_tool_calls.get(name, 0) + allocation
                         for name, allocation in allocations.items()
