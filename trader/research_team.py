@@ -135,6 +135,7 @@ ROLES = {
             "customer concentration and accounting quality. Read filings; seek contrary evidence. "
             "Analyze available product/segment and geographic revenue changes and margins quantitatively, including their contribution to growth. Explain how mix and concentration affect the thesis. "
             "Coverage first: inspect original passages for operating segments/geography, concentration, competition, revenue recognition/accounting, regulation, and financing/share claims before repeating or deepening a covered topic. Distinguish specific disclosed commitments from broader obligations and date every share base. Use search_document to locate distinct operating, concentration and regulatory sections before spending calls on overlapping passages. Do not label available but unread evidence unavailable; inspect operating discussion and notes before listing gaps. Distinguish receivables concentration from revenue concentration and retention. "
+            "Use exact returned passage offsets, not rounded or guessed offsets. Heading/table-of-contents matches do not complete coverage: advance search_document past those matches to the substantive disclosure. Report available concentration percentages with their denominator and date; generic concentration language cannot replace disclosed figures. "
             "Separate truly absent sources, unread/budget-limited evidence, and unresolved economic interpretation. Cite exact passages for each material factual claim."
         ),
     ),
@@ -200,6 +201,7 @@ class Budget:
         self.day = now().astimezone(ZoneInfo("America/New_York")).date()
         self.models = self.tools = 0
         self.role_tool_calls = {}
+        self.correction_tool_limits = {}
         self.reserved = dec(0)
         self.failed = False
         self.lock = threading.RLock()
@@ -268,12 +270,16 @@ class Guard(AgentMiddleware):
         self.repair_available = repair_available
         self.running_tasks = set()
         # Reserve one delegation per role before dividing the shared pool.
-        self.specialist_allowance = max(
+        self.initial_specialist_allowance = max(
             0, (budget.cfg.research_max_tool_calls - 2 * len(ROLES)) // len(ROLES)
         )
         self.lead_allowance = max(
-            0, budget.cfg.research_max_tool_calls - len(ROLES) * (1 + self.specialist_allowance)
+            0, budget.cfg.research_max_tool_calls - len(ROLES) * (1 + self.initial_specialist_allowance)
         )
+
+    @property
+    def specialist_allowance(self):
+        return self.budget.correction_tool_limits.get(self.role, self.initial_specialist_allowance)
 
     @property
     def tool_calls(self):
@@ -1119,7 +1125,7 @@ class ResearchDesk:
                 (
                     ""
                     if self.budget.unrestricted_research
-                    else f" You have at most {max(0, (self.cfg.research_max_tool_calls - 2 * len(ROLES)) // len(ROLES))} tool calls in total across this role's original report and any correction."
+                    else f" You currently have at most {max(0, self.budget.correction_tool_limits.get(role, max(0, (self.cfg.research_max_tool_calls - 2 * len(ROLES)) // len(ROLES))) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
                 )
                 + " Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
                 if role != "research_lead"
@@ -1255,6 +1261,24 @@ class ResearchDesk:
                 invalidated = [role, "adversarial"]
                 if role != "valuation":
                     invalidated.insert(1, "valuation")
+                with self.budget.lock:
+                    # Reassign unused shared capacity, retaining one delegation per invalidated role.
+                    if (
+                        not self.budget.unrestricted_research
+                        and self.cfg.research_max_tool_calls - self.budget.tools < len(invalidated)
+                    ):
+                        raise ToolException(
+                            "Correction unavailable: insufficient remaining calls to rebuild required reports."
+                        )
+                    remaining = max(
+                        0, self.cfg.research_max_tool_calls - self.budget.tools - len(invalidated)
+                    )
+                    share, extra = divmod(remaining, len(invalidated))
+                    allocations = {name: share + (i < extra) for i, name in enumerate(invalidated)}
+                    self.budget.correction_tool_limits = {
+                        name: self.budget.role_tool_calls.get(name, 0) + allocation
+                        for name, allocation in allocations.items()
+                    }
                 self.correction = copy.deepcopy(
                     {
                         "role": role,
@@ -1264,6 +1288,8 @@ class ResearchDesk:
                         "report_times": self.report_times,
                         "calculations": self.calculations,
                         "invalidated": invalidated,
+                        "tool_allocations": allocations,
+                        "cumulative_role_tool_limits": self.budget.correction_tool_limits,
                     }
                 )
                 self.budget.events.append(("research_correction_requested", copy.deepcopy(self.correction)))
@@ -1275,6 +1301,7 @@ class ResearchDesk:
                         self.reused.remove(name)
                 return {
                     "invalidated": invalidated,
+                    "tool_allocations": allocations,
                     "instruction": "Re-delegate these reports in order. Original reports remain audited; remaining shared budgets still apply.",
                 }
 

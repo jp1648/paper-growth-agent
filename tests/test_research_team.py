@@ -1805,6 +1805,81 @@ def test_recreated_guard_does_not_reset_role_tool_allowance():
     assert "exhausted" in reply.content and budget.tools == 0
 
 
+@pytest.mark.parametrize(
+    "spent,expected", [(48, {"valuation": 7, "adversarial": 7}), (62, {"valuation": 0, "adversarial": 0})]
+)
+def test_correction_reallocates_only_remaining_shared_tools(spent, expected):
+    import hashlib
+    from types import SimpleNamespace
+
+    from trader.models import dumps
+    from trader.research_team import ROLES, Guard
+
+    cfg = Settings(research_max_tool_calls=64)
+    budget = Budget(cfg)
+    budget.tools = spent
+    budget.role_tool_calls = {"valuation": 14, "adversarial": 10}
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    desk.reports = {name: {"value": name} for name in ROLES}
+    original_guard = Guard(budget, "valuation", {"read_source"})
+    result = desk.correction_tool().invoke(
+        {
+            "role": "valuation",
+            "report_sha256": hashlib.sha256(dumps(desk.reports["valuation"]).encode()).hexdigest(),
+            "reason": "Calculate alternatives",
+        }
+    )
+    assert result["tool_allocations"] == expected
+    assert budget.tools == spent and budget.role_tool_calls["valuation"] == 14
+    assert desk.correction["cumulative_role_tool_limits"]["valuation"] == 14 + expected["valuation"]
+    assert original_guard.specialist_allowance == 14 + expected["valuation"]
+    guard = Guard(budget, "valuation", {"read_source"})
+    request = SimpleNamespace(tool_call={"name": "read_source", "id": "correction-read", "args": {}})
+    for _ in range(expected["valuation"]):
+        guard.wrap_tool_call(
+            request, lambda _: ToolMessage(content="original evidence", tool_call_id="correction-read")
+        )
+    reply = guard.wrap_tool_call(request, lambda _: pytest.fail("Allocated capacity exceeded"))
+    assert "exhausted" in reply.content
+    assert budget.tools == spent + expected["valuation"]
+    assert sum(expected.values()) + 2 <= 64 - spent
+    budget.tools = 64
+    with pytest.raises(ResearchLimit, match="tool-call limit"):
+        budget.tool()
+
+
+@pytest.mark.parametrize("role,spent", [("valuation", 63), ("business", 62)])
+def test_impossible_correction_preserves_completed_reports(role, spent):
+    import copy
+    import hashlib
+
+    from trader.models import dumps
+    from trader.research_team import ROLES
+
+    cfg = Settings(research_max_tool_calls=64)
+    provider = Evidence()
+    budget = Budget(cfg)
+    budget.tools = spent
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    desk.reports = {name: {"value": name} for name in ROLES}
+    original = copy.deepcopy(desk.reports)
+    result = desk.correction_tool().invoke(
+        {
+            "role": role,
+            "report_sha256": hashlib.sha256(dumps(original[role]).encode()).hexdigest(),
+            "reason": "Repair material gap",
+        }
+    )
+    assert "insufficient remaining" in result
+    assert desk.reports == original and desk.correction is None
+    assert budget.tools == spent and budget.correction_tool_limits == {}
+
+
 def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, decision):
     class CorrectingLead(TeamModel):
         _phase: int = PrivateAttr(default=0)

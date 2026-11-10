@@ -12,9 +12,9 @@ readiness. The prospective trial remains `predeclared_not_started`.
 
 | Goal | Verified state | Remaining requirement / next action |
 |---|---|---|
-| 1. Costs | Retained model-spend records are settled; November 9 estimated model spend is $3.6508275. Detailed Cloud billing export exists and the project is linked to the matching billing account; its eight exported rows cover older October 13 usage, with zero trader-attributed rows. | Authenticate/allocate all operating costs before trial activation. Missing trader rows are not zero cost; preserve blocked Flovia unknown operations. |
-| 2. Release | Paused runtime 24a04ef verified across 35 Python files; both exact-head CI runs passed. Local full suite: 1069 passed, seven skipped. Fresh startup reconciliation passed; experiment, position, configuration, spending and pause unchanged. Existing authenticated Cloud Run dashboard remains deployed. | Preserve exact-artifact receipts; deployment is not research acceptance or trial activation. |
-| 3. Research | November 9 Apple attempt failed the final-call budget guard; independent semantic review also rejected material coverage and normalization gaps, including a historical sum error. Final-context reduction, paginated filing navigation and exact signed cash-flow sums are now deployed and independently reviewed. | One separately identified Apple development attempt is planned for November 10 or later, with fresh funding/ledger checks, $5 run/$6 daily ceilings and independent outcome review. No further paid retry November 9. Microsoft holdout remains ungenerated. |
+| 1. Costs | Run4 provider reconciliation retained; run5 and run6 estimates settled with no unknown model charges before run7. Detailed GCP export now has Trader-attributed usage: $4.016056 gross, offset by credits, through November8 21UTC. | Export remains delayed; later costs are pending, not zero. Preserve blocked Flovia unknown operations. User confirms OpenAI credits are Trader-only; bounded unattended allocation remains to install against fresh evidence. |
+| 2. Release | Paused runtime 23373c4 verified across all 36 Python files; both exact-head CI runs passed. Full local suite: 1140 passed, seven skipped. Fresh reconciliation passed; original experiment/configuration/history/pause retained. | Preserve exact-artifact receipts. Held AAPL review remains overdue; deployment does not establish research acceptance or trial activation. |
+| 3. Research | Run5 completed mechanically but failed independent economic review. Run6 stopped at a false context-accounting boundary. Reviewed accounting-only correction deployed; run7 launched with a fresh stable ID and $20 supervised testing cap. | Run7 completed mechanically but failed independent economics: correction lacked remaining valuation tools, alternatives/concentration incomplete. Fix offline before another paid attempt. Microsoft holdout remains ungenerated. Standing testing authorization permits exceeding ordinary budgets; ordinary $6/day and $5/run limits remain unchanged. |
 | 4. Combined execution failures | Local SIGKILL/partial-fill/cancel/restore scenarios plus two-host fencing and stopped-source checkpoint recovery have evidence. Stopped-host recovery used replayed broker fixtures and did not submit orders. | Full in-flight replacement after original-disk loss/network partition and actual broker bust/reopened-order contract remain unproved. Separate drills are not combined-case proof. |
 | 5. Operations | Two-hour PostgreSQL outage recovered 7170 events; independent host-outage/recovery alerts and fresh-host snapshots verified. Required research traces now fail closed on local-outbox errors. | Broader combined load/partition failures and full in-flight replacement recovery remain; no claim of lossless telemetry under every fault. |
 | 6. Measurement/trial | Selected policy; retained raw prices/calendar; reviewed benchmark purchases, distributions, partial/reversed payments and paired cost-adjusted returns implemented. Initial friction and receivable/cash transfers tested once. | QQQ descriptive arithmetic and shared-input checks are implemented. Draft bundle now integrates retained bindings, study identity and sensitivity inventory; substantiate cash terms, complete costs and independent evidence; finish special-action handling and remaining metrics; use the [selected research-only scope](prospective-scope-decision.md) and finish its frozen schedule and freeze/approve the future opening manifest. Then collect at least 60 regular sessions AND 12 weeks. No historical backfill substitutes for prospective outcomes. |
@@ -4136,3 +4136,40 @@ provider input and audit history byte-equivalent. Research tests: 88 passed.
 This resolves a premature rejection, not investment acceptance or guaranteed
 completion of later turns. Direct user confirmation that only Trader uses the
 credits is retained privately; a bounded unattended allocation is not yet installed.
+
+### Accounting release 23373c4 and supervised run7
+
+Both CI checks (42745010915, 42745004753) and build
+9a01bd2b-627e-4d64-a33a-f402ba07a6f9 passed. Reviewed image
+`sha256:ae660e513d9004058ab4e37799165d0d175d1cd780c95c7032e51bcb70693912`
+is running; all36 source hashes verified after startup. The first postrestart
+probe preceded container creation; a subsequent read verified the running image,
+fresh heartbeat and healthy reconciliation. No second deployment was performed.
+Original pause, config, experiment, cost ledger and order history are preserved.
+
+Run `annual-testing-v3-dev-20261109-7` launched with the unchanged Apple case,
+reviewed source/launcher and a $20 testing cap. Fresh displayed grant balance was
+$79.37; conservatively deducted all $3.219535 of run6 before applying a $15 buffer.
+Run7 completed all four reports and WATCH in406seconds; $7.1132250 estimated
+model cost settled with zero unknown calls. Mechanical completion passed.
+Independent economic review requires changes: valuation correction had zero role
+tools remaining, required alternative values were not calculated, available
+concentration figures were omitted, and a small compensation arithmetic error
+remained. No order, study activation or unattended allocation occurred.
+
+### Correction capacity repair — offline
+
+Run7's independent economic review is now recorded separately: accepted0,
+reviewed-failed1, pending0; original outputs remain unchanged. The failure
+exposed an allocation defect: valuation had used its initial14 tools, while the
+shared pool still had capacity. The one explicit correction cycle now allocates
+remaining shared tools across invalidated specialists after allowing for their
+delegations. Cumulative role counters, global tool/model/time/cost limits and
+original reports remain intact; no replay or new cycle replenishes capacity.
+The allocation and cumulative limits are audited and specialist prompts state
+remaining capacity. Business navigation instructions require exact offsets and
+substantive concentration disclosures rather than table-of-contents headings.
+Targeted research tests:92 passed. Independent review identified and the fix now
+rejects an impossible correction before invalidating reports when even the
+required re-delegations cannot fit. Zero-tool corrections remain possible when
+delegations fit. Final review and deployment pending.
