@@ -430,3 +430,38 @@ def test_missing_required_fact_returns_gap_without_creating_valuation(tool_name)
     assert CAPEX in result["reason"]
     assert "calculation_id" not in result
     assert not desk.calculations
+
+
+def test_evidence_collector_retains_allocated_expense_under_original_tag(env):
+    import httpx
+
+    from trader.evidence import EvidenceProvider
+
+    service, _, data = env
+    service.cfg.sec_user_agent = "Test test@example.com"
+    record = {**financial_facts()[CFO]["USD"][0], "val": 75}
+
+    def respond(request):
+        if "companyfacts" in str(request.url):
+            return httpx.Response(
+                200,
+                json={
+                    "entityName": "Synthetic",
+                    "cik": 1,
+                    "facts": {
+                        "us-gaap": {"AllocatedShareBasedCompensationExpense": {"units": {"USD": [record]}}}
+                    },
+                },
+            )
+        return httpx.Response(
+            200, json={"cik": 1, "name": "Synthetic", "filings": {"recent": {"form": [], "filingDate": []}}}
+        )
+
+    provider = EvidenceProvider(
+        service.cfg, service.store, data, httpx.Client(transport=httpx.MockTransport(respond))
+    )
+    result = provider.fetch("ACME")
+    content = result["sources"][0]["content"]
+    assert content["facts"]["AllocatedShareBasedCompensationExpense"]["USD"] == [record]
+    assert content["fact_taxonomies"]["AllocatedShareBasedCompensationExpense"] == "us-gaap"
+    assert "ShareBasedCompensation" not in content["facts"]

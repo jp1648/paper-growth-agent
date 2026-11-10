@@ -1476,7 +1476,7 @@ class ResearchDesk:
             },
             "correction_available": self.correction is None,
             "correction_valuation_provenance": self.correction_valuation_provenance(),
-            "correction_instruction": "Before finalizing, use request_correction if available and a specific material defect can be repaired with remaining budgets. Otherwise preserve the gap in the final decision. A correction requires new downstream reports and critique; it does not grant acceptance.",
+            "correction_instruction": "Before finalizing, inspect missing coverage and material objections across all reports. When several repairable defects exist, target the earliest incomplete dependency: available but unread business disclosures require business correction before downstream valuation repair. Carry all relevant critique defects into the correction reason so rebuilt valuation and critique address them together; do not spend the sole correction on valuation alone while required upstream business coverage remains unread. Use request_correction only when the defect can be repaired with remaining budgets; otherwise preserve the gap in the final decision. A correction requires new downstream reports and critique; it does not grant acceptance.",
             "report_times": self.report_times,
             "calculations": self.calculations,
             "evidence": [
@@ -1710,6 +1710,7 @@ class DeepResearchTeam:
                     "testing_budget_override": self.testing,
                     "symbol": context["symbol"],
                     "quote": context.get("quote"),
+                    "research_reference": context.get("research_reference"),
                     "finalize_from": finalize_from,
                     "team_report_times": desk.report_times if desk else {},
                 },

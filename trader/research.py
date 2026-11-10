@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import date, datetime, time, timedelta
 from typing import TypedDict
+from zoneinfo import ZoneInfo
 
 from langgraph.graph import END, START, StateGraph
 
@@ -19,7 +21,8 @@ class GraphState(TypedDict, total=False):
     study_stratum: str
     portfolio: dict
     evidence: dict
-    quote: dict
+    quote: dict | None
+    research_reference: dict | None
     research: dict
     valuation: dict
     catalysts: dict
@@ -32,6 +35,67 @@ class GraphState(TypedDict, total=False):
     risk: list[str]
     execution: dict
     report: dict
+
+
+def research_input(service, symbol, *, deferred):
+    if deferred:
+        clock = service.broker.clock()
+        if clock["is_open"] is False:
+            stamp, observed = dt(clock["timestamp"]), now()
+            if abs((observed - stamp).total_seconds()) > 30:
+                raise ValueError("Broker clock stale; historical research reference unavailable")
+            zone = ZoneInfo("America/New_York")
+            day = stamp.astimezone(zone).date()
+            start = day - timedelta(days=14)
+            sessions = service.broker.calendar(start.isoformat(), day.isoformat())
+            if not isinstance(sessions, list) or len(sessions) > 15:
+                raise ValueError("Invalid historical research calendar")
+            dates, completed = [], []
+            for session in sessions:
+                session_day = date.fromisoformat(session["date"])
+                opening, closing = time.fromisoformat(session["open"]), time.fromisoformat(session["close"])
+                if (
+                    session_day.isoformat() != session["date"]
+                    or not start <= session_day <= day
+                    or session_day.weekday() >= 5
+                    or opening.tzinfo is not None
+                    or closing.tzinfo is not None
+                    or not time(9, 30) == opening < closing <= time(16)
+                ):
+                    raise ValueError("Invalid regular-session research calendar boundaries")
+                dates.append(session_day)
+                closing_at = datetime.combine(session_day, closing, zone)
+                if closing_at <= min(stamp, observed):
+                    completed.append((closing_at, session))
+            if dates != sorted(set(dates)):
+                raise ValueError("Research calendar requires unique increasing session dates")
+            if not completed:
+                raise ValueError("No completed regular session available for research reference")
+            closing_at, session = completed[-1]
+            price = dec(service.data.session_close(symbol, session))
+            if price <= 0:
+                raise ValueError("Nonpositive historical research reference")
+            return {
+                "quote": None,
+                "research_reference": {
+                    "symbol": symbol,
+                    "price": str(price),
+                    "basis": "last_validated_regular_session_minute_bar_close",
+                    "method": "Last available split-adjusted 1Min bar close within 300 seconds before the scheduled session close; not an official consolidated closing-auction price",
+                    "session_bounds_source": "https://paper-api.alpaca.markets/v2/calendar",
+                    "session": session,
+                    "session_closed_at": closing_at.isoformat(),
+                    "retrieved_at": now().isoformat(),
+                    "feed": service.cfg.feed,
+                    "source": f"https://data.alpaca.markets/v2/stocks/{symbol}/bars",
+                    "timeframe": "1Min",
+                    "adjustment": "split",
+                    "coverage": "IEX exchange only" if service.cfg.feed == "iex" else "US consolidated SIP",
+                    "historical": True,
+                    "executable": False,
+                },
+            }
+    return {"quote": service.data.quote(symbol).model_dump(mode="json"), "research_reference": None}
 
 
 def build_graph(service, team):
@@ -89,14 +153,14 @@ def build_graph(service, team):
                 raise ValueError("Research run key belongs to another symbol")
             commit_research(s, cached)
             return cached
-        quote = service.data.quote(s["symbol"]).model_dump(mode="json")
-        context = {**s, "quote": quote, "current_timestamp": now().isoformat()}
+        pricing = research_input(service, s["symbol"], deferred=bool(s.get("research_only")))
+        context = {**s, **pricing, "current_timestamp": now().isoformat()}
         result = (
             team.run(context, finalize_from=s["finalize_from"])
             if s.get("finalize_from")
             else team.run(context)
         )
-        result["quote"] = quote
+        result.update(pricing)
         proposal = Decision.model_validate(result["decision"])
         if proposal.symbol != s["symbol"]:
             raise ValueError("Decision changed the requested symbol")
@@ -133,7 +197,17 @@ def build_graph(service, team):
                     "run_key": s["run_key"],
                     "decision": result["decision"],
                     "reviewed_at": result["research_completed_at"],
-                    "reference_price": result["quote"]["ask"],
+                    "reference_price": (
+                        result["research_reference"]["price"]
+                        if result.get("research_reference")
+                        else result["quote"]["ask"]
+                    ),
+                    "reference_basis": result.get("research_reference")
+                    or {
+                        "basis": "broker_quote_ask",
+                        "timestamp": result["quote"]["timestamp"],
+                        "feed": result["quote"]["feed"],
+                    },
                     "evidence_ids": sorted(x["id"] for x in result["evidence"]["sources"]),
                     "valuation": result["valuation"],
                     "team_reports": result["team_reports"],

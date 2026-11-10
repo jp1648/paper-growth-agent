@@ -67,7 +67,7 @@ def test_legacy_unverified_cache_is_refetched(env, monkeypatch):
     legacy["sec_schema"] = 4
     source.store.put("ACME", legacy, "evidence_cache")
     bundle = source.get("ACME")
-    assert bundle["sec_schema"] == 5
+    assert bundle["sec_schema"] == 6
     assert bundle["sources"][0]["content"]["cik"] == "0000000001"
 
 
@@ -315,7 +315,7 @@ def test_fetch_keeps_verified_same_day_filing_but_excludes_date_only_facts(env, 
     assert [s["published_at"] for s in bundle["sources"] if s["id"].startswith("news-")] == [
         (AT - timedelta(seconds=1)).isoformat()
     ]
-    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 5
+    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 6
 
 
 @pytest.mark.parametrize("offset,expected", [(-1, 1), (1, 0)])
@@ -350,3 +350,40 @@ def test_news_invalid_revision_cannot_be_cached(env, monkeypatch, updated):
     with pytest.raises(ValueError):
         source.get("ACME", fresh=True)
     assert source.store.get("ACME", "evidence_cache") is None
+
+
+def test_old_schema_cache_refreshes_to_retain_allocated_compensation(env, monkeypatch):
+    import copy
+
+    source = provider(env, monkeypatch)
+    legacy = source.fetch("ACME")
+    legacy["sec_schema"] = 5
+    assert "AllocatedShareBasedCompensationExpense" not in legacy["sources"][0]["content"]["facts"]
+    original = copy.deepcopy(legacy)
+    source.store.put("ACME", legacy, "evidence_cache")
+    original_request = source.request
+    requests = []
+
+    def request(url):
+        requests.append(url)
+        raw = original_request(url).json()
+        if "companyfacts" in url:
+            raw["facts"]["us-gaap"]["AllocatedShareBasedCompensationExpense"] = {
+                "units": {"USD": [{"val": 25, "filed": "2026-01-01"}]}
+            }
+        return httpx.Response(200, json=raw)
+
+    monkeypatch.setattr(source, "request", request)
+    bundle = source.get("ACME", fresh=False)
+    assert bundle["sec_schema"] == 6 and len(requests) == 2
+    content = bundle["sources"][0]["content"]
+    assert content["facts"]["AllocatedShareBasedCompensationExpense"]["USD"][0]["val"] == 25
+    assert content["fact_taxonomies"]["AllocatedShareBasedCompensationExpense"] == "us-gaap"
+    assert content["facts"]["ShareBasedCompensation"]["USD"][0]["val"] == 10
+    assert legacy == original
+    monkeypatch.setattr(
+        source, "fetch", lambda symbol: pytest.fail("Upgraded fresh cache should be reusable")
+    )
+    cached = source.get("ACME", fresh=False)
+    assert cached["sec_schema"] == 6
+    assert cached["sources"][0]["content"] == content

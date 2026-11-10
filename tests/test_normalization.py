@@ -302,3 +302,129 @@ def test_frozen_v3_canonical_sec_sbc_enables_arithmetic_not_economic_approval(sy
     original = next(c for c in old["cases"] if c["id"] == case["id"])["inputs"]["sources"][0]
     with pytest.raises(MissingAnnualFact):
         normalized_cash_flow(original, entry["period_end"], cutoff, bridge, {original["id"]: original})
+
+
+def test_explicit_allocated_expense_is_not_an_automatic_canonical_alias(normalization):
+    desk, source, bridge = normalization
+    default = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    explicit = normalized_cash_flow(
+        source,
+        "2025-12-31",
+        CUTOFF,
+        {**bridge, "compensation_source_tag": "ShareBasedCompensation"},
+        desk.sources,
+    )
+    assert default == explicit and default["bridged_equity_cash_flow_usd"] == "445"
+    assert "compensation_source_tag" not in default["assumptions"]
+    assert "compensation_source_tag" not in default
+    facts = source["content"]["facts"]
+    facts["AllocatedShareBasedCompensationExpense"] = {
+        "USD": [{**facts["ShareBasedCompensation"]["USD"][0], "val": 75}]
+    }
+    source["content"]["fact_taxonomies"] = {"AllocatedShareBasedCompensationExpense": "us-gaap"}
+    del facts["ShareBasedCompensation"]
+    with pytest.raises(MissingAnnualFact, match="ShareBasedCompensation"):
+        normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    bridge["compensation_source_tag"] = "AllocatedShareBasedCompensationExpense"
+    with pytest.raises(ValueError, match="explicit future-service compensation_policy"):
+        normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    bridge["compensation_policy"] = {
+        "annual_cash_usd": "60",
+        "rationale": "Conditional future replacement assumption, not disclosed historical expense",
+        "legacy_award_treatment": "Legacy claims separately reserved in shares; no accounting expense double charge",
+        "evidence_ids": ["assumptions"],
+    }
+    before = copy.deepcopy((source, bridge))
+    result = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    assert result["compensation_source_tag"] == "AllocatedShareBasedCompensationExpense"
+    assert result["compensation_source_taxonomy"] == "us-gaap"
+    assert "not verified CFO addback" in result["compensation_measure_label"]
+    assert result["sbc_fact"]["val"] == 75 and result["sbc_fact"]["unit"] == "USD"
+    assert result["sbc_fact"]["accn"] == facts[CFO]["USD"][0]["accn"]
+    assert result["future_compensation_cash_usd"] == "60"
+    assert (
+        result["bridged_equity_cash_flow_usd"] == "425"
+    )  # 600 -100 -60 -15; no 75 expense/addback substitution.
+    assert (source, bridge) == before
+
+
+@pytest.mark.parametrize("fault", ["accession", "currency", "conflict", "period", "negative", "taxonomy"])
+def test_allocated_expense_selection_keeps_original_annual_guards(normalization, fault):
+    desk, source, bridge = normalization
+    record = {**source["content"]["facts"][CFO]["USD"][0], "val": 75}
+    selected = {"USD": [record]}
+    source["content"]["facts"]["AllocatedShareBasedCompensationExpense"] = selected
+    source["content"]["fact_taxonomies"] = {"AllocatedShareBasedCompensationExpense": "us-gaap"}
+    bridge.update(
+        compensation_source_tag="AllocatedShareBasedCompensationExpense",
+        compensation_policy={
+            "annual_cash_usd": "60",
+            "rationale": "Conditional future cash cost",
+            "legacy_award_treatment": "Separate outstanding claims",
+            "evidence_ids": ["assumptions"],
+        },
+    )
+    if fault == "accession":
+        record["accn"] = "0000000001-26-000009"
+    elif fault == "currency":
+        selected["EUR"] = selected.pop("USD")
+    elif fault == "conflict":
+        selected["USD"].append({**record, "val": 76})
+    elif fault == "period":
+        record["start"] = "2025-10-01"
+    elif fault == "taxonomy":
+        source["content"]["fact_taxonomies"]["AllocatedShareBasedCompensationExpense"] = "custom"
+    else:
+        record["val"] = -1
+    with pytest.raises(ValueError):
+        normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+
+
+def test_both_compensation_tags_are_distinct_and_never_summed(normalization):
+    from trader.financials import cash_flow_diagnostics
+
+    desk, source, bridge = normalization
+    facts = source["content"]["facts"]
+    facts["AllocatedShareBasedCompensationExpense"] = {
+        "USD": [{**facts["ShareBasedCompensation"]["USD"][0], "val": 75}]
+    }
+    source["content"]["fact_taxonomies"] = {
+        "ShareBasedCompensation": "us-gaap",
+        "AllocatedShareBasedCompensationExpense": "us-gaap",
+    }
+    canonical = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    assert (
+        canonical["sbc_expense_equivalent_usd"] == "40" and canonical["bridged_equity_cash_flow_usd"] == "445"
+    )
+    diagnostic = cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
+    assert diagnostic["sbc_deduction_sensitivity_usd"] == "460"
+    assert diagnostic["allocated_compensation_expense_fact"]["val"] == 75
+    assert diagnostic["facts"]["ShareBasedCompensation"]["val"] == 40
+    assert diagnostic["facts"]["AllocatedShareBasedCompensationExpense"]["val"] == 75
+    del facts["ShareBasedCompensation"]
+    diagnostic = cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
+    assert diagnostic["sbc_deduction_sensitivity_usd"] is None
+    assert "ShareBasedCompensation" in diagnostic["missing_facts"]
+    assert diagnostic["allocated_compensation_expense_fact"]["val"] == 75
+
+
+def test_existing_canonical_calculation_and_diagnostic_payloads_are_byte_stable(normalization):
+    import hashlib
+
+    from trader.financials import cash_flow_diagnostics
+    from trader.models import dumps
+
+    desk, source, bridge = normalization
+    normalized = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    diagnostic = cash_flow_diagnostics(source, "2025-12-31", CUTOFF)
+    # Pre-change canonical fixture payloads: preserve historical calculation IDs/replay.
+    assert (
+        hashlib.sha256(dumps(normalized).encode()).hexdigest()
+        == "f6aaedcfc9991945ffcbd1aedf970cce49e892ef8a1aead5c933bec7bc22808d"
+    )
+    assert (
+        hashlib.sha256(dumps(diagnostic).encode()).hexdigest()
+        == "33a42573c3585cfc29a563dc80248940df98bc4552a5ccbb2333dd0bcbc8ac65"
+    )
+    assert "compensation_source_tag" not in normalized["assumptions"]
+    assert "allocated_compensation_expense_fact" not in diagnostic

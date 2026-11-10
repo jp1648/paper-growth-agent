@@ -4,9 +4,8 @@ import argparse
 import fcntl
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import ROUND_DOWN
-from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -14,7 +13,8 @@ from trader.accounting import LedgerError
 from trader.alpaca import AlpacaBroker, AlpacaData, safe_error
 from trader.config import Settings
 from trader.evidence import EvidenceProvider
-from trader.models import TERMINAL, D, Decision, dt, dumps, now
+from trader.models import TERMINAL, D, Decision, dumps, now
+from trader.research import research_input
 from trader.research_team import DeepResearchTeam
 from trader.service import Service
 from trader.spending import spending_status
@@ -31,38 +31,6 @@ def exclusive(service):
             yield
         finally:
             fcntl.flock(handle, fcntl.LOCK_UN)
-
-
-def research_price(service, symbol):
-    clock = service.broker.clock()
-    if clock["is_open"]:
-        return service.data.quote(symbol).model_dump(mode="json")
-    zone = ZoneInfo("America/New_York")
-    stamp = dt(clock["timestamp"])
-    day = stamp.astimezone(zone).date()
-    sessions = service.broker.calendar((day - timedelta(days=14)).isoformat(), day.isoformat())
-    completed = [
-        session
-        for session in sessions
-        if datetime.fromisoformat(session["date"] + "T" + session["close"]).replace(tzinfo=zone) <= stamp
-    ]
-    if not completed:
-        raise RuntimeError("No completed regular session available for research reference")
-    session = max(completed, key=lambda item: item["date"])
-    close = service.data.session_close(symbol, session)
-    return {
-        "symbol": symbol,
-        "reference_price": str(close),
-        "ask": str(close),
-        "timestamp": datetime.fromisoformat(session["date"] + "T" + session["close"])
-        .replace(tzinfo=zone)
-        .isoformat(),
-        "source": "historical regular-session close; ask field is a reference only",
-        "feed": service.cfg.feed,
-        "historical": True,
-        "executable": False,
-        "coverage": "IEX exchange only" if service.cfg.feed == "iex" else "consolidated SIP",
-    }
 
 
 def confirmed_fill(store, cid):
@@ -151,13 +119,13 @@ def run(
                     EvidenceProvider(bounded, store, service.data),
                     unrestricted_research=unrestricted_research,
                 )
-                quote = research_price(service, symbol)
+                pricing = research_input(service, symbol, deferred=True)
                 context = {
                     "symbol": symbol,
                     "run_key": run_key,
                     "fresh": True,
                     "research_only": True,
-                    "quote": quote,
+                    **pricing,
                     "current_timestamp": now().isoformat(),
                     "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": None},
                 }
@@ -169,7 +137,7 @@ def run(
                 proposal = Decision.model_validate(result["decision"])
                 if proposal.symbol != symbol:
                     raise ValueError("Research decision changed the requested symbol")
-                result["quote"] = quote
+                result.update(pricing)
                 store.put(run_key, result, "acceptance_research")
                 record.update(status="complete", estimated_cap_usd=cap)
             else:

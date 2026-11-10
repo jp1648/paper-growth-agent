@@ -138,10 +138,10 @@ def test_real_deepagents_under_acceptance_lock(env, decision):
 def test_closed_market_uses_completed_regular_session(env):
     service, broker, _ = env
     broker.open = False
-    result = acceptance.research_price(service, "ACME")
+    result = acceptance.research_input(service, "ACME", deferred=True)["research_reference"]
     assert result["historical"] and result["executable"] is False
-    assert result["timestamp"].startswith("2026-10-20T16:00")
-    assert result["reference_price"] == "100"
+    assert result["session_closed_at"].startswith("2026-10-20T16:00")
+    assert result["price"] == "100"
 
 
 def test_fill_requires_matching_activity_quantity(env, decision):

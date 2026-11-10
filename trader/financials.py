@@ -34,6 +34,9 @@ class NormalizationBridge(Model):
     share_evidence_ids: list[str] = Field(min_length=1)
     share_rationale: str = Field(min_length=1)
     financing_and_claims: str = Field(min_length=1)
+    compensation_source_tag: Literal["ShareBasedCompensation", "AllocatedShareBasedCompensationExpense"] = (
+        "ShareBasedCompensation"
+    )
     compensation_policy: CompensationPolicy | None = None
 
 
@@ -41,9 +44,19 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     """Reproduce an explicit bridge; selected adjustments remain reviewable assumptions."""
     bridge = NormalizationBridge.model_validate(bridge).model_dump(mode="json", exclude_none=True)
     proxy = annual_cash_flow(source, period_end, cutoff)
-    sbc = annual_facts(source, period_end, cutoff, [("ShareBasedCompensation", "USD")])[
-        "ShareBasedCompensation"
-    ]
+    compensation_tag = bridge["compensation_source_tag"]
+    if compensation_tag == "ShareBasedCompensation":
+        bridge.pop("compensation_source_tag")  # Preserve existing canonical calculation payloads.
+    if compensation_tag == "AllocatedShareBasedCompensationExpense" and not bridge.get("compensation_policy"):
+        raise ValueError(
+            "Allocated compensation expense requires an explicit future-service compensation_policy; it is not a verified cash-flow addback"
+        )
+    if (
+        compensation_tag == "AllocatedShareBasedCompensationExpense"
+        and source["content"].get("fact_taxonomies", {}).get(compensation_tag) != "us-gaap"
+    ):
+        raise ValueError("Allocated compensation expense requires original us-gaap taxonomy provenance")
+    sbc = annual_facts(source, period_end, cutoff, [(compensation_tag, "USD")])[compensation_tag]
     baseline = next(iter(proxy["facts"].values()))
     if any(sbc[k] != baseline[k] for k in ("start", "end", "accn", "filed", "form")):
         raise ValueError("Normalization SBC and cash flows must use the same filing basis")
@@ -113,6 +126,15 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
         result["limitations"][0] = (
             "Explicit future-service cash policy replaces, rather than adds to, historical SBC; "
             "legacy award claims and tax effects require independent review."
+        )
+    if compensation_tag == "AllocatedShareBasedCompensationExpense":
+        result.update(
+            compensation_source_tag=compensation_tag,
+            compensation_source_taxonomy=source["content"].get("fact_taxonomies", {}).get(compensation_tag),
+            compensation_measure_label="Allocated recognized pretax compensation expense; not verified CFO addback or total award cost",
+        )
+        result["limitations"].append(
+            "Allocated expense is only a historical expense anchor. Capitalized compensation, tax effects, legacy awards and financing claims remain separate; immaterial is not exact zero, and no CFO addback equivalence is assumed."
         )
     return result
 
@@ -204,7 +226,13 @@ def cash_flow_diagnostics(source, period_end, cutoff):
         "PaymentsOfDividendsCommonStock",
         "IncomeTaxesPaidNet",
     )
-    extra = annual_facts(source, period_end, cutoff, [(t, "USD") for t in tags], optional=True)
+    extra = annual_facts(
+        source,
+        period_end,
+        cutoff,
+        [(t, "USD") for t in (*tags, "AllocatedShareBasedCompensationExpense")],
+        optional=True,
+    )
     baseline = next(iter(proxy["facts"].values()))
     for record in extra.values():
         if any(record[k] != baseline[k] for k in ("start", "end", "accn", "filed", "form")):
@@ -230,6 +258,11 @@ def cash_flow_diagnostics(source, period_end, cutoff):
             "Weighted-average shares are not a valuation-date or future diluted share base.",
         ],
     }
+    if "AllocatedShareBasedCompensationExpense" in extra:
+        result["allocated_compensation_expense_fact"] = extra["AllocatedShareBasedCompensationExpense"]
+        result["limitations"].append(
+            "Allocated compensation expense is disclosed separately; it does not substitute for canonical SBC or verify a CFO addback, total award cost or future cash policy."
+        )
     if tags[0] in extra:
         result["sbc_deduction_sensitivity_usd"] = str(cash - capex - dec(extra[tags[0]]["val"]))
     if tags[1] in extra and tags[2] in extra:

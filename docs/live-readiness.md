@@ -4422,3 +4422,35 @@ marked final answer only from a completed, non-refused, tool-free message, using
 the unchanged native schema parser. It preserves the original message and counts
 usage once; ambiguous/unphased/invalid/refused/incomplete responses still fail.
 This is offline validation, not a successful rerun or revised PG acceptance.
+
+### Observed regression and deferred-research repair
+
+The observed P&G regression on the parser candidate completed all four specialist
+reports, then stopped before the final Decision: the next lead reservation was
+$5.6336675 against the $5 test allowance. Actual settled estimate was $4.0754925,
+with no unknown charges. Independent review also identified available business
+coverage still unread; a larger allowance alone is not a sufficient remedy. The
+original failure remains unchanged. Correction guidance now prioritizes the
+earliest incomplete dependency and carries remaining objections through rebuilt
+downstream reports, without adding cycles or resetting counters.
+
+Closed-market deferred research now uses a separate historical reference from a
+validated completed broker-calendar session and last available regular-session
+minute bar. It retains feed, session, retrieval time and non-executable basis;
+it does not invent bid/ask fields or a consolidated closing-auction price. The
+ordinary graph retains the held portfolio and prior thesis. The acceptance helper
+uses the same reference path. Open-market/execution calls still require quotes,
+and subsequent reuse still passes the existing fresh execution guards.
+
+Generic financial input support now retains the original allocated compensation
+expense tag, requiring explicit selection, original annual US-GAAP provenance and
+an explicit future-service cash policy. It does not alias expense to a cash-flow
+addback, add it to canonical compensation, or remove legacy/tax/financing review.
+Canonical calculation payloads remain unchanged. SEC cache schema6 refreshes
+older bundles that omitted this field. CAT source preflight remains distinct from
+full economic acceptance, especially for finance-subsidiary reinvestment.
+
+Combined offline validation:1257 tests passed,7 skipped; lint/format checks passed.
+No successful full P&G acceptance, active trial or new order follows from these
+source changes. The next testing allowance must cover measured requirements and
+confirmed credit; ordinary spending history remains counted without resets.
