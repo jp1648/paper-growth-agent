@@ -202,3 +202,31 @@ def test_uncapped_liability_blocks_new_research_but_not_reconciliation(env, deci
     assert all(item["status"] == "unbounded model usage unresolved" for item in result["outcomes"])
     assert result["outcomes"]
     assert service.store.get(pending.key, "research_spend", scope="global") == original
+
+
+def test_testing_override_exceeds_daily_budget_but_preserves_cost_and_crash_liability(env):
+    service, _, _ = env
+    cfg = service.cfg.model_copy(update={"research_daily_cost_usd": dec(6), "research_max_cost_usd": dec(20)})
+    normal = DailyReservation(service.store, cfg, "normal")
+    normal.finish(dec(6))
+    testing = DailyReservation(service.store, cfg, "testing", testing=True)
+    assert testing.allowance == 20
+    assert testing.record["testing_budget_override"] is True
+    with pytest.raises(DailyBudgetExceeded, match="outstanding"):
+        DailyReservation(service.store, cfg, "duplicate-testing", testing=True)
+    testing.finish(dec("7.50"))
+    assert spending_status(service.store, dec(6))["charged_or_reserved_usd"] == dec("13.50")
+    with pytest.raises(DailyBudgetExceeded, match="exhausted"):
+        DailyReservation(service.store, cfg, "ordinary")
+    assert DailyReservation(service.store, cfg, "next-testing", testing=True).allowance == 20
+
+
+def test_testing_override_does_not_change_study_or_enable_unbounded_calls(env):
+    service, _, _ = env
+    with pytest.raises(DailyBudgetExceeded, match="bounded runs"):
+        DailyReservation(
+            service.store, service.cfg, "unbounded-test", testing=True, unrestricted_research=True
+        )
+    service.store.put("active", {"status": "operator_approved"}, "paper_study")
+    with pytest.raises(DailyBudgetExceeded, match="outside an active study"):
+        DailyReservation(service.store, service.cfg, "study-test", testing=True)

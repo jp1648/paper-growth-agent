@@ -75,11 +75,21 @@ def research_cost_summary(store):
 
 
 class DailyReservation:
-    def __init__(self, store, cfg, run_key, *, unrestricted_research=False):
+    def __init__(self, store, cfg, run_key, *, unrestricted_research=False, testing=False):
         self.store, self.key = store, str(uuid4())
         # Reserve before any API call; a crash keeps the full allowance charged to this day.
         with store.db:
             store.db.execute("BEGIN IMMEDIATE")
+            if testing and (unrestricted_research or store.get("active", "paper_study") is not None):
+                raise DailyBudgetExceeded("Testing overrides require bounded runs outside an active study")
+            if (
+                testing
+                and store.db.execute(
+                    "SELECT 1 FROM documents WHERE scope='global' AND kind='research_spend' "
+                    "AND coalesce(json_extract(body, '$.status'), 'unknown')!='settled' LIMIT 1"
+                ).fetchone()
+            ):
+                raise DailyBudgetExceeded("Settle outstanding model charges before another testing run")
             if store.get("active", "paper_study") is not None:
                 from .paper_dispatch import funding_gate
 
@@ -89,7 +99,11 @@ class DailyReservation:
             status = spending_status(store, cfg.research_daily_cost_usd)
             self.unrestricted_research = unrestricted_research
             self.allowance = (
-                None if unrestricted_research else min(cfg.research_max_cost_usd, status["remaining_usd"])
+                None
+                if unrestricted_research
+                else cfg.research_max_cost_usd
+                if testing
+                else min(cfg.research_max_cost_usd, status["remaining_usd"])
             )
             if not unrestricted_research and status["unbounded_unknown_runs"]:
                 raise DailyBudgetExceeded(
@@ -104,6 +118,8 @@ class DailyReservation:
                 "started_at": now(),
                 "usd": dec(0) if unrestricted_research else self.allowance,
                 "unrestricted_research": unrestricted_research,
+                "testing_budget_override": testing,
+                "normal_daily_limit_usd": cfg.research_daily_cost_usd,
                 "unknown_total": unrestricted_research,
                 "status": "reserved",
             }

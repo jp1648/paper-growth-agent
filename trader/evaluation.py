@@ -559,7 +559,9 @@ def run_case(cfg, store, case, model, run_key):
     return record
 
 
-def run_suite(cfg, suite_path, output_dir, run_id, max_cost, split="development", *, models=None):
+def run_suite(
+    cfg, suite_path, output_dir, run_id, max_cost, split="development", *, models=None, testing=False
+):
     """Explicitly budgeted research-only run; shared daily reservation survives interruption."""
     import os
     import re
@@ -574,7 +576,8 @@ def run_suite(cfg, suite_path, output_dir, run_id, max_cost, split="development"
     if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}", run_id):
         raise ValueError("Invalid evaluation run ID")
     cap = dec(max_cost)
-    if not cap.is_finite() or not 0 < cap <= min(cfg.research_max_cost_usd, cfg.research_daily_cost_usd):
+    ceiling = dec(100) if testing else min(cfg.research_max_cost_usd, cfg.research_daily_cost_usd)
+    if not cap.is_finite() or not 0 < cap <= ceiling:
         raise ValueError("Evaluation budget must fit both configured per-run and daily limits")
     if split not in {"development", "holdout"}:
         raise ValueError("Select development or holdout explicitly")
@@ -616,7 +619,7 @@ def run_suite(cfg, suite_path, output_dir, run_id, max_cost, split="development"
             }
         )
         budget_cfg = cfg.model_copy(update={"research_max_cost_usd": cap})
-        reservation = DailyReservation(root, budget_cfg, "evaluation:" + run_id)
+        reservation = DailyReservation(root, budget_cfg, "evaluation:" + run_id, testing=testing)
         allowance = reservation.allowance
         ledger = Store(local_cfg.database)
         ledger.experiment = {"id": "evaluation:" + run_id}
@@ -632,6 +635,7 @@ def run_suite(cfg, suite_path, output_dir, run_id, max_cost, split="development"
             "suite_hash": fingerprint(suite),
             "parent_suite_hash": fingerprint(original),
             "candidate_id": run_id,
+            "testing_budget_override": testing,
             "code_revision": fingerprint(code),
             "prompt_hash": fingerprint(prompt),
             "model_versions": {r: cfg.research_model(r).model for r in [*SCHEMAS, "research_lead"]},

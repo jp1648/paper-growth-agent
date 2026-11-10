@@ -68,6 +68,11 @@ def main(argv=None):
     live_eval.add_argument("--max-cost", required=True)
     live_eval.add_argument("--split", choices=["development", "holdout"], default="development")
     live_eval.add_argument("--allow-paid", action="store_true", required=True)
+    live_eval.add_argument(
+        "--testing",
+        action="store_true",
+        help="Use the explicit --max-cost testing allowance instead of normal run/day budgets; no broker",
+    )
     comparison = sub.add_parser("evaluate-compare", help="Compare paired frozen research evaluations")
     comparison.add_argument("--baseline", required=True)
     comparison.add_argument("--candidate", required=True)
@@ -246,7 +251,13 @@ def main(argv=None):
         from .evaluation import run_suite
 
         result = run_suite(
-            Settings.load(args.config), args.suite, args.output_dir, args.run_id, args.max_cost, args.split
+            Settings.load(args.config),
+            args.suite,
+            args.output_dir,
+            args.run_id,
+            args.max_cost,
+            args.split,
+            testing=args.testing,
         )
         print(json.dumps(result["summary"], indent=2))
         return 0

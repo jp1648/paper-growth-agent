@@ -139,7 +139,8 @@ def test_failures_are_included_in_cost_denominator(tmp_path):
 
 
 @pytest.mark.parametrize("missing_capex", [False, True])
-def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeypatch, missing_capex):
+@pytest.mark.parametrize("testing", [False, True])
+def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeypatch, missing_capex, testing):
     from test_research_team import TeamModel, financial_facts
 
     from trader import alpaca, observability
@@ -214,9 +215,15 @@ def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeyp
         )
     model = GapAwareModel(decision=decision, gap=True) if missing_capex else TeamModel(decision=decision)
     cfg = Settings(
-        database=str(tmp_path / "operational.sqlite"), input_cost_per_million="1", output_cost_per_million="1"
+        database=str(tmp_path / "operational.sqlite"),
+        input_cost_per_million="1",
+        output_cost_per_million="1",
+        research_daily_cost_usd="0" if testing else "10",
+        research_max_cost_usd="0.5" if testing else "5",
     )
-    result = run_suite(cfg, suite_path, tmp_path / "run", "real-graph-offline", "1", models=model)
+    result = run_suite(
+        cfg, suite_path, tmp_path / "run", "real-graph-offline", "1", models=model, testing=testing
+    )
     assert result["cases"][0]["complete"]
     assert result["cases"][0]["mechanical_pass"], result["cases"][0]
     if missing_capex:
@@ -246,7 +253,9 @@ def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeyp
     assert ledger.get("real-graph-offline", "evaluation_manifest", scope="global")["status"] == "complete"
     ledger.db.close()
     with pytest.raises(ValueError, match="already exists"):
-        run_suite(cfg, suite_path, tmp_path / "other", "real-graph-offline", "1", models=model)
+        run_suite(
+            cfg, suite_path, tmp_path / "other", "real-graph-offline", "1", models=model, testing=testing
+        )
 
 
 def test_comparison_rejects_different_evidence_and_reports_regression(tmp_path):
@@ -290,7 +299,9 @@ def test_provider_failure_retains_reservation_and_stops_next_case(tmp_path):
     path = tmp_path / "suite.json"
     path.write_text(json.dumps(suite))
     cfg = Settings(
-        database=str(tmp_path / "operational.sqlite"), input_cost_per_million="1", output_cost_per_million="1"
+        database=str(tmp_path / "operational.sqlite"),
+        input_cost_per_million="1",
+        output_cost_per_million="1",
     )
     model = TimeoutModel(decision=recording["cases"][suite["cases"][0]["id"]]["decision"])
     result = run_suite(cfg, path, tmp_path / "run", "timeout-case", "1", models=model)
