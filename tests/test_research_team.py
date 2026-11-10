@@ -1146,10 +1146,8 @@ def test_provider_decision_numeric_schema_and_decimal_runtime_remain_consistent(
 
 
 @pytest.mark.parametrize("normal_parent", [False, True])
-def test_finalize_saved_reports_one_call_no_investigation_and_preserves_unknown_hold(
-    env, decision, normal_parent
-):
-    from trader.spending import DailyReservation
+def test_finalize_saved_reports_requires_unknown_reconciliation_before_one_call(env, decision, normal_parent):
+    from trader.spending import DailyBudgetExceeded, DailyReservation
 
     service, broker, _ = env
     worker, _ = team(env, decision, gap=True)
@@ -1205,6 +1203,13 @@ def test_finalize_saved_reports_one_call_no_investigation_and_preserves_unknown_
         "run_key": "finalization",
         "quote": {"historical": True, "executable": False, "reference_price": "101"},
     }
+    with pytest.raises(DailyBudgetExceeded, match="Unknown model usage"):
+        recovery.run(new_context, finalize_from="failed-parent")
+    assert not model.calls
+    assert service.store.get(hold.key, "research_spend", scope="global") == original_hold
+    # Explicit fixture charge reconciliation is now required; unrestricted recovery cannot bypass unknown usage.
+    hold.finish(dec("1.23"))
+    original_hold = service.store.get(hold.key, "research_spend", scope="global")
     result = recovery.run(new_context, finalize_from="failed-parent")
     assert result["decision"]["action"] == "WATCH" and result["decision"]["quantity"] == "0"
     assert len(model.calls) == 1 and broker.submits == 0

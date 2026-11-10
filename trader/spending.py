@@ -21,6 +21,34 @@ def spending_status(store, limit, at=None):
 
     records = [json.loads(row[0]) for row in rows]
     used = sum((dec(r["usd"]) for r in records), dec(0))
+    # Testing costs remain in gross reports and provider allocations, not ordinary daily admission.
+    settled_testing = sum(
+        (
+            dec(r["usd"])
+            for r in records
+            if r.get("testing_budget_override") is True
+            and r.get("unrestricted_research") is False
+            and r.get("status") == "settled"
+            and r.get("unknown_total") is False
+        ),
+        dec(0),
+    )
+    ordinary_used = used - settled_testing
+    testing_records = [
+        json.loads(row[0])
+        for row in store.db.execute(
+            "SELECT body FROM documents WHERE scope='global' AND kind='research_spend' "
+            "AND json_type(body, '$.testing_budget_override')='true'"
+        )
+    ]
+    unresolved_testing = sum(
+        r.get("status") != "settled" or r.get("unknown_total") is not False for r in testing_records
+    )
+    unknown_usage = store.db.execute(
+        "SELECT count(*) FROM documents WHERE scope='global' AND kind='research_spend' "
+        "AND (coalesce(json_extract(body, '$.status'), 'unknown') NOT IN ('settled','reserved') "
+        "OR coalesce(json_extract(body, '$.unknown_total'), 0)!=0)"
+    ).fetchone()[0]
     # Midnight resets the allowance, not an uncapped liability from an earlier run.
     unbounded = store.db.execute(
         "SELECT count(*) FROM documents WHERE scope='global' AND kind='research_spend' "
@@ -33,6 +61,11 @@ def spending_status(store, limit, at=None):
         "limit_usd": limit,
         "charged_or_reserved_usd": used,
         "remaining_usd": max(dec(0), limit - used),
+        "settled_testing_usd": settled_testing,
+        "ordinary_charged_or_reserved_usd": ordinary_used,
+        "ordinary_remaining_usd": max(dec(0), limit - ordinary_used),
+        "unresolved_testing_runs": unresolved_testing,
+        "unknown_usage_runs": unknown_usage,
         "unresolved_runs": sum(r["status"] != "settled" for r in records),
         "unbounded_unknown_runs": unbounded,
     }
@@ -103,8 +136,16 @@ class DailyReservation:
                 if unrestricted_research
                 else cfg.research_max_cost_usd
                 if testing
-                else min(cfg.research_max_cost_usd, status["remaining_usd"])
+                else min(cfg.research_max_cost_usd, status["ordinary_remaining_usd"])
             )
+            if status["unknown_usage_runs"]:
+                raise DailyBudgetExceeded(
+                    "Unknown model usage remains unresolved; settle outstanding model charges"
+                )
+            if status["unresolved_testing_runs"]:
+                raise DailyBudgetExceeded(
+                    "Explicit testing usage remains unresolved; settle outstanding model charges"
+                )
             if not unrestricted_research and status["unbounded_unknown_runs"]:
                 raise DailyBudgetExceeded(
                     "Unbounded model usage remains unresolved; reconcile provider charges"

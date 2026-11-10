@@ -224,7 +224,13 @@ class Runner:
                     if spending["unbounded_unknown_runs"]:
                         outcomes.append({"symbol": symbol, "status": "unbounded model usage unresolved"})
                         continue
-                    if spending["remaining_usd"] <= 0:
+                    if spending["unknown_usage_runs"]:
+                        outcomes.append({"symbol": symbol, "status": "unknown model usage unresolved"})
+                        continue
+                    if spending["unresolved_testing_runs"]:
+                        outcomes.append({"symbol": symbol, "status": "explicit testing usage unresolved"})
+                        continue
+                    if spending["ordinary_remaining_usd"] <= 0:
                         outcomes.append({"symbol": symbol, "status": "daily model budget exhausted"})
                         continue
                 if (

@@ -123,10 +123,12 @@ def _funding_gate(store, cfg, current):
         return "confirmed credit cannot fund full capped run and buffer"
     if dec(funding["buffer_usd"]) < 10:
         return "funding buffer below reviewed minimum"
-    if (
-        spending_status(store, cfg.research_daily_cost_usd, current)["remaining_usd"]
-        < cfg.research_max_cost_usd
-    ):
+    spending = spending_status(store, cfg.research_daily_cost_usd, current)
+    if spending["unknown_usage_runs"]:
+        return "unresolved model charge"
+    if spending["unresolved_testing_runs"]:
+        return "explicit testing usage remains unresolved"
+    if spending["ordinary_remaining_usd"] < cfg.research_max_cost_usd:
         return "daily allowance cannot fund full capped run"
     return None
 

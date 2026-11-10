@@ -58,13 +58,18 @@ safety reviews remain recorded. Never reclassify an unsuccessful sufficient case
 after seeing its result merely to improve the completion rate. Independently
 reviewed economic acceptance remains distinct from mechanical completion.
 
-The current authorized model caps are $6 per New York day and $5 per run.
-Thirty-six runs each consuming the maximum would cost $180 in model usage. This is
+The current ordinary model caps are $6 per New York day and $6 per run.
+Thirty-six runs each consuming the maximum would cost $216 in model usage. This is
 scenario arithmetic, not a forecast, new budget approval or guaranteed successful
-research. Two $5 runs cannot fit the same $6 day. Schedule at most one full-cap
+research. Two $6 runs cannot fit the same $6 day. Schedule at most one full-cap
 attempt per day; any additional calls must fit the actual remaining allowance,
 confirmed provider credit and conservative buffer. Unknown charges/reservations
 remain liabilities. Failed attempts and required independent review costs count.
+Explicit bounded testing outside an active study has a separate admission exemption;
+its settled costs remain in gross spending and provider-credit deductions. Unknown
+charges block both modes. No testing override is permitted within this study, and
+ordinary safety reviews share its daily allowance. Historical charges are never
+removed or relabeled.
 At 60 sessions the daily ceilings sum to $360, but that is neither a funding
 balance nor authorization to spend that total. Existing per-call/run safeguards
 continue to control every attempt; do not stretch capped runs to meet a quota.

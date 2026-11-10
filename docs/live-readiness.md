@@ -4481,3 +4481,21 @@ A fresh, independently reviewed replacement funding allocation of $11 is install
 with the $15 buffer and original November 29 expiry intact. No charge or prior
 allocation history was erased. Daily capacity remains exhausted, and no active
 paper study or new order follows from this work.
+
+### Explicit testing exemption and ordinary admission
+
+The user's testing exemption is prospective admission policy, not removal of test
+costs. An independently reviewed policy separates the $6 ordinary daily allowance
+from already-settled, explicitly tagged bounded testing attempts. Only exact
+boolean testing approval, bounded mode, settled status and known cost qualify.
+Untagged legacy or unrestricted runs are not retrospectively relabeled. Gross
+spending, every provider-allocation debit, and all economic cost measurements keep
+the testing charges. Historical daily-compliance statements are not rewritten.
+
+Unknown charges across days block both modes; unresolved explicit testing also
+blocks ordinary admission. Ordinary concurrent reservations still consume the
+normal allowance. Testing remains forbidden inside an active measured study, so
+this cannot become an escape from its budget, sampling or acceptance criteria.
+The new ordinary subtotal and remaining allowance are reported separately from
+total charges. Implementation validation/deployment is recorded separately; this
+policy does not itself enable trading or satisfy research acceptance.

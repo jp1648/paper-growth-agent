@@ -384,7 +384,14 @@ def test_allocation_survives_settlement_and_subtracts_all_experiments(allocated_
     assert funding_gate(runner.store, runner.cfg, later) is None
     runner.store.put(
         "testing",
-        {"day": AT.date().isoformat(), "usd": "3", "status": "settled", "testing_budget_override": True},
+        {
+            "day": AT.date().isoformat(),
+            "usd": "3",
+            "status": "settled",
+            "testing_budget_override": True,
+            "unrestricted_research": False,
+            "unknown_total": False,
+        },
         "research_spend",
         scope="global",
     )
@@ -520,3 +527,49 @@ def test_concurrent_reservations_obey_allocation_and_daily_caps(
         "SELECT body FROM documents WHERE scope='global' AND kind='research_spend'"
     ).fetchall()
     assert len(rows) == 1 and dec(json.loads(rows[0][0])["usd"]) == 5
+
+
+def test_daily_admission_exempts_settled_testing_but_allocation_still_pays_it(allocated_runtime):
+    from trader.paper_dispatch import funding_gate
+    from trader.spending import spending_status
+
+    runner, _, _, _, _ = allocated_runtime
+    record = {
+        "day": AT.date().isoformat(),
+        "usd": "7",
+        "testing_budget_override": True,
+        "unrestricted_research": False,
+        "unknown_total": False,
+        "status": "settled",
+    }
+    runner.store.put("settled-testing", record, "research_spend", scope="global")
+    assert spending_status(runner.store, dec(6))["remaining_usd"] == 0
+    assert (
+        funding_gate(runner.store, runner.cfg, AT) is None
+    )  # 15allocation-7cost >=5run; ordinaryday still6.
+    runner.store.put("second-settled-testing", {**record, "usd": "4"}, "research_spend", scope="global")
+    assert (
+        funding_gate(runner.store, runner.cfg, AT)
+        == "confirmed credit cannot fund full capped run and buffer"
+    )
+    assert runner.store.get("settled-testing", "research_spend", scope="global") == record
+
+
+def test_previous_day_testing_reservation_blocks_funded_ordinary_admission(allocated_runtime):
+    from trader.paper_dispatch import funding_gate
+
+    runner, _, _, _, _ = allocated_runtime
+    runner.store.put(
+        "unsettled-testing",
+        {
+            "day": (AT - timedelta(days=1)).date().isoformat(),
+            "usd": "1",
+            "testing_budget_override": True,
+            "unrestricted_research": False,
+            "unknown_total": False,
+            "status": "reserved",
+        },
+        "research_spend",
+        scope="global",
+    )
+    assert funding_gate(runner.store, runner.cfg, AT) == "explicit testing usage remains unresolved"

@@ -35,14 +35,21 @@ def test_daily_reservations_survive_restart_and_unknown_usage(env, monkeypatch):
         with pytest.raises(DailyBudgetExceeded):
             DailyReservation(reopened, cfg, "reset-cannot-erase-cost")
         monkeypatch.setattr("trader.spending.now", lambda: AT + timedelta(days=1))
-        assert DailyReservation(reopened, cfg, "new-day").allowance == 5
+        with pytest.raises(DailyBudgetExceeded, match="Unknown model usage"):
+            DailyReservation(reopened, cfg, "new-day")
+        unknown.finish(dec(".1"))
+        assert DailyReservation(reopened, cfg, "new-day-after-reconciliation").allowance == 5
     finally:
         reopened.db.close()
 
 
-def test_daily_reservations_are_atomic_across_connections(env):
+@pytest.mark.parametrize("after_testing", [False, True])
+def test_daily_reservations_are_atomic_across_connections(env, after_testing):
     service, _, _ = env
     service.cfg.research_daily_cost_usd = dec(5)
+    if after_testing:
+        testing = DailyReservation(service.store, service.cfg, "settled-testing", testing=True)
+        testing.finish(dec(8))
     barrier = Barrier(2)
 
     def reserve():
@@ -230,3 +237,123 @@ def test_testing_override_does_not_change_study_or_enable_unbounded_calls(env):
     service.store.put("active", {"status": "operator_approved"}, "paper_study")
     with pytest.raises(DailyBudgetExceeded, match="outside an active study"):
         DailyReservation(service.store, service.cfg, "study-test", testing=True)
+
+
+def test_settled_bounded_testing_has_separate_ordinary_admission_without_erasing_costs(env):
+    service, _, _ = env
+    cfg = service.cfg.model_copy(update={"research_daily_cost_usd": dec(6), "research_max_cost_usd": dec(20)})
+    testing = DailyReservation(service.store, cfg, "testing-only", testing=True)
+    testing.finish(dec("8.5"))
+    original = service.store.get(testing.key, "research_spend", scope="global")
+    status = spending_status(service.store, dec(6))
+    assert status["charged_or_reserved_usd"] == status["settled_testing_usd"] == dec("8.5")
+    assert status["remaining_usd"] == 0
+    assert status["ordinary_charged_or_reserved_usd"] == 0 and status["ordinary_remaining_usd"] == 6
+    normal = DailyReservation(service.store, cfg, "ordinary-after-test")
+    assert normal.allowance == 6
+    with pytest.raises(DailyBudgetExceeded, match="exhausted"):
+        DailyReservation(service.store, cfg, "ordinary-duplicate")
+    normal.finish(dec(6))
+    assert spending_status(service.store, dec(6))["charged_or_reserved_usd"] == dec("14.5")
+    assert spending_status(service.store, dec(6))["ordinary_remaining_usd"] == 0
+    assert service.store.get(testing.key, "research_spend", scope="global") == original
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("testing_budget_override", 1),
+        ("testing_budget_override", False),
+        ("testing_budget_override", "true"),
+        ("testing_budget_override", None),
+        ("unrestricted_research", True),
+        ("unrestricted_research", None),
+        ("unrestricted_research", 0),
+        ("unknown_total", None),
+        ("unknown_total", 0),
+        ("unknown_total", "false"),
+        ("status", "unknown"),
+    ],
+)
+def test_only_exact_known_bounded_testing_flags_are_exempt(env, field, value):
+    service, _, _ = env
+    service.cfg.research_daily_cost_usd = dec(6)
+    record = {
+        "day": AT.date().isoformat(),
+        "usd": "7",
+        "testing_budget_override": True,
+        "unrestricted_research": False,
+        "unknown_total": False,
+        "status": "settled",
+    }
+    if value is None:
+        record.pop(field)
+    else:
+        record[field] = value
+    service.store.put("exact-flags", record, "research_spend", scope="global")
+    status = spending_status(service.store, dec(6))
+    assert status["settled_testing_usd"] == 0 and status["ordinary_charged_or_reserved_usd"] == 7
+    assert service.store.get("exact-flags", "research_spend", scope="global") == record
+    with pytest.raises(DailyBudgetExceeded):
+        DailyReservation(service.store, service.cfg, "ordinary-must-not-ignore-malformed")
+
+
+@pytest.mark.parametrize("state,unknown", [("reserved", False), ("unknown", True), ("settled", True)])
+def test_previous_day_unresolved_testing_blocks_normal_and_testing_and_runner(env, state, unknown):
+    from types import SimpleNamespace
+
+    service, _, _ = env
+    record = {
+        "day": (AT - timedelta(days=1)).date().isoformat(),
+        "usd": "20",
+        "testing_budget_override": True,
+        "unrestricted_research": False,
+        "unknown_total": unknown,
+        "status": state,
+    }
+    service.store.put("old-test", record, "research_spend", scope="global")
+    assert spending_status(service.store, dec(6))["unresolved_testing_runs"] == 1
+    for testing in (False, True):
+        with pytest.raises(DailyBudgetExceeded, match="outstanding|unresolved"):
+            DailyReservation(service.store, service.cfg, "blocked", testing=testing)
+    result = Runner(
+        service, SimpleNamespace(invoke=lambda payload: pytest.fail("Unresolved testing must block graph"))
+    ).tick()
+    expected = (
+        "explicit testing usage unresolved" if state == "reserved" else "unknown model usage unresolved"
+    )
+    assert result["outcomes"] and all(item["status"] == expected for item in result["outcomes"])
+    assert service.store.get("old-test", "research_spend", scope="global") == record
+
+
+def test_runner_ordinary_preread_uses_admission_not_gross_testing_costs(env):
+    from types import SimpleNamespace
+
+    service, _, _ = env
+    service.cfg.research_daily_cost_usd = dec(6)
+    testing = DailyReservation(service.store, service.cfg, "testing", testing=True)
+    testing.finish(dec(8))
+    calls = []
+
+    def invoke(payload):
+        calls.append(payload)
+        return {"decision": {"action": "WATCH", "confidence": "0.5"}, "execution": {"status": "watch"}}
+
+    result = Runner(service, SimpleNamespace(invoke=invoke)).tick()
+    assert calls and any(item.get("action") == "WATCH" for item in result["outcomes"])
+    assert spending_status(service.store, dec(6))["charged_or_reserved_usd"] == 8
+
+
+@pytest.mark.parametrize("status,unknown", [("unknown", False), (None, False), ("settled", True)])
+def test_any_day_untagged_unknown_charge_blocks_both_admission_lanes(env, status, unknown):
+    service, _, _ = env
+    record = {"day": (AT - timedelta(days=2)).date().isoformat(), "usd": "1", "unknown_total": unknown}
+    if status is not None:
+        record["status"] = status
+    service.store.put("legacy-unknown", record, "research_spend", scope="global")
+    summary = spending_status(service.store, dec(6))
+    assert summary["charged_or_reserved_usd"] == 0 and summary["unknown_usage_runs"] == 1
+    for testing in (False, True):
+        with pytest.raises(DailyBudgetExceeded, match="outstanding|Unknown model usage"):
+            DailyReservation(service.store, service.cfg, "must-not-admit", testing=testing)
+    assert service.store.get("legacy-unknown", "research_spend", scope="global") == record
