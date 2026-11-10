@@ -8,6 +8,7 @@ import re
 import threading
 import time
 from datetime import date, timedelta
+from decimal import localcontext
 from zoneinfo import ZoneInfo
 
 from deepagents import create_deep_agent
@@ -163,6 +164,7 @@ ROLES = {
             "Complete this workflow before deciding to withhold valuation: (1) Reconcile observed historical cash-flow inputs, including signed operating working-capital components for each available comparison year using sum_cash_flows. Separate cash payments from accounting provisions and identify any unresolved tax/escrow attribution; do not invent a decomposition. "
             "(2) For EVERY bridge adjustment and the share/award treatment, state in assumptions: observed source anchor; classification as observed fact, chosen forward policy, or unresolved historical attribution; explicit proposed amount/formula; economic rationale; and an adverse alternative. Management need not have announced your hypothetical financing, reinvestment or compensation policy. Label analyst choices as conditional assumptions, never observed facts. "
             "(3) Model an economically justified conditional bridge and scenarios with the calculation tools. Unknown future policy alone is not grounds to omit calculations. If historical attribution remains uncertain, assess whether a source-supported combined treatment or bounded sensitivity avoids double counting; do not silently set an unknown item to zero. If even bounded modeling would mislead, identify the exact missing historical input and explain why the uncertainty cannot be bounded, rather than merely listing unanswered forecasts. "
+            "A preferred recovery adjustment needs a forecast of operating funding needs anchored in the filing, not simply a fraction of historical outflow. When that preference cannot be justified, label the alternative cases without claiming a preferred normalized estimate. Explain each cash-flow growth scenario through disclosed business mix, margins and reinvestment; explain terminal multiples through post-horizon growth, maturity and competitive risk. Merely calling numbers analyst choices or a bracket is not an economic rationale. Use multiply_values for derived products such as award quantities times grant-date values, and cite the original inputs separately. "
             "All bridge evidence must appear in the valuation report. The historical proxy does not establish normalized earnings. Zero deltas require a specific scenario rationale, never a default to satisfy the schema. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Preserve unresolved_material_gaps for genuinely unsupported material historical inputs or assumptions; calculating a conditional sensitivity does not resolve such gaps or authorize BUY/ADD. A missing or unresolved normalization review blocks BUY/ADD. Return the calculation_id and exact bear/base/bull values when computed. "
             "Use inspect_cash_flow for annual accounting diagnostics or pass the proposed normalization_bridge to obtain its exact per-share result before calling value_scenarios with that same bridge. Missing inputs are gaps; arithmetic does not establish economic support. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
@@ -990,6 +992,24 @@ class ResearchDesk:
                 return result
 
         @tool
+        def multiply_values(left: str, right: str) -> dict:
+            """Multiply two decimal inputs exactly, e.g. award quantity times price. Arithmetic only; cite original sources for inputs and justify any forecast separately."""
+            if any(not re.fullmatch(r"-?[0-9]{1,18}(?:\.[0-9]{1,12})?", value) for value in (left, right)):
+                raise ValueError("Require plain decimals with at most 18 integer and 12 fractional digits")
+            with localcontext() as context:
+                context.prec = 64
+                result = {
+                    "kind": "derived_arithmetic",
+                    "left": left,
+                    "right": right,
+                    "product": format(dec(left) * dec(right), "f"),
+                    "note": "Arithmetic only, not new citable evidence or verification of input units, transcription, economic interpretation or forecast validity.",
+                }
+            with self.budget.lock:
+                self.budget.events.append(("decimal_product", copy.deepcopy(result)))
+            return result
+
+        @tool
         def inspect_valuation(calculation_id: str, target_price: str) -> dict:
             """Compute sensitivity and implied terminal multiples from a saved validated calculation."""
             with self.lock:
@@ -1010,6 +1030,7 @@ class ResearchDesk:
             inspect_valuation,
             inspect_cash_flow,
             sum_cash_flows,
+            multiply_values,
             read_source,
         ]
 

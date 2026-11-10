@@ -4172,4 +4172,42 @@ substantive concentration disclosures rather than table-of-contents headings.
 Targeted research tests:92 passed. Independent review identified and the fix now
 rejects an impossible correction before invalidating reports when even the
 required re-delegations cannot fit. Zero-tool corrections remain possible when
-delegations fit. Final review and deployment pending.
+delegations fit. Independent review approved the boundary fix. Full suite:1144 passed,7 skipped.
+Both exact-head CI checks passed; release16002e1 deployed with all36 source hashes
+verified. Original experiment/config/history/pause preserved; fresh reconciliation
+passed, while held AAPL review remains overdue. Run8 launched with cap$20,80model
+calls,64tools and unchanged context/time/output limits. No trial activation.
+
+### Run8 and diagnosed testing context adjustment
+
+Run8 failed at valuation's local context guard:181,420 accounted bytes against
+180,000, after duplicate accounting was removed (raw195,456). Cost$2.7564100
+is settled with zero unknown calls; all global model records settled. Business
+now correctly covers customer12%, carrier34%versus38%, and vendor46%/23%
+receivables concentration using a retained original passage. Critique/final
+decision did not run, so research remains unaccepted.
+
+Plan9 keeps deployed16002e1, case/scorer and cap$20 fixed, with a test-only
+240,000-byte context ceiling (within configuration validation),80modelcalls,
+64tools,5000outputtokens and1800seconds. No evidence is removed, no global
+monetary/risk gate is waived, and normal runtime settings are unchanged. Fresh
+03:08 grant evidence is conservatively reduced by fullrun6/7/8 costs. Pending
+independent plan approval and launch; never duplicate terminalrun8.
+
+### Run9 independent economic review and narrow repair
+
+Run9 completed all four reports and WATCH/zero shares, with four independently
+reproduced valuations and explicit correction-tool allocation. Its $7.0778275
+estimated model cost is settled; no unknown model costs. Independent review
+still requires economic explanations for growth/terminal assumptions and the
+preferred $10bn operating recovery. It also identified a $120,000 error in
+73.466m awards times $226.68; exact product is $16.653272880bn. Mechanical
+completion is not economic acceptance: reviewed results remain accepted0,
+failed1, pending0. Original artifacts are preserved.
+
+The narrow repair adds bounded exact decimal multiplication to the existing
+audited research tools and asks for explicit operating and terminal-economics
+rationale. Arithmetic output is not primary evidence and does not establish
+forecast validity. Research risk, cost and shared tool limits remain intact.
+The updated result still requires independent review after execution; paper
+activation remains paused.

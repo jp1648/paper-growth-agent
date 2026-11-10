@@ -1928,3 +1928,28 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
     result = build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "correct-once"})
     assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
     assert research.model._phase == 4
+
+
+def test_decimal_product_is_exact_audited_and_not_primary_evidence():
+    cfg = Settings()
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    multiply = next(t for t in desk.tools() if t.name == "multiply_values")
+    before = set(desk.sources)
+    result = multiply.invoke({"left": "73466000", "right": "226.68"})
+    assert result["product"] == "16653272880.00"
+    assert desk.budget.events[-1] == ("decimal_product", result)
+    assert set(desk.sources) == before and desk.calculations == {}
+    assert (
+        multiply.invoke({"left": "999999999999999999", "right": "999999999999999999"})["product"]
+        == "999999999999999998000000000000000001"
+    )
+    assert (
+        multiply.invoke({"left": "-0.000000000001", "right": "0.000000000001"})["product"]
+        == "-0.000000000000000000000001"
+    )
+    for invalid in ["NaN", "Infinity", "1e100000", "1" * 19, "0.0000000000001", "1+2", " 1"]:
+        with pytest.raises(ValueError, match="plain decimals"):
+            multiply.invoke({"left": invalid, "right": "1"})
