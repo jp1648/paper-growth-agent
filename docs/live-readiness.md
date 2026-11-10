@@ -3980,3 +3980,23 @@ subject to the unknown-charge and research-acceptance gates. The lifecycle,
 timeout and compensation code is deployed; no prospective study, extension
 approval or funded allocation has been activated. Frontend deployment is separate.
 Private release evidence: `state/release-f66d2b4/`.
+
+### November 9 dashboard deadline release
+
+The f66d2b4 dashboard is now serving production traffic at the existing protected
+URL. Cloud Build `196252c7-f22c-4b44-a8f4-0a3f65199948` succeeded; immutable image
+`sha256:69b6eb46b33108227ef677d1e4d5b8fdef75426411b9599c8a3b4ca451368714`
+is revision `trader-dashboard-00020-mum`. Non-image service configuration was
+verified unchanged. Candidate and production HTTP checks passed: unauthenticated
+API denied, existing password login succeeds, authenticated API is no-store,
+sign-out revokes access, and server-rendered Study deadlines are present. Returned
+snapshot shows pause true, reconciliation OK, no amendment and original expiry
+January 21, 2027. This check did not inspect rendered browser layout; CI browser
+checks passed for this candidate. Temporary candidate route was removed after
+promotion; previous production revision remains available for rollback.
+
+Fresh incident usage export contains 39 calls: all successful Sol/Terra calls,
+but only four of six known successful Astra calls and no timed-out call. Provider
+usage remains incomplete; no unknown-cost settlement or new paid retry occurred.
+An unanswered user question about whether API credits are shared remains relevant
+to autonomous allocation; do not infer account exclusivity from the local ledger.
