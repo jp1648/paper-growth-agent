@@ -3929,3 +3929,29 @@ Both CI workflows for the preceding candidate 509b740 passed, including the
 rerun of the infrastructure-failed browser-download job. Its built image remains
 undeployed and trading remains paused. Current credit-grant UI shows $80.85
 available, but that aggregate balance does not reconcile the timed-out request.
+
+### November 9 conditional compensation policy and export evidence
+
+Offline independent review identified a calculator restriction behind the award
+normalization gap: only historical SBC expense could be deducted. The bridge now
+optionally accepts an explicit future-service cash-compensation policy, with
+retained evidence, rationale and a separate explanation of legacy award claims.
+It replaces the historical deduction rather than adding another cost. Existing
+bridges reproduce their version-1 output unchanged; explicit policies produce
+version 2 with the replacement cash amount and historical SBC provenance retained.
+Neither schema compliance nor arithmetic establishes forecast validity. The
+research prompt also requires quantified normalization alternatives without
+combining overlapping tax/operating-movement recoveries or perpetuating one-time
+maturities. Tool execution and frozen replay cover both compensation paths,
+including missing citations and tampered arithmetic.
+
+Downloaded minute-level provider usage and itemized cost exports for the current
+incident. The usage window contains only 30 requests versus 41 known completed
+calls plus one unknown timeout locally. It is incomplete even for successful
+calls, so absent rows cannot establish a zero charge. The authoritative root
+ledger still holds $20 for `evaluation:annual-testing-v3-dev-20261109-4`, status
+unknown; pause remains present. No new paid run or reservation release occurred.
+
+Full offline validation after this change: **1111 passed, 7 skipped**. Skipped
+external checks are not evidence of provider or broker acceptance. Ruff and diff
+whitespace checks passed. The change is not deployed or paid-run validated.

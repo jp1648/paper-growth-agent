@@ -67,6 +67,51 @@ def test_bridge_source_immutability_and_independent_arithmetic(normalization):
     assert (source, bridge) == original
 
 
+def test_future_service_policy_replaces_historical_sbc_and_retains_provenance(normalization):
+    desk, source, bridge = normalization
+    legacy = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    assert legacy["bridge_version"] == 1
+    assert "compensation_policy" not in legacy["assumptions"]
+    bridge["compensation_policy"] = {
+        "annual_cash_usd": "60",
+        "rationale": "Synthetic observed new-grant value used as conditional future cash cost",
+        "legacy_award_treatment": "Existing awards reserved in dated shares; no second cash charge",
+        "evidence_ids": ["assumptions"],
+    }
+    result = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    assert result["bridge_version"] == 2
+    assert result["sbc_fact"]["val"] == 40
+    assert result["sbc_expense_equivalent_usd"] == "40"
+    assert result["future_compensation_cash_usd"] == "60"
+    # 600 - 100 - 60 - 15 = 425; the historical 40 is not also deducted.
+    assert result["bridged_equity_cash_flow_usd"] == "425"
+    assert result["cash_flow_per_share"] == "5.312500"
+
+
+@pytest.mark.parametrize(
+    "fault", ["negative", "nan", "unknown_evidence", "future_evidence", "blank_legacy", "blank_rationale"]
+)
+def test_future_compensation_policy_rejects_unsupported_inputs(normalization, fault):
+    desk, source, bridge = normalization
+    policy = {
+        "annual_cash_usd": "60",
+        "rationale": "Conditional future-service policy",
+        "legacy_award_treatment": "Existing shares include awards",
+        "evidence_ids": ["assumptions"],
+    }
+    bridge["compensation_policy"] = policy
+    if fault in {"negative", "nan"}:
+        policy["annual_cash_usd"] = "-1" if fault == "negative" else "NaN"
+    elif fault == "unknown_evidence":
+        policy["evidence_ids"] = ["invented"]
+    elif fault == "future_evidence":
+        desk.sources["assumptions"]["available_at"] = "2027-01-01T00:00:00Z"
+    else:
+        policy["legacy_award_treatment" if fault == "blank_legacy" else "rationale"] = " "
+    with pytest.raises(ValueError):
+        normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+
+
 @pytest.mark.parametrize(
     "fault",
     [
@@ -115,8 +160,20 @@ def test_invalid_normalization_is_not_a_supported_value(normalization, fault):
         normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
 
 
-def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(normalization):
+@pytest.mark.parametrize("explicit_compensation", [False, True])
+def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
+    normalization, explicit_compensation
+):
     desk, source, bridge = normalization
+    if explicit_compensation:
+        bridge["compensation_policy"] = {
+            "annual_cash_usd": "60",
+            "rationale": "Synthetic future-service cash replacement",
+            "legacy_award_treatment": "Existing awards already reserved in shares",
+            "evidence_ids": ["assumptions"],
+        }
+    per_share = "5.312500" if explicit_compensation else "5.562500"
+    present_value = "4.83" if explicit_compensation else "5.06"
     tools = {t.name: t for t in desk.tools()}
     args = {
         "financial_source_id": source["id"],
@@ -124,7 +181,7 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(norm
         "normalization_bridge": bridge,
     }
     inspected = tools["inspect_cash_flow"].invoke(args)
-    assert inspected["cash_flow_per_share"] == "5.562500"
+    assert inspected["cash_flow_per_share"] == per_share
     args.update(
         cash_flow_per_share=inspected["cash_flow_per_share"],
         growth_rates=["0"] * 3,
@@ -133,7 +190,7 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(norm
         years=1,
     )
     calc = tools["value_scenarios"].invoke(args)
-    assert calc["base_value"] == "5.06"  # 5.5625 / 1.1, rounded to cents
+    assert calc["base_value"] == present_value  # Cash per share / 1.1, rounded to cents.
     assert calc["normalization_bridge"] == inspected
     with pytest.raises(ValueError, match="source-derived"):
         tools["value_scenarios"].invoke(dict(args, cash_flow_per_share="5"))
@@ -151,13 +208,13 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(norm
     candidate["calculations"] = {calc["calculation_id"]: calc}
     assert score(case, candidate)["acceptance"] == "pending_human_review"
     # The baseline stays frozen even when a supported bridge changes forecast input.
-    case["expected"]["cash_flow_per_share"] = "5.562500"
+    case["expected"]["cash_flow_per_share"] = per_share
     assert "unsupported_cash_flow_input" in score(case, candidate)["failures"]
     case["expected"]["cash_flow_per_share"] = "5.000000"
     calc["inputs"]["cash_flow_per_share"] = "5"
     assert "unverified_financial_provenance" in score(case, candidate)["failures"]
-    calc["inputs"]["cash_flow_per_share"] = "5.562500"
-    assert desk.validate(Valuation, valuation)["base_value"] == "5.06"
+    calc["inputs"]["cash_flow_per_share"] = per_share
+    assert desk.validate(Valuation, valuation)["base_value"] == present_value
     valuation["evidence_ids"] = [source["id"]]
     with pytest.raises(ValueError, match="bridge evidence"):
         desk.validate(Valuation, valuation)

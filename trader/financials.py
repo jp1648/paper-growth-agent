@@ -16,6 +16,15 @@ class CashFlowAdjustment(Model):
     evidence_ids: list[str] = Field(min_length=1)
 
 
+class CompensationPolicy(Model):
+    """Cash cost of future service, separate from already outstanding award claims."""
+
+    annual_cash_usd: str
+    rationale: str = Field(min_length=1)
+    legacy_award_treatment: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+
+
 class NormalizationBridge(Model):
     """Explicit equity cash-flow assumptions; arithmetic does not certify economics."""
 
@@ -25,11 +34,12 @@ class NormalizationBridge(Model):
     share_evidence_ids: list[str] = Field(min_length=1)
     share_rationale: str = Field(min_length=1)
     financing_and_claims: str = Field(min_length=1)
+    compensation_policy: CompensationPolicy | None = None
 
 
 def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     """Reproduce an explicit bridge; selected adjustments remain reviewable assumptions."""
-    bridge = NormalizationBridge.model_validate(bridge).model_dump(mode="json")
+    bridge = NormalizationBridge.model_validate(bridge).model_dump(mode="json", exclude_none=True)
     proxy = annual_cash_flow(source, period_end, cutoff)
     sbc = annual_facts(source, period_end, cutoff, [("ShareBasedCompensation", "USD")])[
         "ShareBasedCompensation"
@@ -41,6 +51,11 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     if {row["category"] for row in bridge["adjustments"]} != categories:
         raise ValueError("Require each of the four normalization categories exactly once, including zeros")
     refs = set(bridge["share_evidence_ids"])
+    policy = bridge.get("compensation_policy")
+    if policy:
+        if not policy["rationale"].strip() or not policy["legacy_award_treatment"].strip():
+            raise ValueError("Compensation policy requires future-service and legacy-award explanations")
+        refs.update(policy["evidence_ids"])
     for row in bridge["adjustments"]:
         if not row["rationale"].strip():
             raise ValueError("Normalization adjustments require a rationale")
@@ -65,14 +80,17 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     shares, compensation = dec(bridge["valuation_shares"]), dec(sbc["val"])
     if shares <= 0 or compensation < 0:
         raise ValueError("Require positive shares and nonnegative source SBC")
+    future_compensation = dec(policy["annual_cash_usd"]) if policy else compensation
+    if future_compensation < 0:
+        raise ValueError("Future compensation cash cost must be nonnegative")
     cash = dec(proxy["facts"]["NetCashProvidedByUsedInOperatingActivities"]["val"])
     capex = dec(proxy["facts"]["PaymentsToAcquirePropertyPlantAndEquipment"]["val"])
     adjustment = sum((dec(row["annual_delta_usd"]) for row in bridge["adjustments"]), dec(0))
-    normalized = cash - capex - compensation + adjustment
+    normalized = cash - capex - future_compensation + adjustment
     if normalized <= 0:
         raise ValueError("Positive bridged equity cash flow unavailable; do not fabricate a valuation")
-    return {
-        "bridge_version": 1,
+    result = {
+        "bridge_version": 2 if policy else 1,
         "historical_provenance": proxy,
         "sbc_fact": sbc,
         "historical_cfo_less_capex_usd": str(cash - capex),
@@ -90,6 +108,13 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
             "Adjustment amounts, share base, existing award claims and forecasts require independent source/economic review.",
         ],
     }
+    if policy:
+        result["future_compensation_cash_usd"] = str(future_compensation)
+        result["limitations"][0] = (
+            "Explicit future-service cash policy replaces, rather than adds to, historical SBC; "
+            "legacy award claims and tax effects require independent review."
+        )
+    return result
 
 
 class MissingAnnualFact(ValueError):
