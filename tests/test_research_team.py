@@ -1526,8 +1526,14 @@ def test_filing_search_rejects_unbounded_queries(queries):
         cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
     )
     search = next(t for t in desk.tools() if t.name == "search_document")
-    result = search.invoke({"name": "search_document", "id": "bad-search", "type": "tool_call",
-        "args": {"document_id": "unknown", "queries": queries}})
+    result = search.invoke(
+        {
+            "name": "search_document",
+            "id": "bad-search",
+            "type": "tool_call",
+            "args": {"document_id": "unknown", "queries": queries},
+        }
+    )
     assert result.status == "error" and "one to three" in result.content
     assert not desk.texts
 
@@ -1624,15 +1630,23 @@ def test_search_argument_error_can_be_corrected_and_remains_counted():
 
     cfg = Settings()
     budget = Budget(cfg)
-    desk = ResearchDesk(cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), budget, None)
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), budget, None
+    )
     tools = {t.name: t for t in desk.tools()}
     document = tools["filing_documents"].invoke({"symbol": "ACME", "accession": "0000000001-26-000001"})[0]
     guard = Guard(budget, "business", {"search_document"})
     before = dict(desk.sources)
     for count in (7, 1):
-        call = {"name": "search_document", "id": f"search-{count}", "type": "tool_call",
-                "args": {"document_id": document["document_id"], "queries": ["tax"] * count}}
-        result = guard.wrap_tool_call(SimpleNamespace(tool_call=call), lambda req: tools["search_document"].invoke(req.tool_call))
+        call = {
+            "name": "search_document",
+            "id": f"search-{count}",
+            "type": "tool_call",
+            "args": {"document_id": document["document_id"], "queries": ["tax"] * count},
+        }
+        result = guard.wrap_tool_call(
+            SimpleNamespace(tool_call=call), lambda req: tools["search_document"].invoke(req.tool_call)
+        )
         assert result.status == ("error" if count == 7 else "success")
     assert budget.tools == 2 and guard.tool_calls == 2
     events = [body for kind, body in budget.events if kind == "research_tool_result"]
