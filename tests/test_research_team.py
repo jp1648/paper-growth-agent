@@ -1458,9 +1458,7 @@ def test_unknown_document_is_recoverable_without_creating_evidence():
     )
     assert correction["listed_documents"] == [document]
     assert correction["available"] is False and desk.sources == before
-    passage = tools["read_document"].invoke(
-        {"document_id": correction["listed_documents"][0]["document_id"]}
-    )
+    passage = tools["read_document"].invoke({"document_id": correction["listed_documents"][0]["document_id"]})
     assert passage["id"] in desk.sources and "cash flow" in passage["content"]
 
 
@@ -1706,15 +1704,25 @@ def test_correction_invalidates_dependents_preserves_originals_and_rejects_repla
 
     cfg = Settings()
     provider = Evidence()
-    desk = ResearchDesk(cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None)
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
     desk.reports = {name: {"value": name} for name in ROLES}
     desk.report_times = {name: now().isoformat() for name in ROLES}
     desk.calculations["original"] = {"value": "retained"}
     before = copy.deepcopy(desk.reports)
     tool = desk.correction_tool()
-    assert isinstance(tool.invoke({"role": "business", "report_sha256": "stale", "reason": "Missing concentration"}), str)
+    assert isinstance(
+        tool.invoke({"role": "business", "report_sha256": "stale", "reason": "Missing concentration"}), str
+    )
     assert desk.reports == before and desk.correction is None
-    result = tool.invoke({"role": "business", "report_sha256": hashlib.sha256(dumps(before['business']).encode()).hexdigest(), "reason": "Missing concentration"})
+    result = tool.invoke(
+        {
+            "role": "business",
+            "report_sha256": hashlib.sha256(dumps(before["business"]).encode()).hexdigest(),
+            "reason": "Missing concentration",
+        }
+    )
     assert result["invalidated"] == ["business", "valuation", "adversarial"]
     assert set(desk.reports) == {"catalysts"}
     assert desk.correction["reports"] == before
@@ -1722,7 +1730,16 @@ def test_correction_invalidates_dependents_preserves_originals_and_rejects_repla
     desk.reports.update(before)
     with pytest.raises(ValueError, match="fresh critique"):
         desk.result({})
-    assert isinstance(tool.invoke({"role": "business", "report_sha256": hashlib.sha256(dumps(before['business']).encode()).hexdigest(), "reason": "Again"}), str)
+    assert isinstance(
+        tool.invoke(
+            {
+                "role": "business",
+                "report_sha256": hashlib.sha256(dumps(before["business"]).encode()).hexdigest(),
+                "reason": "Again",
+            }
+        ),
+        str,
+    )
     assert len([e for e in desk.budget.events if e[0] == "research_correction_requested"]) == 1
     assert desk.budget.events[-1][1]["reports"] == before
 
@@ -1737,7 +1754,9 @@ def test_recreated_guard_does_not_reset_role_tool_allowance():
     original.tool_calls = original.specialist_allowance
     revised = Guard(budget, "valuation", {"read_source"})
     assert revised.tool_calls == revised.specialist_allowance == 14
-    reply = revised.wrap_tool_call(SimpleNamespace(tool_call={"name": "read_source", "id": "x"}), lambda _: pytest.fail("No quota reset"))
+    reply = revised.wrap_tool_call(
+        SimpleNamespace(tool_call={"name": "read_source", "id": "x"}), lambda _: pytest.fail("No quota reset")
+    )
     assert "exhausted" in reply.content and budget.tools == 0
 
 
@@ -1750,16 +1769,36 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
                 context = json.loads(messages[1].content)
                 request = None
                 if self._phase == 0 and context.get("report_sha256"):
-                    request = ("request_correction", {"role": "business", "report_sha256": context["report_sha256"]["business"], "reason": "Recheck concentration against original evidence"})
+                    request = (
+                        "request_correction",
+                        {
+                            "role": "business",
+                            "report_sha256": context["report_sha256"]["business"],
+                            "reason": "Recheck concentration against original evidence",
+                        },
+                    )
                     self._phase = 1
                 elif 1 <= self._phase <= 3:
                     role = ["business", "valuation", "adversarial"][self._phase - 1]
-                    request = ("task", {"subagent_type": role, "description": "Address concentration correction"})
+                    request = (
+                        "task",
+                        {"subagent_type": role, "description": "Address concentration correction"},
+                    )
                     self._phase += 1
                 elif self._phase == 4:
                     assert not kwargs["tools"]
                 if request:
-                    message = AIMessage(content="", tool_calls=[{"name": request[0], "args": request[1], "id": f"correct-{self._phase}", "type": "tool_call"}])
+                    message = AIMessage(
+                        content="",
+                        tool_calls=[
+                            {
+                                "name": request[0],
+                                "args": request[1],
+                                "id": f"correct-{self._phase}",
+                                "type": "tool_call",
+                            }
+                        ],
+                    )
                     message.usage_metadata = {"input_tokens": 100, "output_tokens": 100, "total_tokens": 200}
                     return ChatResult(generations=[ChatGeneration(message=message)])
             return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)

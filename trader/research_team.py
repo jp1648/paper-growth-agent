@@ -324,9 +324,11 @@ class Guard(AgentMiddleware):
             if len(request.messages) > 1 and isinstance(request.messages[-1], HumanMessage):
                 messages.extend(request.messages[-2:])
             tools = [
-                t for t in tools
+                t
+                for t in tools
                 if (t.get("name") if isinstance(t, dict) else t.name) == "request_correction"
-                and self.repair_available and self.repair_available()
+                and self.repair_available
+                and self.repair_available()
             ]
         if (
             not self.budget.unrestricted_research
@@ -617,8 +619,7 @@ class ResearchDesk:
                 "error": "unknown_reference",
                 "requested_id": document_id,
                 "listed_documents": [
-                    {"document_id": identifier, **doc}
-                    for identifier, doc in self.documents.items()
+                    {"document_id": identifier, **doc} for identifier, doc in self.documents.items()
                 ],
                 "note": "No listed document has this ID. Use an exact ID from filing_documents; an empty list means no document is available. This response supplies no evidence and cannot be cited.",
             }
@@ -1150,8 +1151,7 @@ class ResearchDesk:
                     "instruction": "Address the cited defect using original evidence and calculation tools. Retain unsupported gaps; do not change a conclusion just to gain approval.",
                 }
             dependencies = {
-                name: hashlib.sha256(dumps(self.reports[name]).encode()).hexdigest()
-                for name in prerequisites
+                name: hashlib.sha256(dumps(self.reports[name]).encode()).hexdigest() for name in prerequisites
             }
         schema, instructions = ROLES[role]
         tools = self.tools()
@@ -1173,7 +1173,12 @@ class ResearchDesk:
                 self.reports[role] = self.validate(schema, output.get("structured_response"))
                 self.report_dependencies[role] = dependencies
                 self.report_times[role] = now().isoformat()
-                if role == "catalysts" and self.targeted and self.correction is None and not self.reports[role]["requires_deeper_review"]:
+                if (
+                    role == "catalysts"
+                    and self.targeted
+                    and self.correction is None
+                    and not self.reports[role]["requires_deeper_review"]
+                ):
                     for saved in ("business", "valuation"):
                         if saved in self.reports:
                             continue
@@ -1197,22 +1202,32 @@ class ResearchDesk:
             """Request the investigation's one correction cycle after all reports. Name business, catalysts or valuation, its current report hash, and the specific material defect. Re-delegate invalidated reports in order; a fresh critique is required. No budget is reset."""
             with self.lock:
                 if (
-                    self.correction is not None or self.running
+                    self.correction is not None
+                    or self.running
                     or set(self.reports) != set(ROLES)
                     or role not in {"business", "catalysts", "valuation"}
-                    or not reason.strip() or len(reason) > 2000
+                    or not reason.strip()
+                    or len(reason) > 2000
                     or report_sha256 != hashlib.sha256(dumps(self.reports[role]).encode()).hexdigest()
                 ):
-                    raise ToolException("Correction unavailable or stale report hash; only one explicit material correction cycle is allowed.")
+                    raise ToolException(
+                        "Correction unavailable or stale report hash; only one explicit material correction cycle is allowed."
+                    )
                 self.budget.check()
                 invalidated = [role, "adversarial"]
                 if role != "valuation":
                     invalidated.insert(1, "valuation")
-                self.correction = copy.deepcopy({
-                    "role": role, "reason": reason, "report_sha256": report_sha256,
-                    "reports": self.reports, "report_times": self.report_times,
-                    "calculations": self.calculations, "invalidated": invalidated,
-                })
+                self.correction = copy.deepcopy(
+                    {
+                        "role": role,
+                        "reason": reason,
+                        "report_sha256": report_sha256,
+                        "reports": self.reports,
+                        "report_times": self.report_times,
+                        "calculations": self.calculations,
+                        "invalidated": invalidated,
+                    }
+                )
                 self.budget.events.append(("research_correction_requested", copy.deepcopy(self.correction)))
                 for name in invalidated:
                     self.reports.pop(name)
@@ -1220,7 +1235,11 @@ class ResearchDesk:
                     self.report_dependencies.pop(name, None)
                     if name in self.reused:
                         self.reused.remove(name)
-                return {"invalidated": invalidated, "instruction": "Re-delegate these reports in order. Original reports remain audited; remaining shared budgets still apply."}
+                return {
+                    "invalidated": invalidated,
+                    "instruction": "Re-delegate these reports in order. Original reports remain audited; remaining shared budgets still apply.",
+                }
+
         request_correction.handle_tool_error = True
         return request_correction
 
@@ -1269,7 +1288,10 @@ class ResearchDesk:
         return {
             **self.context,
             "reports": self.reports,
-            "report_sha256": {name: hashlib.sha256(dumps(report).encode()).hexdigest() for name, report in self.reports.items()},
+            "report_sha256": {
+                name: hashlib.sha256(dumps(report).encode()).hexdigest()
+                for name, report in self.reports.items()
+            },
             "correction_available": self.correction is None,
             "correction_instruction": "Before finalizing, use request_correction if available and a specific material defect can be repaired with remaining budgets. Otherwise preserve the gap in the final decision. A correction requires new downstream reports and critique; it does not grant acceptance.",
             "report_times": self.report_times,
