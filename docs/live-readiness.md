@@ -3955,3 +3955,28 @@ unknown; pause remains present. No new paid run or reservation release occurred.
 Full offline validation after this change: **1111 passed, 7 skipped**. Skipped
 external checks are not evidence of provider or broker acceptance. Ruff and diff
 whitespace checks passed. The change is not deployed or paid-run validated.
+
+### November 9 paused release of f66d2b4
+
+Both CI workflows passed. Cloud Build
+`44ffe436-437f-4e08-8aa0-eff08b5b3d28` succeeded; the executor now runs immutable
+image `sha256:8ad043ee17c073263d118be4080cba8f8e1855cd52f2c3e5d185f57ee85f2b87`.
+All 36 runtime source hashes matched. Initial metadata-based registry login
+failed; existing authenticated CLI access downloaded the image without adding
+permissions or persisting credentials. A deployment preflight failed because
+Docker required a PID column; it stopped before service mutation. The corrected
+procedure was independently reviewed before the successful paused restart.
+
+The original experiment and configuration are preserved, trading pause remains,
+no active study is installed, and intent/order/activity/acceptance counts remain
+2/1/3/8. All global spending key/body pairs retained the exact same digest before
+backup and after restart, including the terminal run4 unknown $20 reservation.
+Rollback restores the prior image/environment, never an older ledger snapshot.
+
+Fresh heartbeat and broker reconciliation succeeded after restart. **Overall
+health is not green:** the existing AAPL holding has an overdue research review.
+This does not authorize liquidation or clearing the warning. Paid review remains
+subject to the unknown-charge and research-acceptance gates. The lifecycle,
+timeout and compensation code is deployed; no prospective study, extension
+approval or funded allocation has been activated. Frontend deployment is separate.
+Private release evidence: `state/release-f66d2b4/`.
