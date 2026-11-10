@@ -4384,3 +4384,41 @@ dispatch or local limit diagnostics. Shared counters, outside-lock dispatch,
 partial-error propagation, fresh-critique validation and original audits remain.
 Full suite1183 passed,7 skipped. This is offline evidence; the observed Microsoft
 failure is not converted into a passing or unseen result.
+
+### Bounded research testing and P&G disposition
+
+Release c74f213 adds explicit `research --defer-execution --testing --max-cost USD`.
+The override changes only the in-memory per-run cap and daily-budget admission;
+all prior charges remain counted, unresolved charges and active studies block
+admission, and model/tool/context/time limits remain enforced. It still uses the
+normal broker-backed research graph and saves a thesis; deferred execution does
+not mean an isolated evaluation. Supervised pause/listener exclusion and funding
+preflight remain necessary. Independent review and 1196 passing tests (7 skipped)
+preceded deployment; all 37 source hashes, original config/pause/history and spend
+records were verified unchanged except the deployed code.
+
+The independently frozen P&G full/missing pair is now observed: one accepted
+missing-input abstention and one failed sufficient-evidence case, no pending
+reviews. The full case stopped parsing valuation before critique/final decision.
+Combined settled model estimates were $2.4608700, with no unknown charges. Neither
+provisional arithmetic nor the accepted abstention establishes full research
+acceptance. Existing error telemetry preserved the complete failed response:
+commentary text preceded a schema-valid final-answer JSON block, and the native
+parser concatenated both. This reproduces the failure offline; it does not change
+the original failed result or authorize a blind paid retry.
+
+The independently reviewed prospective opening-stage addendum preserves all v2
+final measurement criteria: opening attests observable-ledger reconciliation,
+collectors, funding, safety and frozen protocol readiness; pending invoices and
+unknown actual claims remain pending and block final economic acceptance. They
+are never zero or excluded from the final metric. No calculation guard is relaxed
+and the addendum does not itself activate a study. On November 10 shortly after
+midnight New York time, the broker's latest AAPL ask was zero and its daily-loss
+baseline was unavailable; both gates remain enforced and the held review overdue.
+
+The phase-aware parser repair passed independent replay against the exact retained
+failed response and 1223 offline tests (7 skipped). It selects one explicitly
+marked final answer only from a completed, non-refused, tool-free message, using
+the unchanged native schema parser. It preserves the original message and counts
+usage once; ambiguous/unphased/invalid/refused/incomplete responses still fail.
+This is offline validation, not a successful rerun or revised PG acceptance.

@@ -16,7 +16,12 @@ from deepagents.backends import StateBackend
 from deepagents.middleware.subagents import SubAgentMiddleware
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, TodoListMiddleware
-from langchain.agents.structured_output import ProviderStrategy
+from langchain.agents.middleware.types import ModelResponse
+from langchain.agents.structured_output import (
+    ProviderStrategy,
+    ProviderStrategyBinding,
+    StructuredOutputValidationError,
+)
 from langchain.tools.tool_node import ToolCallRequest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
@@ -427,7 +432,36 @@ class Guard(AgentMiddleware):
         reserved = self.budget.model(request_bytes, self.role)
         started = time.monotonic()
         try:
-            response = handler(request.override(tools=tools, messages=messages))
+            try:
+                response = handler(request.override(tools=tools, messages=messages))
+            except StructuredOutputValidationError as error:
+                message = error.ai_message
+                blocks = message.content if isinstance(message.content, list) else []
+                text = [block for block in blocks if isinstance(block, dict) and block.get("type") == "text"]
+                final = [block for block in text if block.get("phase") == "final_answer"]
+                if (
+                    message.response_metadata.get("status") != "completed"
+                    or message.response_metadata.get("incomplete_details")
+                    or message.response_metadata.get("error")
+                    or message.response_metadata.get("refusal")
+                    or message.additional_kwargs.get("refusal")
+                    or message.tool_calls
+                    or message.invalid_tool_calls
+                    or len(final) != 1
+                    or any(block.get("phase") not in {"commentary", "final_answer"} for block in text)
+                    or any(
+                        not isinstance(block, dict) or block.get("type") not in {"text", "reasoning"}
+                        for block in blocks
+                    )
+                ):
+                    raise
+                try:
+                    binding = ProviderStrategyBinding.from_schema_spec(request.response_format.schema_spec)
+                    selected = binding.parse(message.model_copy(update={"content": final}))
+                except ValueError:
+                    raise error
+                # Parse the explicit final phase; preserve the complete original message for audit/history.
+                response = ModelResponse(result=[message], structured_response=selected)
         except Exception as error:
             usage = getattr(getattr(error, "ai_message", None), "usage_metadata", None)
             self.record_usage([usage] if usage else [], reserved)

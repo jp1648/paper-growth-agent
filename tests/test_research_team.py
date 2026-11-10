@@ -524,9 +524,25 @@ def test_sec_documents_safe_urls_bounded_content_and_no_redirects(tmp_path):
     store.db.close()
 
 
-@pytest.mark.parametrize("mode", ["complete", "refuse", "incomplete"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "complete",
+        "refuse",
+        "incomplete",
+        "mixed",
+        "mixed_ambiguous",
+        "mixed_unphased",
+        "mixed_invalid",
+        "mixed_malformed",
+        "mixed_unknown_phase",
+        "mixed_incomplete_details",
+        "mixed_refusal",
+        "mixed_incomplete",
+    ],
+)
 @pytest.mark.parametrize("model_id", ["gpt-6.1-sol", "gpt-6-astra", "gpt-6.1-terra"])
-def test_openai_responses_wire_contract_and_refusal(mode, model_id, monkeypatch):
+def test_openai_responses_wire_contract_and_refusal(mode, model_id, monkeypatch, tmp_path):
     from langchain.agents.structured_output import StructuredOutputValidationError
     from langchain_openai import ChatOpenAI
 
@@ -543,7 +559,14 @@ def test_openai_responses_wire_contract_and_refusal(mode, model_id, monkeypatch)
         "missing_information": ["Limited evidence"],
     }
 
+    from trader import observability as obs
+
+    sink = obs.Sink(tmp_path / "telemetry.sqlite", "unused", start=False)
+    monkeypatch.setattr(obs, "_sink", sink)
+    calls = []
+
     def handler(req):
+        calls.append(req)
         assert str(req.url) == "https://api.openai.com/v1/responses"
         payload = json.loads(req.content)
         assert payload["store"] is False
@@ -558,6 +581,38 @@ def test_openai_responses_wire_contract_and_refusal(mode, model_id, monkeypatch)
             if mode == "refuse"
             else [{"type": "output_text", "text": json.dumps(summary), "annotations": []}]
         )
+        output = [
+            {
+                "id": "msg_fixture",
+                "type": "message",
+                "role": "assistant",
+                "status": "completed",
+                "content": content,
+            }
+        ]
+        if mode.startswith("mixed"):
+            final = {**output[0], "phase": "final_answer"}
+            commentary = {
+                **output[0],
+                "id": "msg_commentary",
+                "phase": "commentary",
+                "content": [{"type": "output_text", "text": "Checking evidence", "annotations": []}],
+            }
+            output = [commentary, final]
+            if mode == "mixed_ambiguous":
+                output.append({**final, "id": "msg_other_final"})
+            if mode == "mixed_unphased":
+                commentary.pop("phase")
+            if mode == "mixed_invalid":
+                final["content"] = [
+                    {"type": "output_text", "text": '{"evidence_ids": []}', "annotations": []}
+                ]
+            if mode == "mixed_malformed":
+                final["content"] = [{"type": "output_text", "text": "not JSON", "annotations": []}]
+            if mode == "mixed_unknown_phase":
+                commentary["phase"] = "unknown"
+            if mode == "mixed_refusal":
+                final["content"] = [{"type": "refusal", "refusal": "Fixture refusal"}]
         return httpx.Response(
             200,
             json={
@@ -565,18 +620,12 @@ def test_openai_responses_wire_contract_and_refusal(mode, model_id, monkeypatch)
                 "object": "response",
                 "created_at": 1,
                 "model": model_id,
-                "status": "incomplete" if mode == "incomplete" else "completed",
+                "status": "incomplete" if mode in {"incomplete", "mixed_incomplete"} else "completed",
                 "error": None,
-                "incomplete_details": None,
-                "output": [
-                    {
-                        "id": "msg_fixture",
-                        "type": "message",
-                        "role": "assistant",
-                        "status": "completed",
-                        "content": content,
-                    }
-                ],
+                "incomplete_details": {"reason": "max_output_tokens"}
+                if mode == "mixed_incomplete_details"
+                else None,
+                "output": output,
                 "usage": {
                     "input_tokens": 20,
                     "output_tokens": 30,
@@ -604,14 +653,34 @@ def test_openai_responses_wire_contract_and_refusal(mode, model_id, monkeypatch)
     if mode == "incomplete":
         with pytest.raises(ResearchLimit, match="incomplete"):
             agent.invoke({"messages": [{"role": "user", "content": "Review fixture evidence"}]})
-    elif mode == "refuse":
+    elif mode in {
+        "refuse",
+        "mixed_ambiguous",
+        "mixed_unphased",
+        "mixed_invalid",
+        "mixed_malformed",
+        "mixed_unknown_phase",
+        "mixed_incomplete_details",
+        "mixed_refusal",
+        "mixed_incomplete",
+    }:
         with pytest.raises(StructuredOutputValidationError):
             output = agent.invoke({"messages": [{"role": "user", "content": "Review fixture evidence"}]})
             desk.validate(Catalysts, output.get("structured_response"))
     else:
         output = agent.invoke({"messages": [{"role": "user", "content": "Review fixture evidence"}]})
         assert desk.validate(Catalysts, output["structured_response"]) == summary
-    assert any(kind == "model_cost" for kind, _ in budget.events)
+    assert sum(kind == "model_cost" for kind, _ in budget.events) == 1
+    assert len(calls) == 1 and budget.models == 1
+    if mode == "mixed":
+        original = output["messages"][-1]
+        assert [block.get("phase") for block in original.content] == ["commentary", "final_answer"]
+        with sink.db() as db:
+            events = [json.loads(row[0]) for row in db.execute("SELECT body FROM outbox")]
+        responses = [event for event in events if event["name"] == "model.response"]
+        assert len(responses) == 1
+        saved = responses[0]["payload"]["response"]["result"][0]
+        assert saved["content"] == original.content
 
 
 def test_context_shortens_only_old_source_results_without_mutating_history():
