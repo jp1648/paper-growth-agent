@@ -201,6 +201,69 @@ def test_full_worked_dividend_chain(ledger_input):
     assert not result["unpaid_entitlements"]
 
 
+def test_full_settlement_scales_with_modeled_holdings_and_retains_payment_locks(ledger_input):
+    import copy
+
+    from trader.benchmark import build_ledger
+
+    d = ledger_input
+    days = (9, 10, 11, 12, 13, 16, 17)
+    template = d["sessions"][0]
+    d["sessions"] = [
+        dict(
+            copy.deepcopy(template),
+            date=f"2026-11-{day:02}",
+            close=f"2026-11-{day:02}T21:00:00Z",
+            mark="108.58",
+        )
+        for day in days
+    ]
+    d["expected_sessions"] = [r["date"] for r in d["sessions"]]
+    d["slippage_bps"] = 0
+    d["sessions"][0]["mark"] = "100.05"
+    for index, identifier in ((1, "d1"), (4, "d2")):
+        d["sessions"][index]["events"] = [
+            {
+                "id": identifier,
+                "kind": "dividend",
+                "evidence": "issuer",
+                "gross_per_share": "1",
+                "withholding_per_share": "0",
+                "fee_per_share": "0",
+            }
+        ]
+        payment_row = d["sessions"][index + 1]
+        payment_row["events"] = [
+            {
+                "id": "p" + identifier,
+                "kind": "payment",
+                "evidence": "paid",
+                "dividend_id": identifier,
+                "payment_date": payment_row["date"],
+                "available_at": payment_row["date"] + "T22:00:00Z",
+                "settle_remaining": True,
+                "settlement_evidence": "fixture-confirmed-full-distribution",
+            }
+        ]
+    baseline = build_ledger(d)
+    d["cash_model"] = {"annual_rate": "0.05", "amendment_sha256": "a" * 64}
+    modeled = build_ledger(d)
+    assert baseline["entitlements"]["d2"]["quantity"] == "9"
+    assert modeled["entitlements"]["d2"]["quantity"] == "10"
+    payment = modeled["entitlements"]["d2"]["payments"][0]
+    assert payment["net_cash"] == "10.00"
+    assert payment["settlement_basis"] == "remaining_entitlement"
+    assert payment["reinvest_on"] == "2026-11-17"
+    assert all(p["date"] not in ("2026-11-11", "2026-11-16") for p in modeled["purchases"])
+    d["sessions"][2]["events"][0]["net_cash"] = "9"
+    with pytest.raises(ValueError, match="Choose fixed"):
+        build_ledger(d)
+    del d["sessions"][2]["events"][0]["net_cash"]
+    d["sessions"][2]["events"][0]["settlement_evidence"] = ""
+    with pytest.raises(ValueError, match="Missing evidence"):
+        build_ledger(d)
+
+
 def test_opening_exdate_no_entitlement_and_split(ledger_input):
     from trader.benchmark import build_ledger
 

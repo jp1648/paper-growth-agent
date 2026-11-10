@@ -562,3 +562,36 @@ conservative: genuine quantity-dependent receipts or residual-cash interest may
 differ between scenarios and will require explicit review and a future
 rate/convention binding before this assembler accepts them. Never fabricate equal
 cash amounts to satisfy the check.
+
+## Paper-only cash convention integration
+
+The separately retained `forward-paper-v2-paper-cash.json` defines hypothetical
+0%, 2% and 5% scenarios; it does not attest actual account yield. For that exact
+amendment, the evidence bundle's `cash_comparison` attachment contains hash-bound
+`agent_cash` and `inventory` references. The builder verifies retained price and
+calendar bindings, reconciles inventory marks, and checks replayed cash against
+that same inventory before deriving all three rate scenarios for the primary
+whole-share/5bps SPY and QQQ ledgers and the descriptive cash-only comparator.
+Existing execution-friction sensitivity comparisons remain separately reported.
+
+Portfolio claims must explicitly classify evidenced, final cash-interest
+receivables and liabilities outside reported equity, including supported zeros.
+The model removes these components, plus actually booked interest and separately
+classified interest withholding, exactly once. Other fees, dividends, receivables,
+liabilities and operating costs remain. Opening nonzero interest claims/liabilities
+require a separately reviewed carry-in treatment; they are not silently removed.
+Original broker cash, holdings and input artifacts remain unchanged.
+
+A hypothetical ETF payment may use `settle_remaining: true` and a distinct
+`settlement_evidence` reference only when full settlement of the declared net
+entitlement is supported. It cannot also provide fixed `net_cash`. This derives
+payments from each scenario's holdings, preserves payment locks and existing
+reinvestment dates, and records the basis in the audit. Fixed partial payments
+and reversals are still supported by the ordinary ledger; when a cash scenario
+changes the entitlement, fixed receipts or reversals require scenario-specific
+review rather than an automatic copied amount.
+
+The resulting matrix reports after-cost returns, excess returns and drawdowns
+for every rate and flags primary excess-return sign changes. SPY remains primary;
+QQQ and cash cannot pass the primary uncertainty gate. Calculated agreement is
+not authentication of source completeness, actual account terms or activation.

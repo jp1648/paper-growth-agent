@@ -247,6 +247,11 @@ def test_descriptive_returns_drawdown_and_primary_boundary(document, symbol):
     else:
         assert result["comparison_role"] == "primary"
     document["benchmark"] = "CASH"
+    cash = build_observations(document)
+    assert cash["comparison_role"] == "secondary_descriptive_only"
+    with pytest.raises(ValueError, match="primary"):
+        paired_uncertainty(cash)
+    document["benchmark"] = "UNSUPPORTED"
     with pytest.raises(ValueError, match="SPY or"):
         build_observations(document)
 

@@ -3,6 +3,8 @@ import json
 from decimal import Decimal
 
 import pytest
+from test_benchmark import ledger_input  # noqa: F401
+from test_paper_observations import claim
 
 from trader.paper_cash import interval_interest, replay
 
@@ -165,3 +167,161 @@ def test_interest_precision_and_boundaries():
         with pytest.raises((ValueError, TypeError)):
             interval_interest(amount, "0.05", "2026-11-09", "2026-11-10")
     assert Decimal(interval_interest("1000", "0", "2026-11-09", "2026-11-10")["credit"]) == 0
+
+
+@pytest.fixture
+def matrix_input(ledger_input):  # noqa: F811
+    from trader.paper_cash import AMENDMENT_SHA256
+
+    cash = example()
+    cash["amendment_sha256"] = AMENDMENT_SHA256
+    add_interest(cash)
+    points = [
+        {
+            "date": r["date"],
+            "portfolio": claim(r["cash"], cost="0" if i == 0 else "1"),
+            "benchmark": claim("1000"),
+            "external_deposits": "0",
+            "external_withdrawals": "0",
+            "flow_evidence": "fixture",
+        }
+        for i, r in enumerate(cash["sessions"])
+    ]
+    nav = {
+        "version": 1,
+        "currency": "USD",
+        "benchmark": "SPY",
+        "flow_policy": "no_external_flows",
+        "source_manifest_sha256": "f" * 64,
+        "benchmark_method": "fixture",
+        "cost_allocation_method": "fixture",
+        "opening": points[0],
+        "observations": points[1:],
+        "expected_sessions": cash["expected_sessions"][1:],
+    }
+    inventory = {
+        "observations": [
+            {"date": r["date"], "portfolio": {"cash": r["cash"], "marked_equity": r["cash"]}}
+            for r in cash["sessions"]
+        ]
+    }
+    for point in points:
+        point["portfolio"]["cash_interest_liability_not_in_equity"] = {
+            "amount": "0",
+            "status": "final",
+            "evidence_sha256": "d" * 64,
+        }
+        point["portfolio"]["cash_interest_receivable_not_in_equity"] = {
+            "amount": "0",
+            "status": "final",
+            "evidence_sha256": "d" * 64,
+        }
+    ledger_input.update(calendar_sha256=cash["calendar_sha256"], expected_sessions=cash["expected_sessions"])
+    ledger_input["sessions"] = ledger_input["sessions"][:3]
+    for row, cash_row in zip(ledger_input["sessions"], cash["sessions"], strict=True):
+        row.update(date=cash_row["date"], close=cash_row["close"], mark="100")
+    return nav, cash, inventory, {s: deepcopy_ledger(ledger_input, s) for s in ("SPY", "QQQ")}
+
+
+def deepcopy_ledger(ledger, symbol):
+    result = copy.deepcopy(ledger)
+    result["symbol"] = symbol
+    return result
+
+
+def test_matrix_uses_one_portfolio_all_rates_and_removes_interest_once(matrix_input):
+    from trader.paper_cash import AMENDMENT_SHA256, compare_scenarios
+
+    before = copy.deepcopy(matrix_input)
+    result = compare_scenarios(*matrix_input, AMENDMENT_SHA256)
+    assert matrix_input == before
+    assert set(result["scenarios"]) == {"0", "0.02", "0.05"}
+    for scenario in result["scenarios"].values():
+        assert set(scenario["comparisons"]) == {"SPY", "QQQ", "CASH"}
+        for symbol, comparison in scenario["comparisons"].items():
+            report = comparison["returns"]
+            assert report["benchmark"] == symbol
+            expected = Decimal(scenario["agent_cash"]["balances"][-1]["modeled_cash"]) - 1
+            assert Decimal(report["balances"][-1]["portfolio"]["net_nav"]) == expected
+            assert report["comparison_role"] == (
+                "primary" if symbol == "SPY" else "secondary_descriptive_only"
+            )
+    assert (
+        result["scenarios"]["0"]["comparisons"]["CASH"]["returns"]["performance"]["net_excess_return"]
+        == "-0.001"
+    )
+
+
+@pytest.mark.parametrize("fault", ["equity", "cash", "calendar", "capital", "close", "missing", "amendment"])
+def test_matrix_rejects_substitution(matrix_input, fault):
+    from trader.paper_cash import AMENDMENT_SHA256, compare_scenarios
+
+    nav, cash, inventory, benchmarks = matrix_input
+    if fault == "equity":
+        nav["observations"][0]["portfolio"]["reported_equity"] = "1002"
+    elif fault == "cash":
+        inventory["observations"][1]["portfolio"]["cash"] = "1002"
+    elif fault == "calendar":
+        benchmarks["QQQ"]["calendar_sha256"] = "d" * 64
+    elif fault == "capital":
+        benchmarks["QQQ"]["opening_capital"] = "1001"
+    elif fault == "close":
+        benchmarks["QQQ"]["sessions"][1]["close"] = "2026-11-09T20:59:00Z"
+    elif fault == "missing":
+        del benchmarks["QQQ"]
+    else:
+        cash["amendment_sha256"] = "e" * 64
+    with pytest.raises(ValueError):
+        compare_scenarios(*matrix_input, AMENDMENT_SHA256)
+
+
+def test_matrix_removes_unposted_interest_but_preserves_other_claims(matrix_input):
+    from trader.paper_cash import AMENDMENT_SHA256, compare_scenarios
+
+    nav = matrix_input[0]
+    for point in nav["observations"]:
+        point["portfolio"]["net_receivables_not_in_equity"] = "12"
+        point["portfolio"]["cash_interest_receivable_not_in_equity"]["amount"] = "10"
+    result = compare_scenarios(*matrix_input, AMENDMENT_SHA256)
+    nav0 = result["scenarios"]["0"]["comparisons"]["CASH"]["returns"]["balances"][-1]["portfolio"]
+    assert nav0 == {"gross_nav": "1002.00", "net_nav": "1001.00"}
+    nav["observations"][0]["portfolio"]["cash_interest_receivable_not_in_equity"]["status"] = "unknown"
+    with pytest.raises(ValueError, match="Unknown actual cash-interest"):
+        compare_scenarios(*matrix_input, AMENDMENT_SHA256)
+
+
+def test_interest_withholding_removed_once_and_unrelated_liabilities_preserved(matrix_input):
+    from trader.paper_cash import AMENDMENT_SHA256, compare_scenarios
+
+    nav, cash, inventory, _ = matrix_input
+    cash["sessions"][1]["events"].append(
+        {
+            "id": "tax",
+            "kind": "interest_withholding",
+            "at": "2026-11-09T13:00:00Z",
+            "delta_cash": "-0.20",
+            "cash_after": "1000.80",
+            "locked_cash_after": "0",
+            "evidence_sha256": "d" * 64,
+        }
+    )
+    nav["version"] = 2
+    for i, point in enumerate([nav["opening"], *nav["observations"]]):
+        for side in ("portfolio", "benchmark"):
+            point[side]["accrued_liabilities_not_in_equity"] = {
+                "amount": "0",
+                "status": "final",
+                "evidence": "fixture",
+            }
+        if i:
+            cash["sessions"][i]["cash"] = "1000.80"
+            inventory["observations"][i]["portfolio"].update(cash="1000.80", marked_equity="1000.80")
+            point["portfolio"]["reported_equity"] = "1000.80"
+            point["portfolio"]["accrued_liabilities_not_in_equity"]["amount"] = "0.30"
+            point["portfolio"]["cash_interest_liability_not_in_equity"]["amount"] = "0.10"
+    result = compare_scenarios(*matrix_input, AMENDMENT_SHA256)
+    values = result["scenarios"]["0"]["comparisons"]["CASH"]["returns"]["balances"][-1]["portfolio"]
+    assert values == {"gross_nav": "999.80", "net_nav": "998.80"}
+    nav["observations"][0]["portfolio"]["cash_interest_liability_not_in_equity"]["status"] = "unknown"
+    with pytest.raises(ValueError, match="Unknown interest-linked"):
+        compare_scenarios(*matrix_input, AMENDMENT_SHA256)

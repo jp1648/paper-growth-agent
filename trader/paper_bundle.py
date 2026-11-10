@@ -57,6 +57,7 @@ def build_file(source, output):
         raise ValueError("Study must bind the retained protocol")
     missing = [f"study_manifest.{key}" for key in protocol["manifest_required"] if not manifest.get(key)]
     comparisons, primary, scenarios = {}, None, {}
+    cash_sources = {}
     entries = bundle["comparisons"]
     expected = {f"{symbol}:{method}" for symbol in ("SPY", "QQQ") for method in METHODS}
     if set(entries) - expected:
@@ -97,6 +98,8 @@ def build_file(source, output):
                 raise ValueError(f"Study manifest differs from observations: {field}")
         prices = bind_prices(capture_manifest.parent, ledger)
         binding = bind_benchmark(nav, ledger)
+        if method == "whole_5bps":
+            cash_sources[symbol] = (nav, ledger, capture_manifest.parent)
         if primary is not None:
             verify_shared_portfolio(primary, nav)
         else:
@@ -116,6 +119,32 @@ def build_file(source, output):
             missing.append(f"evidence.{category}")
         else:
             read(evidence[category])
+    cash_matrix = None
+    if protocol.get("cash_model") is not None:
+        if not evidence.get("cash_comparison") or set(cash_sources) != {"SPY", "QQQ"}:
+            missing.append("cash_scenario_matrix")
+        else:
+            from .paper_cash import compare_scenarios
+            from .paper_observations import reconcile_marks
+
+            _, cash_spec_raw = read(evidence["cash_comparison"])
+            cash_spec = json.loads(cash_spec_raw)
+            _, cash_raw = read(cash_spec["agent_cash"])
+            _, inventory_raw = read(cash_spec["inventory"])
+            cash = json.loads(cash_raw)
+            inventory = json.loads(inventory_raw)
+            marked = reconcile_marks(cash_sources["SPY"][2], inventory)
+            if protocol["cash_model"]["annual_rates"] != ["0", "0.02", "0.05"]:
+                raise ValueError("Unsupported cash convention rate matrix")
+            if cash["calendar_sha256"] != comparisons["SPY:whole_5bps"]["prices"]["calendar_sha256"]:
+                raise ValueError("Cash calendar differs from retained capture")
+            cash_matrix = compare_scenarios(
+                cash_sources["SPY"][0],
+                cash,
+                marked,
+                {symbol: value[1] for symbol, value in cash_sources.items()},
+                bundle["protocol"]["sha256"],
+            )
     result = {
         "version": 1,
         "status": "draft_diagnostic_only",
@@ -124,6 +153,7 @@ def build_file(source, output):
         "protocol": bundle["protocol"],
         "study_manifest": manifest,
         "comparisons": comparisons,
+        "cash_scenario_matrix": cash_matrix,
         "evidence": evidence,
         "missing_evidence": missing,
         "activation_authorized": False,

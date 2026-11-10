@@ -4325,3 +4325,29 @@ Common portfolio-NAV binding and the full0/2/5% scenario matrix remain to be
 implemented and independently reviewed. Until then the comparison binder rejects
 modeled benchmark cash rather than accepting an unmatched portfolio convention.
 Actual account terms and applicable fees remain separate live-readiness gates.
+
+### Cash convention matrix and preserved holdout
+
+The offline bundle now binds cash replay to retained-price inventory and a single
+portfolio NAV/cost history, derives the fixed0/2/5% matrix across agent, SPY, QQQ
+and cash, and flags changes in the sign of primary excess return. Independent
+review found and prompted fixes for unposted interest, interest-linked liabilities
+and fixed-dollar reversal reuse. Supported actual interest components are removed
+once; other claims/costs remain. Unsupported opening carry-in and changed-entitlement
+reversal scenarios fail closed. Full-distribution evidence can drive each ETF
+scenario's own settlement amount without changing reinvestment timing.
+
+One untouched Microsoft holdout attempt is separately reviewed and launched as
+`annual-testing-v3-holdout-20261109-1`: both original complete/missing-source cases,
+exact accepted6a06 research candidate, $5 shared cap and the existing exclusive-use
+funding allocation. It is not a retry or prompt-tuning run. Its outcome and
+independent semantic review remain pending; no paper activation follows yet.
+
+Independent review approved the offline matrix within its explicit unsupported
+boundaries;112 focused tests passed, and full suite1182 passed with7 skipped.
+The fixed-dollar reversal reproducer now rejects changed entitlements; interest
+withholding/liability removal retains unrelated costs. Source classification and
+opening approval remain separate. A read-only paper broker snapshot at
+2026-11-10T04:36:28Z reports cash99655.66, one AAPL share at344.33 average entry,
+zero open orders and next regular open2026-11-10T09:30:00-05:00. It is preopening
+evidence, not an opening-close valuation or a new fill.

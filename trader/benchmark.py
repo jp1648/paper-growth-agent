@@ -277,7 +277,15 @@ def _build_ledger(document):
                     ZoneInfo("America/New_York")
                 ).date() < date.fromisoformat(payment_day):
                     raise ValueError("Completed-payment confirmation cannot predate payment")
-                paid = amount(event["net_cash"], cents=True)
+                if event.get("settle_remaining") is True:
+                    if "net_cash" in event:
+                        raise ValueError("Choose fixed payment cash or evidenced full entitlement settlement")
+                    evidence(event["settlement_evidence"])
+                    paid = dec(entitlement["net"]) - dec(entitlement["received"])
+                else:
+                    if "settle_remaining" in event:
+                        raise ValueError("Full entitlement settlement must be explicitly true")
+                    paid = amount(event["net_cash"], cents=True)
                 if paid <= 0:
                     raise ValueError("Payment must be positive")
                 received = dec(entitlement["received"]) + paid
@@ -289,6 +297,10 @@ def _build_ledger(document):
                     {
                         "id": identifier,
                         "net_cash": str(paid),
+                        "settlement_basis": "remaining_entitlement"
+                        if event.get("settle_remaining")
+                        else "fixed_cash",
+                        "settlement_evidence": event.get("settlement_evidence"),
                         "reversed": "0",
                         "reversals": [],
                         "payment_date": payment_day,

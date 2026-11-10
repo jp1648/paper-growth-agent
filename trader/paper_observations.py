@@ -18,8 +18,8 @@ def build_observations(document):
 def _build_observations(document):
     if type(document.get("version")) is not int or document["version"] not in (1, 2):
         raise ValueError("Require observation input version 1 or 2")
-    if document.get("currency") != "USD" or document.get("benchmark") not in ("SPY", "QQQ"):
-        raise ValueError("Require SPY or descriptive secondary QQQ comparison in USD")
+    if document.get("currency") != "USD" or document.get("benchmark") not in ("SPY", "QQQ", "CASH"):
+        raise ValueError("Require SPY or descriptive secondary QQQ/CASH comparison in USD")
     if document.get("flow_policy") != "no_external_flows":
         raise ValueError("Intraday flows require subperiod valuations; this builder prohibits flows")
     for key in ("benchmark_method", "cost_allocation_method", "source_manifest_sha256"):
@@ -143,7 +143,7 @@ def _build_observations(document):
             "Net receivables require supported entitlement and deductions; gross unpaid dividends are insufficient.",
             "Calendar, marks, splits, benchmark holdings/reinvestment and cost allocation need independent review.",
             "Version 1 has no liability bridge; version 2 requires explicit evidenced unbooked liabilities.",
-            "QQQ is descriptive only and cannot replace the preregistered primary SPY comparison.",
+            "QQQ and CASH are descriptive only and cannot replace the preregistered primary SPY comparison.",
             "No trial activation, acceptance or trading authorization follows from this calculation.",
         ],
     }
