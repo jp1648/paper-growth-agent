@@ -4265,3 +4265,30 @@ original-source access and arithmetic. Independent source operations may batch
 within a model turn, but each tool remains metered and no IDs are guessed.
 Focused95 tests and full1147 tests pass (7 skipped); independent review approved.
 This is offline efficiency evidence, not proof of ordinary-cap research acceptance.
+
+### Run11 fits runtime ceilings but fails independent economics
+
+Run11 used36modelcalls,48tools,424.875seconds,149735peakbytes and$3.8481025
+estimated model spend, settled with no unknown charges. Both exact-head CI
+checks passed; c14cda9 deployed with36 source hashes verified and pause,
+configuration, original experiment and ledger/history preserved.
+
+Independent review records accepted0/failed1/pending0. Available geography and
+concentration remain unread; recovery alternatives and award reconciliation are
+incomplete. The critic also alleges changed valuation parameters contradicted by
+the retained original report/correction snapshot, and dismisses award numbers
+present near the end of a cited passage. Recorded arithmetic reproduces; this is
+not evidence of calculator corruption. WATCH remains supported by actual gaps,
+but cheaper mechanical completion does not substitute for research acceptance.
+Run10's independent conditional-research acceptance remains preserved.
+
+The existing$30 funding allocation now has$26.1518975 remaining after run11;
+its baseline and original expiry are unchanged. No new paid retry is justified
+until the specific reading-capacity and correction-provenance issues are addressed.
+
+A separately reviewed prospective paper cash specification is retained in
+forward-paper-v2-paper-cash.json. V1 stays unchanged. It defines common0/2/5%
+hypothetical cash scenarios, opening/rounding/flow/feasibility boundaries, and
+keeps actual account terms mandatory before any live-money readiness decision.
+It is specification approval only: deterministic replay and opening approval
+remain required, and no study or trading activation follows from the amendment.
