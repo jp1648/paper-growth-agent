@@ -17,6 +17,7 @@ from deepagents.middleware.subagents import SubAgentMiddleware
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, TodoListMiddleware
 from langchain.agents.structured_output import ProviderStrategy
+from langchain.tools.tool_node import ToolCallRequest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import ToolException, tool
@@ -1148,7 +1149,7 @@ class ResearchDesk:
                     if self.budget.unrestricted_research
                     else f" You currently have at most {max(0, self.budget.correction_tool_limits.get(role, max(0, (self.cfg.research_max_tool_calls - 2 * len(ROLES)) // len(ROLES))) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
                 )
-                + " Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
+                + " Batch independent source searches, reads or arithmetic requests in one model turn when their inputs are already known; each operation still counts against the shared tool budget. Never guess a source ID or offset to batch a dependent lookup. Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
                 if role != "research_lead"
                 else ""
             ),
@@ -1220,8 +1221,12 @@ class ResearchDesk:
             }
         schema, instructions = ROLES[role]
         tools = self.tools()
-        if role != "valuation":
-            tools = [t for t in tools if t.name != "value_scenarios"]
+        excluded = {
+            "business": {"value_scenarios", "inspect_valuation", "inspect_cash_flow"},
+            "catalysts": {"value_scenarios", "inspect_valuation", "inspect_cash_flow"},
+            "adversarial": {"value_scenarios"},
+        }.get(role, set())
+        tools = [t for t in tools if t.name not in excluded]
         try:
             agent = self.agent(role, schema, instructions, tools)
             output = self.invoke_report(
@@ -1330,6 +1335,36 @@ class ResearchDesk:
         return request_correction
 
     def run(self):
+        # Prerequisites are fixed; reserve model reasoning for research and the final decision.
+        dispatch = Guard(self.budget, "research_lead", {"task"}, self.reports)
+        order = ("catalysts", "business", "valuation", "adversarial") if self.targeted else tuple(ROLES)
+        for role in order:
+            request = ToolCallRequest(
+                tool_call={
+                    "name": "task",
+                    "id": f"initial-{role}",
+                    "args": {
+                        "subagent_type": role,
+                        "description": "Complete your assigned research using original evidence and the available prior reports.",
+                    },
+                    "type": "tool_call",
+                },
+                tool=None,
+                state={},
+                runtime=None,
+            )
+            dispatch.wrap_tool_call(
+                request,
+                lambda req: ToolMessage(
+                    content=self.specialist(
+                        req.tool_call["args"]["subagent_type"],
+                        {"messages": [HumanMessage(content=req.tool_call["args"]["description"])]},
+                    )["messages"][-1].content,
+                    tool_call_id=req.tool_call["id"],
+                ),
+            )
+        if set(self.reports) != set(ROLES):
+            raise ValueError("Initial research omitted a required specialist")
         subagents = [
             {
                 "name": role,
@@ -1341,16 +1376,14 @@ class ResearchDesk:
         lead = self.agent(
             "research_lead",
             Decision,
-            "You are the research lead and portfolio manager. Plan the investigation with write_todos. "
-            "Delegate to business and catalysts first (they may run concurrently), then valuation, then "
-            "adversarial. For targeted news review, call catalysts first; unchanged fresh business/valuation "
-            "reports may be reused by the system. All four reports must exist before your final decision. "
+            "You are the research lead and portfolio manager. The required initial specialist reports are complete. "
+            "Review their reasoning and contrary evidence before your final decision. "
             "If the completed critique exposes a material correctable defect, use request_correction once with the current report hash and a specific reason, then re-delegate invalidated specialists. This uses only remaining budgets. Otherwise finalize honestly; never treat unresolved gaps as resolved. "
             "Use your assigned auxiliary planning/source allowance when enforced; reserve delegation for all four specialists. Delegate evidence gaps rather than browsing exhaustively yourself. Compare with existing holdings and cash, resolve conflicts, "
             "then propose BUY/ADD/HOLD/REDUCE/SELL/WATCH. The critique is mandatory. Use quantity zero for "
             "HOLD/WATCH and numeric limit_price zero (never N/A). Use holding_period_days zero for WATCH when no holding is proposed; other actions require 1–730 days. Keep the final decision concise (under 600 words), including at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Use whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "
             "invalidation conditions and a future review date. An unresolved material gap blocks BUY/ADD.",
-            [t for t in self.tools() if t.name != "value_scenarios"] + [self.correction_tool()],
+            [self.correction_tool()],
             subagents,
         )
         prompt = {

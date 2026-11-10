@@ -347,9 +347,7 @@ def test_missing_default_rates_fails_before_any_client(monkeypatch):
     assert clients == []
 
 
-@pytest.mark.parametrize(
-    "mode", ["gap", "unsupported_valuation", "omit_specialists", "malicious_tool", "budget"]
-)
+@pytest.mark.parametrize("mode", ["gap", "unsupported_valuation", "malicious_tool", "budget"])
 def test_deepagents_cannot_bypass_review_permissions_or_budget(env, decision, mode):
     research, _ = team(env, decision, **({mode: True} if mode != "budget" else {}))
     service, broker, _ = env
@@ -785,7 +783,7 @@ def test_premature_and_concurrent_delegation_keep_reserved_slot_available():
     )
 
 
-def test_full_graph_reserves_all_specialists_after_exhaustive_lead_browsing(env, decision):
+def test_full_graph_bounds_exhaustive_specialists_before_lead_review(env, decision):
     class ExhaustiveModel(TeamModel):
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
             schema = kwargs["response_format"]["json_schema"]["name"]
@@ -798,7 +796,7 @@ def test_full_graph_reserves_all_specialists_after_exhaustive_lead_browsing(env,
             names = {tool.get("name") if isinstance(tool, dict) else tool.name for tool in kwargs["tools"]}
             if schema == "Decision" and json.loads(messages[1].content).get("reports"):
                 context = json.loads(messages[1].content)
-                assert len(messages) == 2 and not names
+                assert len(messages) == 2 and names == {"request_correction"}
                 assert set(context["report_times"]) == set(context["reports"])
                 assert context["calculations"] and context["quote"] and context["portfolio"]
                 assert context["reports"]["adversarial"]["evidence_ids"]
@@ -845,7 +843,7 @@ def test_full_graph_reserves_all_specialists_after_exhaustive_lead_browsing(env,
     assert result["execution"]["status"] == "submitted"
     assert broker.submits == 1
     audit = service.store.get("exhaustive-lead", "research_audit")
-    assert audit["tool_calls"] == 48 and not audit["stopped"]
+    assert audit["tool_calls"] == 44 and not audit["stopped"]
 
 
 @pytest.mark.parametrize("primary", ["primary.htm", None])
@@ -1953,3 +1951,59 @@ def test_decimal_product_is_exact_audited_and_not_primary_evidence():
     for invalid in ["NaN", "Infinity", "1e100000", "1" * 19, "0.0000000000001", "1+2", " 1"]:
         with pytest.raises(ValueError, match="plain decimals"):
             multiply.invoke({"left": invalid, "right": "1"})
+
+
+def test_initial_delegation_is_complete_metered_and_precedes_single_lead_call(env, decision):
+    research, model = team(env, decision, omit_specialists=True)
+    result = build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "fixed-dispatch"})
+    assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
+    assert model.calls.count("Decision") == 1 and model.calls[-1] == "Decision"
+    first = {name: model.calls.index(name) for name in ("Research", "Catalysts", "Valuation", "Critique")}
+    assert first["Research"] < first["Catalysts"] < first["Valuation"] < first["Critique"]
+    audit = env[0].store.get("fixed-dispatch", "research_audit")
+    tasks = [e for e in env[0].store.events("research_tool_result") if e["body"]["name"] == "task"]
+    assert len(tasks) == 4 and all(e["body"]["succeeded"] for e in tasks)
+    assert audit["tool_calls"] == len(env[0].store.events("research_tool_result"))
+
+
+def test_initial_missing_report_stops_before_lead(env, decision, monkeypatch):
+    research, model = team(env, decision)
+    original = ResearchDesk.specialist
+
+    def missing(self, role, task):
+        if role == "adversarial":
+            return {"messages": [AIMessage(content="No report")]}
+        return original(self, role, task)
+
+    monkeypatch.setattr(ResearchDesk, "specialist", missing)
+    with pytest.raises(ValueError, match="Initial research omitted"):
+        build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "missing-dispatch"})
+    assert "Decision" not in model.calls and env[1].submits == 0
+
+
+def test_role_tools_keep_evidence_and_adversarial_arithmetic(env, decision):
+    class ToolScopeModel(TeamModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            schema = kwargs["response_format"]["json_schema"]["name"]
+            names = {t.get("name") if isinstance(t, dict) else t.name for t in kwargs["tools"]}
+            if schema in {"Research", "Catalysts", "Valuation", "Critique"}:
+                assert {
+                    "read_source",
+                    "read_document",
+                    "search_document",
+                    "sum_cash_flows",
+                    "multiply_values",
+                } <= names
+                if schema in {"Research", "Catalysts"}:
+                    assert not names & {"value_scenarios", "inspect_cash_flow", "inspect_valuation"}
+                elif schema == "Critique":
+                    assert {"inspect_cash_flow", "inspect_valuation"} <= names
+                else:
+                    assert {"value_scenarios", "inspect_cash_flow", "inspect_valuation"} <= names
+            else:
+                assert names == {"request_correction"}
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    research, model = team(env, decision)
+    research.model = ToolScopeModel(decision=model.decision)
+    build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "role-tools"})

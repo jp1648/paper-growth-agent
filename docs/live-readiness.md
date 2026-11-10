@@ -4211,3 +4211,57 @@ rationale. Arithmetic output is not primary evidence and does not establish
 forecast validity. Research risk, cost and shared tool limits remain intact.
 The updated result still requires independent review after execution; paper
 activation remains paused.
+
+### Run10 accepted conditional research; release2590f44
+
+Run10 completed all four reports and WATCH/zero shares with $6.193680 estimated
+model spend, all settled and zero unknown charges. Independent review verified
+11 original passages, calculation arithmetic, and the economic framing; separate
+replay reports accepted1/failed0/pending0. The persistence case is explicitly not
+a preferred normalized fair value, and the combined-recovery alternative exceeds
+$200. The final decision incorporates that contrary scenario. This is acceptance
+of conditional research and temporary abstention, not a BUY or performance claim.
+Original artifacts remain unchanged under annual-testing-v3-dev-20261109-10.
+
+Release2590f44 passed1145 tests (7 skipped), both exact-head CI checks and image
+build. All36 runtime source hashes verified after deployment. Trading pause,
+ordinary configuration, original experiment and all ledger/history preserved;
+reconciliation passes and held AAPL review remains overdue. No active trial.
+
+Runtime feasibility remains separate: run10 consumed49 model calls,55 tools,
+peak185099 context bytes and$6.193680, exceeding ordinary5/run,24calls,48tools
+and180000 context. Do not claim supervised testing proves normal-cap operation.
+Independent diagnosis measured run9's first six lead calls at$1.50155; removing
+those alone still leaves48calls/$5.5762775. Investigate bounded orchestration and
+payload efficiencies while preserving economic review, original evidence and
+monetary/risk gates. No unseen Microsoft holdout output was inspected or tuned.
+
+Bounded funding allocation `paper-opening-20261110-allocation-1` is installed
+under the user's exclusive-use confirmation and finish-funding authorization:
+$30 allocation, $15 buffer, conservative available$49.1093225 after subtracting
+all run6–10 estimates from the refreshed provider balance. Original observation
+time and all44 settled spending records form the immutable baseline. Independent
+review bound exact receipt/installer bytes. Transaction verified today's ordinary
+daily gate blocks, next-day funding gate passes, expiry blocks, and pause remains.
+Expires2026-11-29T00:00UTC; this is not funding for the full12-week study. Any new
+research reservations/spend consume this allocation; no assumed refill or purchase.
+
+
+### Runtime configuration correction and efficiency repair
+
+A fresh read of Settings.load('/run/config.toml') in the deployed container
+shows60 model calls,48 tools,600seconds,180000input bytes,5000output tokens,
+$5/run and$6/day. Earlier24-call/3000-token comparisons used the local config;
+they are not the deployed settings. No runtime configuration was changed.
+The remaining measured gaps are cost, tool capacity and peak context, not a
+49-versus24 call limit. Retained runtime-limits-verified.json records this.
+
+Initial specialist ordering now uses the existing guarded/metered task path
+without a model deciding known prerequisites. Targeted news still runs catalysts
+first and preserves validated fresh-report reuse; all other required reports and
+critique precede Astra's correction/final judgment. Delegations remain charged and
+traced. Business/catalyst tools omit valuation-inspection schemas; critic retains
+original-source access and arithmetic. Independent source operations may batch
+within a model turn, but each tool remains metered and no IDs are guessed.
+Focused95 tests and full1147 tests pass (7 skipped); independent review approved.
+This is offline efficiency evidence, not proof of ordinary-cap research acceptance.
