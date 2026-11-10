@@ -1552,9 +1552,12 @@ class ResearchDesk:
 
 
 class DeepResearchTeam:
-    def __init__(self, cfg, store, evidence_provider, model=None, *, unrestricted_research=False):
+    def __init__(
+        self, cfg, store, evidence_provider, model=None, *, unrestricted_research=False, testing=False
+    ):
         self.cfg, self.store, self.provider, self.model = cfg, store, evidence_provider, model
         self.unrestricted_research = unrestricted_research
+        self.testing = testing
 
     def models(self, *, finalizing=False):
         cfg = self.cfg
@@ -1585,6 +1588,8 @@ class DeepResearchTeam:
     @traced("research.run")
     def run(self, context, *, finalize_from=None):
         cfg = self.cfg
+        if self.testing and not context.get("research_only"):
+            raise ValueError("Testing research requires deferred execution")
         parent = None
         if finalize_from:
             if context["run_key"] == finalize_from or self.store.get(context["run_key"], "research_audit"):
@@ -1614,7 +1619,11 @@ class DeepResearchTeam:
                 "reference_note": "New broker-backed reference for finalization; not the original investigation quote",
             }
         reservation = DailyReservation(
-            self.store, cfg, context["run_key"], unrestricted_research=self.unrestricted_research
+            self.store,
+            cfg,
+            context["run_key"],
+            unrestricted_research=self.unrestricted_research,
+            testing=self.testing,
         )
         budget = Budget(cfg, reservation.allowance, unrestricted_research=self.unrestricted_research)
         desk = None
@@ -1664,6 +1673,7 @@ class DeepResearchTeam:
                     "estimated_usd": budget.reserved,
                     "stopped": budget.failed,
                     "unrestricted_research": self.unrestricted_research,
+                    "testing_budget_override": self.testing,
                     "symbol": context["symbol"],
                     "quote": context.get("quote"),
                     "finalize_from": finalize_from,

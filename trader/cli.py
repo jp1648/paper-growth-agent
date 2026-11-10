@@ -37,6 +37,12 @@ def main(argv=None):
     )
     research.add_argument("--run-key", required=True, help="Stable logical decision ID, reused on retry")
     research.add_argument("--finalize-from", help="Explicit failed run with four fresh completed reports")
+    research.add_argument(
+        "--testing",
+        action="store_true",
+        help="Research only: use the explicit --max-cost allowance instead of normal daily funding; retain other limits",
+    )
+    research.add_argument("--max-cost", help="Explicit bounded testing allowance in USD")
     execute = sub.add_parser("execute")
     execute.add_argument("decision_file")
     execute.add_argument("--intent-key", required=True)
@@ -149,6 +155,11 @@ def main(argv=None):
     entitlement.add_argument("directory")
     entitlement.add_argument("--input", required=True)
     args = parser.parse_args(argv)
+    if args.command == "research":
+        if args.testing and (not args.defer_execution or args.max_cost is None):
+            parser.error("Research --testing requires --defer-execution and --max-cost")
+        if args.max_cost is not None and not args.testing:
+            parser.error("Research --max-cost requires --testing")
     if args.command == "model-paper-cash":
         from .paper_cash import replay
 
@@ -291,6 +302,9 @@ def dispatch(args):
     store = None
     try:
         cfg = Settings.load(args.config)
+        testing_research = args.command == "research" and args.testing
+        if testing_research:
+            cfg = Settings.model_validate({**cfg.model_dump(), "research_max_cost_usd": args.max_cost})
         store = Store(cfg.database)
         if args.command == "resolve-notification":
             from .notifications import resolve_delivery
@@ -359,7 +373,10 @@ def dispatch(args):
                 return
             else:
                 graph = build_graph(
-                    service, DeepResearchTeam(cfg, store, EvidenceProvider(cfg, store, service.data))
+                    service,
+                    DeepResearchTeam(
+                        cfg, store, EvidenceProvider(cfg, store, service.data), testing=testing_research
+                    ),
                 )
                 if args.command == "research":
                     result = graph.invoke(
