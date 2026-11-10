@@ -25,6 +25,13 @@ export interface TraceEvent {
   truncated: boolean;
 }
 export interface Snapshot {
+  lifecycle?: {
+    original_ends_at: string;
+    amended: boolean;
+    valid: boolean;
+    execution_ends_at: string | null;
+    effective_ends_at: string | null;
+  };
   x_credits?: {
     status: string;
     checked_at: string;

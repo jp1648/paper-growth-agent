@@ -43,6 +43,11 @@ def publish_snapshot(service):
         "generated_at": now(),
         "experiment_id": store.scope,
         "started_at": store.experiment.get("started_at"),
+        "lifecycle": {
+            "original_ends_at": store.experiment["ends_at"],
+            "amended": report["lifecycle"]["approval"] is not None,
+            **{k: report["lifecycle"].get(k) for k in ("valid", "execution_ends_at", "effective_ends_at")},
+        },
         "portfolio": {
             k: report[k]
             for k in (

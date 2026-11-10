@@ -152,3 +152,21 @@ def test_snapshot_includes_execution_coverage_without_inventing_zero(env):
     assert quality["aggregate_slippage_usd"] is None
     assert quality["aggregate_slippage_bps"] is None
     assert not quality["reference_coverage_complete"]
+
+
+def test_lifecycle_snapshot_exposes_deadlines_not_approval_packet(env):
+    service, _, _ = env
+    lifecycle = publish_snapshot(service)["lifecycle"]
+    original = service.store.experiment["ends_at"]
+    assert lifecycle == {
+        "original_ends_at": original,
+        "amended": False,
+        "valid": True,
+        "execution_ends_at": original,
+        "effective_ends_at": original,
+    }
+    service.store.put("approved", {"invalid": "receipt"}, "experiment_extension")
+    lifecycle = publish_snapshot(service)["lifecycle"]
+    assert lifecycle["amended"] and not lifecycle["valid"]
+    assert lifecycle["execution_ends_at"] is None and lifecycle["effective_ends_at"] is None
+    assert "approval" not in lifecycle

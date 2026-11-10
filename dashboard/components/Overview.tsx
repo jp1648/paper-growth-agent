@@ -45,6 +45,38 @@ export default function Overview({
           </section>
         ))}
       </div>
+      {s.lifecycle && (
+        <section className="panel" aria-label="Study deadlines">
+          <h2>Study deadlines</h2>
+          <p>
+            Original experiment expiry: {time(s.lifecycle.original_ends_at)}
+          </p>
+          {s.lifecycle.valid ? (
+            <>
+              <p>
+                Research and order cutoff:{" "}
+                {time(s.lifecycle.execution_ends_at ?? undefined)}
+              </p>
+              <p>
+                Reconciliation deadline:{" "}
+                {time(s.lifecycle.effective_ends_at ?? undefined)}
+              </p>
+              <p>
+                {s.lifecycle.amended
+                  ? "An audited extension preserves the original experiment history."
+                  : "No extension installed."}{" "}
+                Reconciliation time does not permit new trades or automatic
+                liquidation.
+              </p>
+            </>
+          ) : (
+            <p className="notice">
+              Lifecycle approval is invalid. New execution is blocked;
+              cancellation remains available.
+            </p>
+          )}
+        </section>
+      )}
       <section className="panel" aria-label="Economic result">
         <div className="panel-title">
           <div>
