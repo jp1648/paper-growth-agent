@@ -4584,3 +4584,44 @@ netting of proceeds, leases or acquisitions. Canonical calculation payloads rema
 unchanged. Independent reviews passed; the combined offline suite passed 1403
 tests with seven opt-in checks skipped. These changes are not yet deployment or
 successful paid validation evidence.
+
+### November 10 evening: observed research outcomes and restored paper controls
+
+Release `8409520` was deployed with all 38 Python source files verified and the
+ordinary $6 run/day limits unchanged. The fifth observed PG regression completed
+four reports in 397 seconds for $5.5512125, with no unknown model charges.
+Independent economic review still requires changes: material operating-cash-flow
+explanations and broader equity-award disclosures were not investigated, and
+minority ownership attribution remains unsupported. Improved correction capacity
+and reproduced arithmetic do not turn this observed failure into unseen acceptance.
+
+The separately supervised held-AAPL review reached valuation but stopped on an
+allocated-compensation request lacking its mandatory future-service policy. Its
+$2.9903025 estimated model cost is settled. The exact original pause, ordinary
+listener, deployed source/image and configuration were restored and verified;
+broker reads confirm one AAPL share and zero open orders, with unchanged intent
+and order records. No completed current holding review or new execution occurred.
+
+A narrow source fix makes only this missing-policy error recoverable at both
+calculation-tool boundaries. It creates no calculation or substituted assumption;
+invalid original provenance and other financial errors still fail closed. The
+agent must provide an explicit evidenced policy within the same remaining limits.
+Both rejection-and-correction paths pass focused offline tests. Deployment and a
+successful real rerun remain separate, uncompleted checks.
+
+Gross November 10 settled model estimates now total $30.5386125, including
+explicitly authorized testing; the finite allocation retains $25.3164900 after
+both attempts. These estimates are not a provider invoice. The broker's current
+daily-loss baseline now passes for November 10, but November 11 requires a fresh
+check. A prospective November 11–February 8 schedule is prepared and independently
+checked only as a draft. Research acceptance, opening evidence, lifecycle amendment
+and substantive opening approval remain pending; no study is active.
+
+Retained PG tool arguments confirm that the agent did not target the equity-plan
+table and used a cash-flow search phrase that missed the management discussion;
+two incorrect document identifiers also consumed repair calls. The candidate now
+replaces generic coverage wording with explicit investigation of those disclosure
+classes and passes compact registered document IDs/URLs to every specialist,
+including corrections. Original text, search ordering, scoring and limits are
+unchanged. This is a workflow correction, not evidence that the next model run
+will satisfy the economic review.

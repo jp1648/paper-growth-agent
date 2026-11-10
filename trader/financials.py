@@ -10,6 +10,10 @@ from pydantic import Field
 from .models import Model, dec, dt
 
 
+class CompensationPolicyRequired(ValueError):
+    """The analyst must explicitly supply a future-service compensation policy."""
+
+
 class CashFlowAdjustment(Model):
     category: Literal[
         "cash_taxes",
@@ -85,7 +89,7 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     if compensation_tag == "ShareBasedCompensation":
         bridge.pop("compensation_source_tag")  # Preserve existing canonical calculation payloads.
     if compensation_tag == "AllocatedShareBasedCompensationExpense" and not bridge.get("compensation_policy"):
-        raise ValueError(
+        raise CompensationPolicyRequired(
             "Allocated compensation expense requires an explicit future-service compensation_policy; it is not a verified cash-flow addback"
         )
     if (

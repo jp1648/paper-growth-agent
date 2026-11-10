@@ -696,3 +696,49 @@ def test_noncommon_absence_preserves_approved_financial_asset_v3_payload(normali
         hashlib.sha256(dumps(result).encode()).hexdigest()
         == "9f0135633edd2922ed976a18b3e1eb53a0faf7df92375e832834195228a9353c"
     )
+
+
+@pytest.mark.parametrize("tool_name", ["inspect_cash_flow", "value_scenarios"])
+def test_missing_compensation_policy_is_correctable_without_creating_calculation(normalization, tool_name):
+    desk, source, bridge = normalization
+    facts = source["content"]["facts"]
+    facts["AllocatedShareBasedCompensationExpense"] = {
+        "USD": [{**facts["ShareBasedCompensation"]["USD"][0], "val": 75}]
+    }
+    source["content"]["fact_taxonomies"] = {"AllocatedShareBasedCompensationExpense": "us-gaap"}
+    desk.sources[source["id"]] = source
+    bridge["compensation_source_tag"] = "AllocatedShareBasedCompensationExpense"
+    tool = next(t for t in desk.tools() if t.name == tool_name)
+    args = {
+        "financial_source_id": source["id"],
+        "financial_period_end": "2025-12-31",
+        "normalization_bridge": bridge,
+    }
+    if tool_name == "value_scenarios":
+        args.update(
+            cash_flow_per_share="5.312500",
+            growth_rates=["0", ".05", ".10"],
+            discount_rate=".10",
+            terminal_multiples=["10", "15", "20"],
+            years=5,
+        )
+    original = copy.deepcopy((source, bridge))
+    rejected = tool.invoke(args)
+    assert rejected["available"] is False and rejected["error"] == "compensation_policy_required"
+    assert not desk.calculations and (source, bridge) == original
+    bridge["compensation_policy"] = {
+        "annual_cash_usd": "60",
+        "rationale": "Conditional replacement assumption",
+        "legacy_award_treatment": "Legacy claims reserved separately",
+        "evidence_ids": ["assumptions"],
+    }
+    corrected = tool.invoke(args)
+    assert corrected.get("available") is not False
+    if tool_name == "value_scenarios":
+        assert corrected["calculation_id"] in desk.calculations
+    else:
+        assert corrected["cash_flow_per_share"] == "5.312500"
+    # A missing policy is correctable; invalid original provenance is still a hard failure.
+    source["content"]["fact_taxonomies"]["AllocatedShareBasedCompensationExpense"] = "custom"
+    with pytest.raises(ValueError, match="original us-gaap"):
+        tool.invoke(args)

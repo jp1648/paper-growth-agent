@@ -1982,6 +1982,10 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
 
     def seed_arithmetic(desk, role, task):
         if role == "business" and desk.correction is None:
+            desk.documents["document-navigation-only"] = {
+                "url": "https://www.sec.gov/Archives/example.htm",
+                "text": "not copied into prompt",
+            }
             tools = {tool.name: tool for tool in desk.tools()}
             tools["sum_cash_flows"].invoke(
                 {
@@ -2000,6 +2004,11 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
             if kwargs["response_format"]["json_schema"]["name"] == "Critique":
                 context = json.loads(messages[1].content)
+                assert {
+                    "document_id": "document-navigation-only",
+                    "url": "https://www.sec.gov/Archives/example.htm",
+                } in context["registered_documents"]
+                assert all(set(doc) == {"document_id", "url"} for doc in context["registered_documents"])
                 if context.get("correction"):
                     assert [r["event"] for r in context["arithmetic"]["records"]] == [
                         "cash_flow_sum",

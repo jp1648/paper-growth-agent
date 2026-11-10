@@ -35,6 +35,7 @@ from .claims import ClaimsCoverage, claim_gaps, validate_claim_coverage
 from .evidence import EvidenceTooLarge
 from .financials import (
     CapitalExpenditureSource,
+    CompensationPolicyRequired,
     MissingAnnualFact,
     NormalizationBridge,
     annual_cash_flow,
@@ -161,7 +162,7 @@ ROLES = {
     "valuation": (
         Valuation,
         (
-            "Use business and catalyst findings. Locate distinct tax, award and financing sections with search_document rather than repeatedly reading overlapping pages. Reserve three tool calls for inspect_cash_flow, value_scenarios and inspect_valuation; spend remaining calls on material gaps. Call value_scenarios with explicitly "
+            "Use business and catalyst findings. Locate MD&A liquidity/cash-flow explanations, tax notes, the equity-compensation plan table and its footnotes, and award/financing notes before closing coverage. Reconcile plan-table scope with individual award notes; an incorporated disclosure not retrieved remains an explicit coverage gap. Before calling material Other/residual operating cash movements unexplained, inspect management cash-flow discussion using descriptive variants, not only the exact statement-row label. Use search_document and returned offsets rather than overlapping or guessed pages. Reserve three tool calls for inspect_cash_flow, value_scenarios and inspect_valuation; spend remaining calls on material gaps. Call value_scenarios with explicitly "
             "justified cash-flow assumptions. Supply financial_source_id and financial_period_end from original "
             "structured facts: matched annual USD operating cash flow, USD capex and diluted weighted-average shares "
             "from one coherent filing accession/date/form. Do not mix amended and older facts. "
@@ -954,6 +955,13 @@ class ResearchDesk:
                         normalization_bridge,
                         bridge_sources,
                     )
+                except CompensationPolicyRequired as exc:
+                    return {
+                        "available": False,
+                        "error": "compensation_policy_required",
+                        "reason": str(exc),
+                        "note": "No calculation created. Correct the explicit policy with original evidence; no input is assumed or substituted.",
+                    }
                 except MissingAnnualFact as exc:
                     return {
                         "available": False,
@@ -1043,6 +1051,13 @@ class ResearchDesk:
                     capital_expenditure_source=selection,
                     sources=financial_sources,
                 )
+            except CompensationPolicyRequired as exc:
+                return {
+                    "available": False,
+                    "error": "compensation_policy_required",
+                    "reason": str(exc),
+                    "note": "No calculation created. Correct the explicit policy with original evidence; no input is assumed or substituted.",
+                }
             except MissingAnnualFact as exc:
                 return {
                     "available": False,
@@ -1303,6 +1318,10 @@ class ResearchDesk:
                 "evidence": self.source_previews(self.sources.values()),
                 "assignment": task["messages"][-1].content,
                 "claims_coverage": self.claims_coverage(),
+                "registered_documents": [
+                    {"document_id": identifier, "url": document.get("url")}
+                    for identifier, document in self.documents.items()
+                ],
             }
             if self.correction:
                 context["correction"] = {
