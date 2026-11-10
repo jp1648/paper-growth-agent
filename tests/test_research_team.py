@@ -619,7 +619,7 @@ def test_openai_responses_wire_contract_and_refusal(mode, model_id, monkeypatch)
 def test_context_shortens_only_old_source_results_without_mutating_history():
     from trader.research_team import Guard
 
-    old = ToolMessage(content="source-id " + ("x" * 12000), name="read_document", tool_call_id="old")
+    old = ToolMessage(content="source-id " + ("x" * 65000), name="company_evidence", tool_call_id="old")
     report = ToolMessage(content="r" * 12000, name="task", tool_call_id="report")
     latest = ToolMessage(content="y" * 12000, name="read_source", tool_call_id="latest")
     messages = [old, report, AIMessage(content="Next source"), latest]
@@ -1652,3 +1652,32 @@ def test_search_argument_error_can_be_corrected_and_remains_counted():
     events = [body for kind, body in budget.events if kind == "research_tool_result"]
     assert [body["succeeded"] for body in events] == [False, True]
     assert desk.sources == before  # Navigation and error messages never become citable evidence.
+
+
+@pytest.mark.parametrize("tool_name", ["read_document", "read_source"])
+def test_recent_passage_details_survive_reasoning_without_paid_rereads(tool_name):
+    from trader.research_team import Guard
+
+    messages = []
+    for i in range(5):
+        messages.extend(
+            [
+                ToolMessage(
+                    content="x" * 11000 + f"cash-tax-detail-{i}", name=tool_name, tool_call_id=str(i)
+                ),
+                AIMessage(content="Consider financing"),
+            ]
+        )
+    result = Guard.bounded_messages(messages)
+    assert all(result[i] is messages[i] for i in range(len(messages)))
+    assert "cash-tax-detail-0" in result[0].content
+
+
+def test_larger_configured_tool_pool_reaches_specialists_with_lead_reserve():
+    from trader.research_team import ROLES, Guard
+
+    budget = Budget(Settings(research_max_tool_calls=100))
+    guard = Guard(budget, "valuation", {"read_document"})
+    assert guard.specialist_allowance == 23
+    assert len(ROLES) * (guard.specialist_allowance + 1) + guard.lead_allowance == 100
+    assert guard.lead_allowance == 4

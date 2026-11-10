@@ -263,8 +263,8 @@ class Guard(AgentMiddleware):
         self.tool_calls = 0
         self.running_tasks = set()
         # Reserve one delegation per role before dividing the shared pool.
-        self.specialist_allowance = min(
-            10, max(0, (budget.cfg.research_max_tool_calls - len(ROLES)) // len(ROLES))
+        self.specialist_allowance = max(
+            0, (budget.cfg.research_max_tool_calls - 2 * len(ROLES)) // len(ROLES)
         )
         self.lead_allowance = max(
             0, budget.cfg.research_max_tool_calls - len(ROLES) * (1 + self.specialist_allowance)
@@ -280,14 +280,14 @@ class Guard(AgentMiddleware):
 
     @staticmethod
     def bounded_messages(messages):
-        # Originals remain in graph state and the evidence ledger; no paid summarizer.
+        # Keep bounded passages through synthesis; only bulky discovery listings become previews.
         last_assistant = max((i for i, m in enumerate(messages) if isinstance(m, AIMessage)), default=-1)
         result = []
         for i, message in enumerate(messages):
             if (
                 i < last_assistant
                 and isinstance(message, ToolMessage)
-                and message.name in {"read_document", "read_source", "company_evidence", "filing_documents"}
+                and message.name in {"company_evidence", "filing_documents"}
                 and isinstance(message.content, str)
                 and len(message.content) > 1200
             ):

@@ -3872,3 +3872,21 @@ Other exceptions and research limits still propagate. Regression verifies seven
 queries fail, a subsequent valid request works, and neither adds citable sources.
 This fix is not itself research acceptance. A fresh run ID is required for retry;
 the original run and its costs remain preserved. Trading remains paused.
+
+### November 9 second testing attempt: retained evidence and tool allocation
+
+`annual-testing-v3-dev-20261109-2` produced all four specialist reports and a WATCH
+decision in 241 seconds, estimated cost $3.5649750, 39 model calls and 44 tool calls.
+It **failed** sufficient-evidence acceptance (`required_valuation_missing`): the
+valuation report withheld scenarios after exhausting ten tools. No orders occurred.
+Artifacts remain in `state/evaluations/annual-testing-v3-dev-20261109-2`.
+
+Independent diagnosis found that earlier bounded read results were shortened to
+1,200 characters after every assistant reply, hiding already-retrieved material
+cash-tax, award and financing evidence. The fix preserves `read_document` and
+`read_source` results through synthesis; only bulky discovery listings shorten.
+The existing serialized-input-byte and spending gates still run before requests.
+The hardcoded ten-call specialist ceiling now follows the configured total pool,
+reserving lead/delegation capacity; ordinary 48-call configuration is unchanged.
+Any supervised increase must be explicit in the next manifest. Neither this fix
+nor the structurally complete WATCH output constitutes investment acceptance.
