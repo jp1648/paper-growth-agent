@@ -368,6 +368,7 @@ def cash_flow_diagnostics(source, period_end, cutoff, capital_expenditure_source
         "facts": {**proxy["facts"], **extra},
         "missing_facts": [t for t in tags if t not in extra],
         "cfo_less_capex_usd": str(cash - capex),
+        "cash_flow_per_share": proxy["cash_flow_per_share"],
         "sbc_deduction_sensitivity_usd": None,
         "distributions_above_proxy_usd": None,
         "cash_taxes_paid_net_usd": None,

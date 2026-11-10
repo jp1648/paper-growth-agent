@@ -2398,3 +2398,55 @@ def test_news_discovery_projection_retains_complete_original_for_reading():
     tool = next(t for t in desk.tools() if t.name == "read_source")
     assert json.loads(tool.invoke({"source_id": source["id"]})["content"]) == source["content"]
     assert source == original
+
+
+def test_cash_flow_transcription_mismatch_requires_new_exact_request():
+    import copy
+    from types import SimpleNamespace
+
+    from trader.research_team import Guard
+
+    cfg = Settings()
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    tool = next(t for t in desk.tools() if t.name == "value_scenarios")
+    args = {
+        "cash_flow_per_share": "5.000013",
+        "financial_source_id": "fixture-sec",
+        "financial_period_end": "2025-12-31",
+        "growth_rates": ["0"] * 3,
+        "discount_rate": "0.1",
+        "terminal_multiples": ["0"] * 3,
+        "years": 1,
+    }
+    inspect = next(t for t in desk.tools() if t.name == "inspect_cash_flow")
+    diagnostic = inspect.invoke({"financial_source_id": "fixture-sec", "financial_period_end": "2025-12-31"})
+    assert diagnostic["cash_flow_per_share"] == "5.000000"
+    originals = copy.deepcopy(desk.sources)
+    guard = Guard(desk.budget, "valuation", {"value_scenarios"})
+
+    def invoke(arguments):
+        call = {
+            "name": "value_scenarios",
+            "id": f"calc-{desk.budget.tools}",
+            "type": "tool_call",
+            "args": arguments,
+        }
+        response = guard.wrap_tool_call(
+            SimpleNamespace(tool_call=call), lambda req: tool.invoke(req.tool_call)
+        )
+        return json.loads(response.content)
+
+    rejected = invoke(args)
+    assert rejected["available"] is False and rejected["error"] == "cash_flow_input_mismatch"
+    assert rejected["supplied_cash_flow_per_share"] == "5.000013"
+    assert rejected["required_cash_flow_per_share"] == "5.000000"
+    assert not desk.calculations and desk.sources == originals
+    corrected = invoke(args | {"cash_flow_per_share": rejected["required_cash_flow_per_share"]})
+    assert corrected["inputs"]["cash_flow_per_share"] == "5.000000"
+    assert corrected["base_value"] == "4.55" and len(desk.calculations) == 1
+    assert desk.budget.tools == guard.tool_calls == 2
+    with pytest.raises(ValueError, match="Unknown financial evidence"):
+        tool.invoke(args | {"financial_source_id": "invented"})
+    assert len(desk.calculations) == 1 and desk.sources == originals

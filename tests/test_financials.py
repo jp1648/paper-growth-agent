@@ -98,18 +98,19 @@ def test_model_cannot_override_evidenced_cash_flow():
         evaluation_at=CUTOFF.isoformat(),
     )
     tool = next(t for t in desk.tools() if t.name == "value_scenarios")
-    with pytest.raises(ValueError, match="source-derived"):
-        tool.invoke(
-            {
-                "cash_flow_per_share": "5000",
-                "financial_source_id": "fixture-sec",
-                "financial_period_end": "2025-12-31",
-                "growth_rates": ["0", "0", "0"],
-                "discount_rate": ".1",
-                "terminal_multiples": ["0", "0", "0"],
-                "years": 1,
-            }
-        )
+    rejected = tool.invoke(
+        {
+            "cash_flow_per_share": "5000",
+            "financial_source_id": "fixture-sec",
+            "financial_period_end": "2025-12-31",
+            "growth_rates": ["0", "0", "0"],
+            "discount_rate": ".1",
+            "terminal_multiples": ["0", "0", "0"],
+            "years": 1,
+        }
+    )
+    assert rejected["available"] is False and rejected["error"] == "cash_flow_input_mismatch"
+    assert rejected["required_cash_flow_per_share"] == "5.000000"
     assert not desk.calculations
 
 

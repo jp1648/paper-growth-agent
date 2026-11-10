@@ -969,9 +969,13 @@ class ResearchDesk:
                     }
             required_cash = (bridge_result or provenance)["cash_flow_per_share"]
             if dec(cash_flow_per_share) != dec(required_cash):
-                raise ValueError(
-                    "Cash flow must equal source-derived proxy or explicit bridge: " + required_cash
-                )
+                return {
+                    "available": False,
+                    "error": "cash_flow_input_mismatch",
+                    "supplied_cash_flow_per_share": cash_flow_per_share,
+                    "required_cash_flow_per_share": required_cash,
+                    "note": "No calculation created and no input substituted. Use the exact source-derived proxy or explicit bridge value in a new request; this arithmetic requirement does not establish economic normalization.",
+                }
             cash, discount = dec(cash_flow_per_share), dec(discount_rate)
             growth, multiples = list(map(dec, growth_rates)), list(map(dec, terminal_multiples))
             if (

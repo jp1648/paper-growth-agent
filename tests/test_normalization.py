@@ -217,8 +217,10 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
     calc = tools["value_scenarios"].invoke(args)
     assert calc["base_value"] == present_value  # Cash per share / 1.1, rounded to cents.
     assert calc["normalization_bridge"] == inspected
-    with pytest.raises(ValueError, match="source-derived"):
-        tools["value_scenarios"].invoke(dict(args, cash_flow_per_share="5"))
+    rejected = tools["value_scenarios"].invoke(dict(args, cash_flow_per_share="5"))
+    assert rejected["available"] is False and rejected["error"] == "cash_flow_input_mismatch"
+    assert rejected["required_cash_flow_per_share"] == per_share
+    assert "calculation_id" not in rejected
     assert len(desk.calculations) == 1
 
     case = json.loads(Path("evaluations/baseline-v1.json").read_text())["cases"][0]
@@ -453,7 +455,7 @@ def test_both_compensation_tags_are_distinct_and_never_summed(normalization):
     assert diagnostic["allocated_compensation_expense_fact"]["val"] == 75
 
 
-def test_existing_canonical_calculation_and_diagnostic_payloads_are_byte_stable(normalization):
+def test_existing_calculation_and_prior_diagnostic_fields_remain_byte_stable(normalization):
     import hashlib
 
     from trader.financials import cash_flow_diagnostics
@@ -467,8 +469,10 @@ def test_existing_canonical_calculation_and_diagnostic_payloads_are_byte_stable(
         hashlib.sha256(dumps(normalized).encode()).hexdigest()
         == "f6aaedcfc9991945ffcbd1aedf970cce49e892ef8a1aead5c933bec7bc22808d"
     )
+    assert diagnostic["cash_flow_per_share"] == "5.000000"
+    prior_fields = {key: value for key, value in diagnostic.items() if key != "cash_flow_per_share"}
     assert (
-        hashlib.sha256(dumps(diagnostic).encode()).hexdigest()
+        hashlib.sha256(dumps(prior_fields).encode()).hexdigest()
         == "33a42573c3585cfc29a563dc80248940df98bc4552a5ccbb2333dd0bcbc8ac65"
     )
     assert "compensation_source_tag" not in normalized["assumptions"]

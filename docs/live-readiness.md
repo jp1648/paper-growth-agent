@@ -4677,3 +4677,28 @@ cost coverage are not certified. Opening approval remains separate. The canonica
 November 10 daily-price capture cannot be made before November 11 midnight New
 York under the existing collector guard; this is not permission to backdate or
 substitute an earlier economic anchor.
+
+The sixth observed PG regression then stopped in valuation after $1.5211500,
+with all usage settled. It supplied per-share cash flow 5.721956 instead of the
+source-derived 5.721969. Exact comparison correctly rejected the request, but the
+exception ended the investigation. Independent review records zero accepted and
+one reviewed failure; no critique or decision was completed. The failure did not
+come from the $8 testing cap. Original case, recording and results remain intact.
+
+The next narrow fix returns an unavailable mismatch response after provenance
+validation, with both supplied and required values. It creates no calculation,
+changes no input and requires a separately metered corrected request. Accounting
+diagnostics now expose their already-calculated historical per-share proxy;
+existing diagnostic fields and normalized calculation hashes remain unchanged.
+Offline reproduction of the exact PG request verifies rejection then explicit
+correction. This verifies arithmetic recovery, not economic normalization.
+Full checks: 1407 passed, seven external checks skipped; independent focused
+checks: 260 passed. Deployment and paid validation remain pending.
+
+Gross November 10 settled model estimates are $38.9129525 and remaining allocation
+is $16.9421500. A fresh billing export records $6.719385 gross cloud consumption,
+offset by equal credits, with some usage through November 10 18:00 UTC; coverage
+and final invoice reconciliation remain incomplete. Independently reviewed raw
+paper activity supports reconstructed booked closing cash $99655.66 and one AAPL
+share, subject to late-posting revisions. Later broker prices are not closing
+marks; canonical SIP marking and the November 11 loss baseline remain pending.
