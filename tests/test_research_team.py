@@ -1883,6 +1883,12 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
         _phase: int = PrivateAttr(default=0)
 
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            if kwargs["response_format"]["json_schema"]["name"] == "Critique":
+                context = json.loads(messages[1].content)
+                if context.get("correction"):
+                    provenance = context["correction"]["correction_valuation_provenance"]
+                    assert provenance["calculation_inputs_unchanged"] is True
+                    assert provenance["original_calculation_id"] == provenance["current_calculation_id"]
             if kwargs["response_format"]["json_schema"]["name"] == "Decision":
                 context = json.loads(messages[1].content)
                 request = None
@@ -1905,6 +1911,7 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
                     self._phase += 1
                 elif self._phase == 4:
                     assert not kwargs["tools"]
+                    assert context["correction_valuation_provenance"]["calculation_inputs_unchanged"] is True
                 if request:
                     message = AIMessage(
                         content="",
@@ -2007,3 +2014,38 @@ def test_role_tools_keep_evidence_and_adversarial_arithmetic(env, decision):
     research, model = team(env, decision)
     research.model = ToolScopeModel(decision=model.decision)
     build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "role-tools"})
+
+
+def test_correction_provenance_distinguishes_report_changes_inputs_and_missing_calculations():
+    import copy
+    import hashlib
+
+    from trader.models import dumps
+
+    cfg = Settings()
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    assert desk.correction_valuation_provenance() is None
+    inputs = {"shares": "14.933207", "growth_rates": ["0.02", "0.06", "0.10"]}
+    desk.correction = {
+        "reports": {"valuation": {"calculation_id": "old", "method": "Initial conditional case"}},
+        "calculations": {"old": {"inputs": copy.deepcopy(inputs)}},
+    }
+    original = copy.deepcopy(desk.correction)
+    desk.reports["valuation"] = {"calculation_id": "old", "method": "Clarified limitations"}
+    desk.calculations["old"] = {"inputs": copy.deepcopy(inputs)}
+    p = desk.correction_valuation_provenance()
+    assert p["calculation_inputs_unchanged"] is True
+    assert p["original_report_sha256"] != p["current_report_sha256"]
+    assert (
+        p["original_inputs_sha256"]
+        == p["current_inputs_sha256"]
+        == hashlib.sha256(dumps(inputs).encode()).hexdigest()
+    )
+    desk.reports["valuation"]["calculation_id"] = "new"
+    desk.calculations["new"] = {"inputs": {**inputs, "shares": "14.924834"}}
+    assert desk.correction_valuation_provenance()["calculation_inputs_unchanged"] is False
+    desk.reports.pop("valuation")
+    assert desk.correction_valuation_provenance()["calculation_inputs_unchanged"] is None
+    assert desk.correction == original

@@ -180,7 +180,7 @@ ROLES = {
         (
             "Independently seek disconfirming evidence in original sources. Challenge "
             "business, valuation and timing claims. Identify thesis breakers and unresolved material "
-            "gaps, including an unsuitable valuation method. Independently inspect the contrary X sample with read_source; look for bear theses, manipulation and missing coverage, and verify claims against primary sources. Agreement among agents is not evidence."
+            "gaps, including an unsuitable valuation method. Before alleging absent or changed financial evidence, read the full cited passage with read_source and any table continuation with read_document; previews and earlier critiques are not proof of absence. Use recorded calculation IDs and the correction_valuation_provenance comparison when checking revisions. Report prose can change while calculation inputs remain identical; do not invent an earlier model. Identical inputs do not establish economic validity. Independently inspect the contrary X sample with read_source; look for bear theses, manipulation and missing coverage, and verify claims against primary sources. Agreement among agents is not evidence."
         ),
     ),
 }
@@ -1214,6 +1214,7 @@ class ResearchDesk:
                     "reason": self.correction["reason"],
                     "previous_report": self.correction["reports"].get(role),
                     "original_critique": self.correction["reports"]["adversarial"],
+                    "correction_valuation_provenance": self.correction_valuation_provenance(),
                     "instruction": "Address the cited defect using original evidence and calculation tools. Retain unsupported gaps; do not change a conclusion just to gain approval.",
                 }
             dependencies = {
@@ -1403,6 +1404,28 @@ class ResearchDesk:
         )
         return self.result(output)
 
+    def correction_valuation_provenance(self):
+        if self.correction is None:
+            return None
+        original = self.correction["reports"]["valuation"]
+        current = self.reports.get("valuation")
+        before = self.correction["calculations"].get(original.get("calculation_id"))
+        after = self.calculations.get(current.get("calculation_id")) if current else None
+        return {
+            "original_report_sha256": hashlib.sha256(dumps(original).encode()).hexdigest(),
+            "current_report_sha256": hashlib.sha256(dumps(current).encode()).hexdigest() if current else None,
+            "original_calculation_id": original.get("calculation_id"),
+            "current_calculation_id": current.get("calculation_id") if current else None,
+            "original_inputs_sha256": hashlib.sha256(dumps(before["inputs"]).encode()).hexdigest()
+            if before
+            else None,
+            "current_inputs_sha256": hashlib.sha256(dumps(after["inputs"]).encode()).hexdigest()
+            if after
+            else None,
+            "calculation_inputs_unchanged": before["inputs"] == after["inputs"] if before and after else None,
+            "instruction": "Deterministic comparison of saved records, not primary evidence or economic approval. Report wording can change without changing calculation inputs. Inspect calculations by the recorded IDs before alleging a changed model; preserve genuine unsupported assumptions.",
+        }
+
     def final_context(self):
         return {
             **self.context,
@@ -1412,6 +1435,7 @@ class ResearchDesk:
                 for name, report in self.reports.items()
             },
             "correction_available": self.correction is None,
+            "correction_valuation_provenance": self.correction_valuation_provenance(),
             "correction_instruction": "Before finalizing, use request_correction if available and a specific material defect can be repaired with remaining budgets. Otherwise preserve the gap in the final decision. A correction requires new downstream reports and critique; it does not grant acceptance.",
             "report_times": self.report_times,
             "calculations": self.calculations,
