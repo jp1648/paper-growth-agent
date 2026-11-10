@@ -1161,6 +1161,12 @@ def test_finalization_client_is_lead_only_180_second_timeout_no_retry(env, monke
     worker = DeepResearchTeam(service.cfg, service.store, Evidence())
     assert set(worker.models(finalizing=True)) == {"research_lead"}
     assert len(calls) == 1 and calls[0]["timeout"] == 180 and calls[0]["max_retries"] == 0
+    calls.clear()
+    models = worker.models()
+    clients = dict(zip(models, calls, strict=True))
+    assert clients["research_lead"]["timeout"] == 180
+    assert all(client["timeout"] == 60 for role, client in clients.items() if role != "research_lead")
+    assert all(client["max_retries"] == 0 for client in clients.values())
 
 
 def test_watch_has_no_forced_holding_period_but_trades_keep_positive_period(decision):

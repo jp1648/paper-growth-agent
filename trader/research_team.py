@@ -1330,7 +1330,7 @@ class DeepResearchTeam:
                 use_responses_api=True,
                 store=False,
                 max_retries=0,
-                timeout=180 if finalizing else 60,
+                timeout=180 if role == "research_lead" else 60,
                 max_tokens=cfg.research_max_output_tokens,
             )
             for role, route in routes.items()

@@ -3908,3 +3908,24 @@ policy does not by itself prevent conditional modeling; genuinely unbounded miss
 historical information still does. No automatic zero adjustments, Apple-specific
 values, acceptance-rule changes or buy authorization are introduced. Independent
 review and a new frozen run manifest are required before another paid attempt.
+
+### November 9 testing run 4: synthesis timeout isolated
+
+The fourth frozen Apple development run produced all four specialist reports and
+an actual conditional valuation with growth/multiple sensitivities. Independent
+review reproduced $94.10/$146.81/$210.24 and checked eleven saved filing passages.
+This is progress, not acceptance: compensation versus legacy-award overlap and
+quantitative alternatives to the normalization assumptions remain unresolved.
+The final lead call timed out after 60.0759 seconds, leaving no final decision.
+Known estimated cost is $4.5580625 with one unknown-cost request; preserve its
+reservation and require provider reconciliation before another paid test.
+
+The normal research path gave the lead only 60 seconds, while the separate
+finalization path already allowed 180. Both now use 180 seconds for the lead;
+specialists retain 60, automatic retries remain disabled, and overall duration,
+context and spending guards are unchanged. All 77 research-team tests and Ruff
+passed. This timeout change has not been validated against a paid provider run.
+Both CI workflows for the preceding candidate 509b740 passed, including the
+rerun of the infrastructure-failed browser-download job. Its built image remains
+undeployed and trading remains paused. Current credit-grant UI shows $80.85
+available, but that aggregate balance does not reconcile the timed-out request.
