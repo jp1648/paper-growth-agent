@@ -703,8 +703,7 @@ class ResearchDesk:
             if isinstance(content, dict) and "headline" in content:
                 source["content"] = {
                     "headline": content.get("headline"),
-                    "summary": str(content.get("summary") or "")[:500],
-                    "note": "Full article available via read_source; preview is incomplete.",
+                    "note": "Headline-only discovery; read_source retrieves the original summary/article before relying on its details.",
                 }
         return previews
 
@@ -1321,7 +1320,9 @@ class ResearchDesk:
                 "registered_documents": [
                     {"document_id": identifier, "url": document.get("url")}
                     for identifier, document in self.documents.items()
+                    if identifier in self.texts
                 ],
+                "document_navigation_note": "Previously opened documents only, not an exhaustive list. Use filing_documents for other available documents; navigation IDs are not citable evidence.",
             }
             if self.correction:
                 context["correction"] = {

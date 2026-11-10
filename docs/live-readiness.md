@@ -4625,3 +4625,26 @@ classes and passes compact registered document IDs/URLs to every specialist,
 including corrections. Original text, search ordering, scoring and limits are
 unchanged. This is a workflow correction, not evidence that the next model run
 will satisfy the economic review.
+
+Release `24cf6b6` subsequently passed both release checks and was deployed with
+38 source hashes verified, unchanged configuration and all 56 spending records
+preserved. Its supervised Apple attempt stopped at the valuation context guard:
+247198 bytes against 240000 after 16 model calls; the next cost reservation was
+$4.0985975 against $6. The failure was not a monetary limit or the prior
+compensation-policy exception. Cost $2.8023675 settled without unknown usage;
+cleanup again restored the exact pause and listener and confirmed AAPL one share,
+zero open orders and unchanged intent/order keys.
+
+The new navigation projection had copied 92 filing-document links into each
+specialist context. The next source candidate shows previously opened documents
+only, explicitly directing further discovery through `filing_documents`. News
+previews retain every headline, source ID, URL and timestamp, with full summaries
+and articles available through `read_source`. Original evidence and complete tool
+results remain unchanged. Combined exact-request replay falls to 226163 bytes,
+leaving 13837 bytes under the same guard. This is retrievable projection, not a
+claim that omitted preview detail remains in the prompt or that later requests fit.
+
+Gross November 10 settled model estimates are now $33.3409800; remaining allocation
+is $22.5141225. Neither additional expenditure nor the successful cleanup establishes
+investment-quality acceptance. The prepared next PG regression remains blocked
+pending updated candidate bindings, fresh funding checks and independent review.

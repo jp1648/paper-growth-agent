@@ -1986,6 +1986,8 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
                 "url": "https://www.sec.gov/Archives/example.htm",
                 "text": "not copied into prompt",
             }
+            desk.texts["document-navigation-only"] = "Opened original text stays in the cache"
+            desk.documents["document-not-opened"] = {"url": "https://www.sec.gov/Archives/other.htm"}
             tools = {tool.name: tool for tool in desk.tools()}
             tools["sum_cash_flows"].invoke(
                 {
@@ -2009,6 +2011,10 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
                     "url": "https://www.sec.gov/Archives/example.htm",
                 } in context["registered_documents"]
                 assert all(set(doc) == {"document_id", "url"} for doc in context["registered_documents"])
+                assert "document-not-opened" not in {
+                    doc["document_id"] for doc in context["registered_documents"]
+                }
+                assert "not an exhaustive list" in context["document_navigation_note"]
                 if context.get("correction"):
                     assert [r["event"] for r in context["arithmetic"]["records"]] == [
                         "cash_flow_sum",
@@ -2346,3 +2352,35 @@ def test_model_keeps_correction_tool_after_lead_auxiliary_exhaustion(monkeypatch
     with pytest.raises(RuntimeError, match="offline model boundary"):
         guard.wrap_model_call(request, inspect_without_provider_call)
     assert guard.tool_calls == guard.lead_allowance and budget.tools == 0
+
+
+def test_news_discovery_projection_retains_complete_original_for_reading():
+    import copy
+
+    cfg = Settings()
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    source = {
+        "id": "news-original",
+        "source": "fixture-news",
+        "url": "https://example.com/news",
+        "published_at": "2026-01-01T00:00:00Z",
+        "content": {
+            "headline": "Company changes forecast",
+            "summary": "Material qualifying detail",
+            "body": "Complete contrary evidence and qualifications",
+        },
+    }
+    original = copy.deepcopy(source)
+    desk.sources[source["id"]] = source
+    preview = desk.source_previews([source])[0]
+    assert {k: v for k, v in preview.items() if k != "content"} == {
+        k: v for k, v in source.items() if k != "content"
+    }
+    assert preview["content"]["headline"] == source["content"]["headline"]
+    assert "summary" not in preview["content"] and "read_source" in preview["content"]["note"]
+    tool = next(t for t in desk.tools() if t.name == "read_source")
+    assert json.loads(tool.invoke({"source_id": source["id"]})["content"]) == source["content"]
+    assert source == original
