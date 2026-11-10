@@ -17,7 +17,7 @@ from langchain.agents.middleware import AgentMiddleware, TodoListMiddleware
 from langchain.agents.structured_output import ProviderStrategy
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
-from langchain_core.tools import tool
+from langchain_core.tools import ToolException, tool
 from langchain_openai import ChatOpenAI
 from langsmith import tracing_context
 from pydantic import Field
@@ -493,7 +493,7 @@ class Guard(AgentMiddleware):
             self.budget.tool()
             result = handler(request)
             self.trace("tool.response", {"role": self.role, "result": result})
-            succeeded = True
+            succeeded = not (isinstance(result, ToolMessage) and result.status == "error")
             return result
         finally:
             with self.budget.lock:
@@ -692,13 +692,13 @@ class ResearchDesk:
 
         @tool
         def search_document(document_id: str, queries: list[str], start_offset: int = 0) -> dict:
-            """Locate up to three matches per literal query from an absolute start_offset. Use next_start_offset for later matches. Navigation only; read_document supplies citable evidence."""
+            """Search one to three nonempty literal queries, each at most 300 characters; start_offset must be nonnegative. Returns up to three matches per query. Split larger requests into batches. Use next_start_offset for later matches. Navigation only; read_document supplies citable evidence."""
             if (
                 start_offset < 0
                 or not 1 <= len(queries) <= 3
                 or any(not q.strip() or len(q) > 300 for q in queries)
             ):
-                raise ValueError(
+                raise ToolException(
                     "Supply one to three nonempty queries of at most 300 characters and a nonnegative offset"
                 )
             with self.lock:
@@ -725,6 +725,9 @@ class ResearchDesk:
                     "results": results,
                     "note": "Navigation previews are incomplete and not citable evidence. Read relevant offsets with read_document using an empty query. No match is not proof the underlying issue is absent.",
                 }
+
+        # Invalid navigation requests are correctable; evidence and budget failures still abort.
+        search_document.handle_tool_error = True
 
         @tool
         def read_document(document_id: str, query: str = "", offset: int = 0) -> dict:

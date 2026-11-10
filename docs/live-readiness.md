@@ -3854,3 +3854,21 @@ The production owner generation did not change. A read-only runtime check confir
 successful reconciliation, original experiment, one AAPL paper share, no active
 orders, preserved pause and unchanged spending/configuration hashes. Cloud resource
 charges await provider billing; no zero-cost or final-cost claim is made.
+
+### November 9 testing run: bounded navigation error diagnosis
+
+`annual-testing-v3-dev-20261109-1` ended before valuation/adversarial acceptance.
+The shared operational ledger confirms its $0.4991925 estimated model cost is
+settled, with no unknown cost or outstanding research reservation. Authenticated
+Postgres traces show business submitted seven `search_document` queries; the
+one-to-three-query validation raised `ValueError` and terminated the graph.
+Evidence: `state/testing-mode-20261109/search-failure-evidence.json` and
+`post-run-spend.json`. This was a correctable request error, not missing funding.
+
+The tool now explicitly describes its limits and returns a LangChain error message
+for this specific invalid navigation request, allowing a corrected bounded call.
+Both requests consume tool allowances; failed-call telemetry stays unsuccessful.
+Other exceptions and research limits still propagate. Regression verifies seven
+queries fail, a subsequent valid request works, and neither adds citable sources.
+This fix is not itself research acceptance. A fresh run ID is required for retry;
+the original run and its costs remain preserved. Trading remains paused.
