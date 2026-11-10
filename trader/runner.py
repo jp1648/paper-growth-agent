@@ -6,6 +6,7 @@ from decimal import InvalidOperation
 from zoneinfo import ZoneInfo
 
 from .alpaca import safe_error
+from .lifecycle import execution_end
 from .models import dec, dt, news_time, now
 from .observability import traced
 from .reports import daily_report, portfolio_report
@@ -142,7 +143,7 @@ class Runner:
             phase = "intraday"
         elif local >= closing + timedelta(minutes=16):
             phase = "postclose"
-        if current >= dt(self.store.experiment["ends_at"]):
+        if current >= dt(execution_end(self.store, self.cfg)):
             for order in self.store.active_orders():
                 self.service.request_cancel(order)
             if phase == "postclose":

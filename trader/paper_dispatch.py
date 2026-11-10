@@ -4,6 +4,7 @@ import hashlib
 from datetime import timedelta
 from pathlib import Path
 
+from .lifecycle import effective_end
 from .models import dec, dt, dumps, now
 from .spending import spending_status
 
@@ -68,10 +69,16 @@ def dispatch(runner, study, clock, calendar_day):
         or dt(study["approved_at"]) >= dt(study["schedule"]["expected_sessions"][0]["open"])
     ):
         raise ValueError("Study approval or frozen runtime binding invalid")
+    extension = store.get("approved", "experiment_extension")
+    if extension and (
+        extension["study_id"] != study["schedule"]["study_id"]
+        or extension["schedule_sha256"] != study["schedule_sha256"]
+    ):
+        raise ValueError("Experiment extension belongs to a different study or schedule")
     schedule = study["schedule"]
     if study["schedule_sha256"] != fingerprint(schedule):
         raise ValueError("Approved schedule changed")
-    if dt(store.experiment["ends_at"]) < dt(schedule["expected_sessions"][-1]["close"]):
+    if dt(effective_end(store, cfg)) < dt(schedule["expected_sessions"][-1]["close"]):
         raise ValueError("Existing experiment cannot contain the full study window")
     if set(schedule["research_universe"]) != set(cfg.research_universe) or set(
         schedule["execution_universe"]

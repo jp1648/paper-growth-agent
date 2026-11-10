@@ -44,6 +44,8 @@ def main(argv=None):
     kill.add_argument("--reason", required=True)
     adjust = sub.add_parser("acknowledge-adjustment")
     adjust.add_argument("file")
+    extension = sub.add_parser("approve-experiment-extension")
+    extension.add_argument("file")
     revision = sub.add_parser("acknowledge-revision")
     revision.add_argument("file")
     notification = sub.add_parser(
@@ -317,6 +319,10 @@ def dispatch(args):
                 )
             elif args.command == "acknowledge-adjustment":
                 result = service.acknowledge_adjustment(json.loads(Path(args.file).read_text()))
+            elif args.command == "approve-experiment-extension":
+                from .lifecycle import approve_extension
+
+                result = approve_extension(service, json.loads(Path(args.file).read_text()))
             elif args.command == "acknowledge-revision":
                 result = service.acknowledge_revision(json.loads(Path(args.file).read_text()))
             elif args.command == "record-data-cost":

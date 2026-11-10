@@ -11,6 +11,7 @@ from .alpaca import safe_error
 from .evidence import EvidenceProvider
 from .executor_owner import ExecutionFenceError
 from .financials import normalization_supported
+from .lifecycle import execution_end
 from .models import TERMINAL, ZERO, Decision, SubmissionPreflightError, dec, dt, dumps, news_time, now
 from .observability import traced
 from .risk import check, daily_loss
@@ -319,7 +320,7 @@ class Service:
             last["at"] if last else None,
             recon.get("ok", False),
             self.kill_path.exists(),
-            self.store.experiment["ends_at"],
+            execution_end(self.store, self.cfg),
             checked_at,
         )
         if decision.side == "buy":
@@ -500,7 +501,7 @@ class Service:
                         last["at"] if last else None,
                         self.store.get("reconciliation")["ok"],
                         self.kill_path.exists(),
-                        self.store.experiment["ends_at"],
+                        execution_end(self.store, self.cfg),
                         now(),
                     )
                 except Exception as error:
@@ -568,11 +569,16 @@ class Service:
             # Cancellation must work even when missing fills or an unknown submission block replay.
             limit = self.store.get("loss_limit") or {}
             loss_blocked = limit.get("latched") or not limit.get("daily", {}).get("valid", True)
+            try:
+                end = execution_end(self.store, self.cfg)
+            except ValueError:
+                cancel_all = True
+                end = self.store.experiment["ends_at"]
             for o in self.broker.open_orders():
                 if (
                     cancel_all
                     or self.kill_path.exists()
-                    or now() >= dt(self.store.experiment["ends_at"])
+                    or now() >= dt(end)
                     or now() - dt(o["created_at"]) >= timedelta(minutes=self.cfg.order_ttl_minutes)
                     or (loss_blocked and o["side"] == "buy")
                 ) and o["status"] != "pending_cancel":

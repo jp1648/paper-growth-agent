@@ -61,3 +61,21 @@ acceptance, account terms, cost allocation and funding are substantiated. Preser
 the selected five-company research / three-company execution scope and all
 predeclared measurement thresholds. Obtain explicit approval of that concrete
 opening packet before installing an active study.
+
+## November 9 implementation status
+
+The single-amendment implementation is now present; it has not been installed on
+the executor. `approve-experiment-extension` requires pause, a source/config-bound
+receipt, frozen schedule and funding-evidence hash, and an explicit null prior
+amendment marker. The original experiment stays unchanged. Subsequent amendment
+chains are deliberately unsupported; a later change needs a reviewed migration.
+Configuration/source changes invalidate the installed amendment and fail closed.
+
+`execution_end` stops orders and research at the final scheduled close;
+`effective_end` permits at most one additional day for reconciliation. Reports
+expose both dates alongside the unchanged original expiry and approval. Corrupt
+approval data blocks execution but still permits cancellation, without releasing
+reservations absent broker confirmation. Tests cover idempotent/concurrent
+approval, transactional journal failure, copied-ledger restoration, malformed
+receipts, runtime binding, final submission cutoff crossing and grace separation.
+Dashboard presentation and actual frozen-schedule installation remain pending.

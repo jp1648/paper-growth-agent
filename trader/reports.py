@@ -120,8 +120,20 @@ def _portfolio_report(service):
         for o in store.items("order")
         if o["status"] in {"canceled", "expired", "rejected"} and dec(o["filled_qty"]) < dec(o["qty"])
     ]
+    from .lifecycle import effective_end, execution_end
+
+    try:
+        lifecycle = {
+            "effective_ends_at": effective_end(store, service.cfg),
+            "execution_ends_at": execution_end(store, service.cfg),
+            "valid": True,
+        }
+    except ValueError as error:
+        lifecycle = {"effective_ends_at": None, "valid": False, "error": str(error)}
+    lifecycle["approval"] = store.get("approved", "experiment_extension")
     return {
         "experiment": store.experiment,
+        "lifecycle": lifecycle,
         "as_of": snap["captured_at"],
         "market_data": {
             "source": "Alpaca",
