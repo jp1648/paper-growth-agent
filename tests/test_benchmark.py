@@ -148,6 +148,24 @@ def ledger_input():
     }
 
 
+def test_modeled_cash_feedback_without_extra_reinvestments(ledger_input):
+    from trader.benchmark import build_ledger
+
+    ledger_input["cash_model"] = {"annual_rate": "0.05", "amendment_sha256": "a" * 64}
+    result = build_ledger(ledger_input)
+    assert len(result["purchases"]) == 1
+    assert [row["credit"] for row in result["interest_audit"]] == ["0.00", "0.01", "0.01", "0.01"]
+    assert result["interest_audit"][2]["principal"] == "99.56"
+    assert result["balances"][-1]["cash"] == "99.58"
+    from trader.paper_observations import bind_benchmark
+
+    with pytest.raises(ValueError, match="common portfolio/rate binding"):
+        bind_benchmark({}, ledger_input)
+    ledger_input["sessions"][1]["interest_cash"] = "1"
+    with pytest.raises(ValueError, match="exogenous interest"):
+        build_ledger(ledger_input)
+
+
 def test_full_worked_dividend_chain(ledger_input):
     from trader.benchmark import build_ledger
 

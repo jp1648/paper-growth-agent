@@ -4292,3 +4292,36 @@ hypothetical cash scenarios, opening/rounding/flow/feasibility boundaries, and
 keeps actual account terms mandatory before any live-money readiness decision.
 It is specification approval only: deterministic replay and opening approval
 remain required, and no study or trading activation follows from the amendment.
+
+### November 9: run12 independent acceptance within the monetary cap
+
+Run12 completed all four reports and received independent conditional-research
+and WATCH acceptance: one accepted, zero failed, zero pending. Estimated model
+cost $2.7531325 is settled with no unknown calls; 28 model calls, 53 tools and
+253.03 seconds. Exact citations and financial arithmetic reproduce. This supports
+reasoned abstention, not a preferred fair value, BUY, general reliability, or trial
+activation. Proposed 64-tool/240000-byte capacity remains a separate prospective
+configuration decision; $5/run and $6/day limits are unchanged.
+
+Source6a06ae3 passed both CI checks and was deployed with all36 source hashes
+verified. Pause, runtime configuration, experiment and ledger/history were retained.
+The original funding allocation now has $23.3987650 remaining after run12; its
+baseline, buffer and expiry are unchanged. The Microsoft holdout remains untouched.
+
+### Paper cash calculation implementation — diagnostic only
+
+`model-paper-cash --input` replays an explicitly complete, evidenced cash-event
+sequence without touching broker records. It removes actually booked interest
+once, applies the declared ACT/365 hypothetical rate to prior modeled close cash,
+and refuses any observed transaction or payment lock needing unsupported financing.
+The optional benchmark `cash_model` uses that same interval calculation and never
+creates extra interest-only reinvestment events. Original actual-interest mode is
+unchanged. Calendar gaps, rounding, feedback, interest reversals and rejected
+incomplete inputs are tested. Independent review approved the diagnostic helper
+scope, not opening readiness. Focused cash/benchmark/observations/bundle checks:
+100 passed; full suite:1170 passed,7 skipped.
+
+Common portfolio-NAV binding and the full0/2/5% scenario matrix remain to be
+implemented and independently reviewed. Until then the comparison binder rejects
+modeled benchmark cash rather than accepting an unmatched portfolio convention.
+Actual account terms and applicable fees remain separate live-readiness gates.

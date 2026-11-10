@@ -262,6 +262,9 @@ def _bind_benchmark(document, benchmark_document):
     """Recompute comparator accounting rather than trusting pasted NAV/return rows."""
     from .benchmark import build_ledger
 
+    # shortcut: modeled cash stays diagnostic until all rate/portfolio paths are bound in the bundle.
+    if benchmark_document.get("cash_model") is not None:
+        raise ValueError("Modeled cash requires common portfolio/rate binding before comparison acceptance")
     ledger = build_ledger(benchmark_document)
     if document.get("benchmark") not in ("SPY", "QQQ") or ledger["symbol"] != document["benchmark"]:
         raise ValueError("Observation benchmark must match reconstructed SPY or QQQ ledger")

@@ -181,6 +181,10 @@ def _build_ledger(document):
     quantity = Decimal(0)
     entitlements, seen, fills, balances, audit = {}, set(), [], [], []
     previous_nav = capital
+    cash_model = document.get("cash_model")
+    interest_audit = []
+    if cash_model is not None:
+        evidence_hash(cash_model["amendment_sha256"])
     for index, row in enumerate(rows):
         day = row["date"]
         mark = amount(row["mark"])
@@ -191,6 +195,16 @@ def _build_ledger(document):
         interest = amount(row["interest_cash"], cents=True)
         if index == 0 and interest:
             raise ValueError("Opening interest belongs in opening capital")
+        if cash_model is not None:
+            from .paper_cash import interval_interest
+
+            if interest:
+                raise ValueError("Modeled benchmark cash cannot also receive exogenous interest")
+            modeled_interest = interval_interest(
+                str(cash), cash_model["annual_rate"], rows[max(0, index - 1)]["date"], day
+            )
+            interest_audit.append(modeled_interest)
+            interest = dec(modeled_interest["credit"])
         if amount(row["external_deposits"], cents=True) or amount(row["external_withdrawals"], cents=True):
             raise ValueError("External flows invalidate the no-flow ledger")
         events = row["events"]
@@ -408,6 +422,8 @@ def _build_ledger(document):
         "purchases": fills,
         "entitlements": entitlements,
         "split_audit": audit,
+        "cash_model": cash_model,
+        "interest_audit": interest_audit,
         "unpaid_entitlements": [
             key for key, e in entitlements.items() if not e["paid"] and dec(e["net"]) > 0
         ],

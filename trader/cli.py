@@ -109,6 +109,8 @@ def main(argv=None):
         "preview-benchmark-purchase", help="Offline hypothetical ETF purchase arithmetic"
     )
     benchmark.add_argument("--input", required=True)
+    cash_replay = sub.add_parser("model-paper-cash", help="Offline hypothetical cash replay")
+    cash_replay.add_argument("--input", required=True)
     benchmark_ledger = sub.add_parser("build-benchmark-ledger", help="Offline hypothetical ETF ledger")
     benchmark_ledger.add_argument("--input", required=True)
     benchmark_ledger.add_argument("--output", required=True)
@@ -147,6 +149,14 @@ def main(argv=None):
     entitlement.add_argument("directory")
     entitlement.add_argument("--input", required=True)
     args = parser.parse_args(argv)
+    if args.command == "model-paper-cash":
+        from .paper_cash import replay
+
+        path = Path(args.input)
+        if path.stat().st_size > 16 * 1024 * 1024:
+            raise ValueError("Cash replay exceeds input limit")
+        print(dumps(replay(json.loads(path.read_text()))))
+        return 0
     if args.command == "build-benchmark-ledger":
         from .benchmark import build_file
 
