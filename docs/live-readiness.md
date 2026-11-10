@@ -4499,3 +4499,31 @@ this cannot become an escape from its budget, sampling or acceptance criteria.
 The new ordinary subtotal and remaining allowance are reported separately from
 total charges. Implementation validation/deployment is recorded separately; this
 policy does not itself enable trading or satisfy research acceptance.
+
+### November 10: third observed regression and source-only bridge extension
+
+The reviewed runtime capacity change is now applied: $6 per run/$6 per ordinary
+day, 64 tools, 240000 context bytes, 60 model calls and 5000 output tokens. The
+arithmetic-continuity release is deployed; the newer testing-admission separation
+remains source-only at this checkpoint. Earlier proposal status above is historical.
+
+The third observed PG regression completed four reports and WATCH/zero shares in
+366 seconds, with settled estimated cost $4.7187975 and no unknown calls.
+Independent review verified retained arithmetic and actual preferred-note reading,
+but rejected economic completion: available dated common/legacy claims and
+minority cash attribution still lack a supported quantitative treatment or bound.
+This is an observed regression, not a new unseen success. No automatic retry,
+paper-study activation or order follows from mechanical completion.
+
+After settlement, the replacement allocation has $6.2812025 remaining; its $15
+buffer and November 29 expiry remain intact. Gross November 10 testing model
+charges total $15.8551025. This is not a provider invoice or permission to ignore
+funding limits.
+
+An independently reviewed optional financial-asset reinvestment term now supports
+incremental lending cash flows outside consolidated CFO-minus-PPE. Four core
+adjustments remain mandatory, evidence checks remain intact, and existing bridge
+outputs/IDs replay byte-identically. The combined offline suite passes 1302 tests
+with seven opt-in checks skipped. This source-only extension does not certify a
+company valuation; noncommon-equity attribution and dated-claim investigation
+remain separate work.
