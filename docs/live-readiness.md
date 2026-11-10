@@ -4019,3 +4019,37 @@ Independent review approved this code capability, not funding or activation.
 Operational schema and preserved-history limitations are in `docs/always-on.md`.
 This change is not deployed yet. The existing $20 unknown hold is unchanged;
 research acceptance, held-position review and study activation remain incomplete.
+
+### November 9 evening: funding release and run4 reconciliation
+
+Both source-56e15ed CI workflows passed. Cloud Build
+`a488d1cf-16fa-405d-9759-041aba9cdbb6` succeeded; the paused executor now runs
+`sha256:33ed77cb9adfe95905ae7de807869eed4e4b44634099f9aa6af7f8ca25782ae0`.
+All 36 running source hashes matched. The reviewed image-only rollout preserved
+configuration, experiment, spending digest, pause and 2/1/3/8 intent/order/activity/
+acceptance counts. No unattended funding receipt or active study was installed.
+
+Fresh provider exports now match all 41 known successful run4 responses and every
+daily billing token quantity. Independent allocation using the previously verified
+tier prices reconciles run4 to $0.82336175 as of export, with no residual token
+charge. This does not establish that the timed-out request was free or exclude
+later billing corrections. Receipt `provider-reconciliation-20261110-annual-testing-4`
+retains the original unknown $20 record, before/after audit and private SQLite
+backup. Exact predecessor and idempotence checks passed. Pause remains present.
+Evidence: `state/testing-mode-20261109/provider-run4-refresh2/`.
+
+The reviewed broker-free `annual-testing-v3-dev-20261109-5` plan uses the unchanged
+Apple development case, deployed timeout/compensation fixes, a $20 testing cap and
+fresh authenticated $80.85 credit evidence with a $15 buffer. Initial invocation
+failed before Python execution due to root-owned staged files; ownership was
+corrected to the existing executor UID 501, preserving private permissions. The
+next invocation passed preflight and began. Acceptance and final cost are pending;
+Microsoft holdout and trial activation remain separate. No order permission was
+granted by this research launch.
+
+The detailed Google Cloud billing export now contains attributed Trader service
+rows through November 8, 21:00 UTC. The bounded November 1–11 query totals
+$4.016056 gross cost and −$4.016056 credits across ten services, net $0 in this
+snapshot. This is lagging partial evidence, not a claim that current operations
+are free or all costs are final. Query and original results are retained under
+`state/validation-20261110/`; November 9–10 operating/build costs remain outstanding.
