@@ -3890,3 +3890,21 @@ The hardcoded ten-call specialist ceiling now follows the configured total pool,
 reserving lead/delegation capacity; ordinary 48-call configuration is unchanged.
 Any supervised increase must be explicit in the next manifest. Neither this fix
 nor the structurally complete WATCH output constitutes investment acceptance.
+
+### November 9 third testing attempt: distinguish forecasts from missing facts
+
+`annual-testing-v3-dev-20261109-3` used the retained-passage fix and 64 total tool
+slots. All specialist reports and WATCH synthesis returned in 256 seconds; cost
+$4.3707550 is settled in the global ledger with no unresolved charge. It still
+failed `required_valuation_missing`. The valuation specialist used only ten of its
+fourteen available tools, so this failure is not a tool-quota diagnosis. Original
+reports, calculations and traces are retained; no accepted-research claim or order.
+
+The next prompt revision requires a bridge-item workflow: observed source anchor,
+explicit classification (fact / analyst policy / unresolved historical attribution),
+proposed amount or formula, rationale, and adverse alternative. Historical cash
+flow and comparative working-capital components must be reconciled. Unknown future
+policy does not by itself prevent conditional modeling; genuinely unbounded missing
+historical information still does. No automatic zero adjustments, Apple-specific
+values, acceptance-rule changes or buy authorization are introduced. Independent
+review and a new frozen run manifest are required before another paid attempt.
