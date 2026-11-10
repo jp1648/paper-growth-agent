@@ -198,6 +198,7 @@ class Budget:
         self.started = time.monotonic()
         self.day = now().astimezone(ZoneInfo("America/New_York")).date()
         self.models = self.tools = 0
+        self.role_tool_calls = {}
         self.reserved = dec(0)
         self.failed = False
         self.lock = threading.RLock()
@@ -259,11 +260,11 @@ class NoHiddenSummaries(AgentMiddleware):
 
 
 class Guard(AgentMiddleware):
-    def __init__(self, budget, role, allowed, reports=None, final_context=None):
+    def __init__(self, budget, role, allowed, reports=None, final_context=None, repair_available=None):
         self.budget, self.role, self.allowed = budget, role, allowed
         self.reports = reports if reports is not None else {}
         self.final_context = final_context
-        self.tool_calls = 0
+        self.repair_available = repair_available
         self.running_tasks = set()
         # Reserve one delegation per role before dividing the shared pool.
         self.specialist_allowance = max(
@@ -272,6 +273,14 @@ class Guard(AgentMiddleware):
         self.lead_allowance = max(
             0, budget.cfg.research_max_tool_calls - len(ROLES) * (1 + self.specialist_allowance)
         )
+
+    @property
+    def tool_calls(self):
+        return self.budget.role_tool_calls.get(self.role, 0)
+
+    @tool_calls.setter
+    def tool_calls(self, value):
+        self.budget.role_tool_calls[self.role] = value
 
     def trace(self, name, payload):
         try:
@@ -314,7 +323,11 @@ class Guard(AgentMiddleware):
             messages = [HumanMessage(content=dumps(self.final_context()))]
             if len(request.messages) > 1 and isinstance(request.messages[-1], HumanMessage):
                 messages.extend(request.messages[-2:])
-            tools = []
+            tools = [
+                t for t in tools
+                if (t.get("name") if isinstance(t, dict) else t.name) == "request_correction"
+                and self.repair_available and self.repair_available()
+            ]
         if (
             not self.budget.unrestricted_research
             and self.role != "research_lead"
@@ -532,6 +545,8 @@ class ResearchDesk:
         self.documents, self.texts, self.calculations, self.reports = {}, {}, {}, {}
         self.unavailable_documents = {}
         self.report_times = {}
+        self.report_dependencies = {}
+        self.correction = None
         self.reused = []
         self.running = set()
         self.prior = context["portfolio"].get("prior_thesis") or {}
@@ -601,6 +616,10 @@ class ResearchDesk:
                 "available": False,
                 "error": "unknown_reference",
                 "requested_id": document_id,
+                "listed_documents": [
+                    {"document_id": identifier, **doc}
+                    for identifier, doc in self.documents.items()
+                ],
                 "note": "No listed document has this ID. Use an exact ID from filing_documents; an empty list means no document is available. This response supplies no evidence and cannot be cited.",
             }
         if document_id in self.unavailable_documents:
@@ -1061,7 +1080,7 @@ class ResearchDesk:
                 (
                     ""
                     if self.budget.unrestricted_research
-                    else " You have at most ten tool calls for this specialist report."
+                    else f" You have at most {max(0, (self.cfg.research_max_tool_calls - 2 * len(ROLES)) // len(ROLES))} tool calls in total across this role's original report and any correction."
                 )
                 + " Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
                 if role != "research_lead"
@@ -1078,6 +1097,7 @@ class ResearchDesk:
                     allowed,
                     self.reports,
                     self.final_context if role == "research_lead" else None,
+                    (lambda: self.correction is None) if role == "research_lead" else None,
                 ),
             ],
         )
@@ -1122,6 +1142,17 @@ class ResearchDesk:
                 "evidence": self.source_previews(self.sources.values()),
                 "assignment": task["messages"][-1].content,
             }
+            if self.correction:
+                context["correction"] = {
+                    "reason": self.correction["reason"],
+                    "previous_report": self.correction["reports"].get(role),
+                    "original_critique": self.correction["reports"]["adversarial"],
+                    "instruction": "Address the cited defect using original evidence and calculation tools. Retain unsupported gaps; do not change a conclusion just to gain approval.",
+                }
+            dependencies = {
+                name: hashlib.sha256(dumps(self.reports[name]).encode()).hexdigest()
+                for name in prerequisites
+            }
         schema, instructions = ROLES[role]
         tools = self.tools()
         if role != "valuation":
@@ -1140,8 +1171,9 @@ class ResearchDesk:
             )
             with self.lock:
                 self.reports[role] = self.validate(schema, output.get("structured_response"))
+                self.report_dependencies[role] = dependencies
                 self.report_times[role] = now().isoformat()
-                if role == "catalysts" and self.targeted and not self.reports[role]["requires_deeper_review"]:
+                if role == "catalysts" and self.targeted and self.correction is None and not self.reports[role]["requires_deeper_review"]:
                     for saved in ("business", "valuation"):
                         if saved in self.reports:
                             continue
@@ -1159,6 +1191,39 @@ class ResearchDesk:
             with self.lock:
                 self.running.discard(role)
 
+    def correction_tool(self):
+        @tool
+        def request_correction(role: str, report_sha256: str, reason: str) -> dict:
+            """Request the investigation's one correction cycle after all reports. Name business, catalysts or valuation, its current report hash, and the specific material defect. Re-delegate invalidated reports in order; a fresh critique is required. No budget is reset."""
+            with self.lock:
+                if (
+                    self.correction is not None or self.running
+                    or set(self.reports) != set(ROLES)
+                    or role not in {"business", "catalysts", "valuation"}
+                    or not reason.strip() or len(reason) > 2000
+                    or report_sha256 != hashlib.sha256(dumps(self.reports[role]).encode()).hexdigest()
+                ):
+                    raise ToolException("Correction unavailable or stale report hash; only one explicit material correction cycle is allowed.")
+                self.budget.check()
+                invalidated = [role, "adversarial"]
+                if role != "valuation":
+                    invalidated.insert(1, "valuation")
+                self.correction = copy.deepcopy({
+                    "role": role, "reason": reason, "report_sha256": report_sha256,
+                    "reports": self.reports, "report_times": self.report_times,
+                    "calculations": self.calculations, "invalidated": invalidated,
+                })
+                self.budget.events.append(("research_correction_requested", copy.deepcopy(self.correction)))
+                for name in invalidated:
+                    self.reports.pop(name)
+                    self.report_times.pop(name, None)
+                    self.report_dependencies.pop(name, None)
+                    if name in self.reused:
+                        self.reused.remove(name)
+                return {"invalidated": invalidated, "instruction": "Re-delegate these reports in order. Original reports remain audited; remaining shared budgets still apply."}
+        request_correction.handle_tool_error = True
+        return request_correction
+
     def run(self):
         subagents = [
             {
@@ -1175,11 +1240,12 @@ class ResearchDesk:
             "Delegate to business and catalysts first (they may run concurrently), then valuation, then "
             "adversarial. For targeted news review, call catalysts first; unchanged fresh business/valuation "
             "reports may be reused by the system. All four reports must exist before your final decision. "
+            "If the completed critique exposes a material correctable defect, use request_correction once with the current report hash and a specific reason, then re-delegate invalidated specialists. This uses only remaining budgets. Otherwise finalize honestly; never treat unresolved gaps as resolved. "
             "Use your assigned auxiliary planning/source allowance when enforced; reserve delegation for all four specialists. Delegate evidence gaps rather than browsing exhaustively yourself. Compare with existing holdings and cash, resolve conflicts, "
             "then propose BUY/ADD/HOLD/REDUCE/SELL/WATCH. The critique is mandatory. Use quantity zero for "
             "HOLD/WATCH and numeric limit_price zero (never N/A). Use holding_period_days zero for WATCH when no holding is proposed; other actions require 1–730 days. Keep the final decision concise (under 600 words), including at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Use whole shares/cent prices for trades. Never infer a fill. Supply all rationales, "
             "invalidation conditions and a future review date. An unresolved material gap blocks BUY/ADD.",
-            [t for t in self.tools() if t.name != "value_scenarios"],
+            [t for t in self.tools() if t.name != "value_scenarios"] + [self.correction_tool()],
             subagents,
         )
         prompt = {
@@ -1203,6 +1269,9 @@ class ResearchDesk:
         return {
             **self.context,
             "reports": self.reports,
+            "report_sha256": {name: hashlib.sha256(dumps(report).encode()).hexdigest() for name, report in self.reports.items()},
+            "correction_available": self.correction is None,
+            "correction_instruction": "Before finalizing, use request_correction if available and a specific material defect can be repaired with remaining budgets. Otherwise preserve the gap in the final decision. A correction requires new downstream reports and critique; it does not grant acceptance.",
             "report_times": self.report_times,
             "calculations": self.calculations,
             "evidence": [
@@ -1263,6 +1332,11 @@ class ResearchDesk:
         self.budget.check()
         if set(self.reports) != set(ROLES):
             raise ValueError("Research lead omitted a required specialist; no executable decision")
+        if self.correction and self.report_dependencies.get("adversarial") != {
+            name: hashlib.sha256(dumps(self.reports[name]).encode()).hexdigest()
+            for name in ("business", "catalysts", "valuation")
+        }:
+            raise ValueError("Corrected research requires a fresh critique of current reports")
         decision = self.validate(Decision, output.get("structured_response"))
         if decision["symbol"] != self.context["symbol"]:
             raise ValueError("Decision changed the requested symbol")

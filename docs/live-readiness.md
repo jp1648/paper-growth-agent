@@ -4053,3 +4053,45 @@ $4.016056 gross cost and −$4.016056 credits across ten services, net $0 in thi
 snapshot. This is lagging partial evidence, not a claim that current operations
 are free or all costs are final. Query and original results are retained under
 `state/validation-20261110/`; November 9–10 operating/build costs remain outstanding.
+
+### Run5 completed; independent economic review still requires changes
+
+`annual-testing-v3-dev-20261109-5` completed all four specialists and a final WATCH
+in 300.1 seconds. Mechanical completion passed; model estimate $5.0436675 settled
+in the global ledger with zero unknown calls and no other unsettled model runs.
+Original recording, calculations, reports and review are preserved. No paper order
+was submitted and no study activated.
+
+Independent review accepts temporary abstention but rejects sufficient-evidence
+research completion: available receivables concentration was omitted, compensation
+cohort treatment remains unresolved, normalization alternatives are incompletely
+valued, and scenario/terminal economics remain inadequately justified. The review
+is `state/evaluations/annual-testing-v3-dev-20261109-5/independent-economic-review.json`.
+These findings must not be converted into acceptance by a mechanical pass.
+
+Offline navigation repair now returns already-listed document metadata after an
+unknown document ID, allowing exact-reference recovery without inventing a source.
+The regression checks no evidence is created by the failed lookup and a corrected
+read produces an original passage. Research module: 77 tests pass; Ruff/diff pass.
+Not deployed or paid-run validated. Further architectural issue: repeated specialist
+delegation returns the cached report; a bounded, audited correction path is needed
+for the lead to resolve the critic's substantive findings rather than only restating
+them. No further paid run has been launched.
+
+### Bounded corrective research cycle — offline verified
+
+Added one lead-requested correction cycle after all four reports. An exact current
+report hash and specific reason are required. Original reports, timestamps and
+calculations remain in an audit event; active downstream reports are invalidated
+and a fresh critique must bind the current upstream report hashes. The correction
+cannot restore targeted cached reports or reset global/per-role tool, model, time
+or spending budgets. Exhaustion remains an incomplete investigation, not approval.
+Specialists now receive their actual configured tool allowance instead of a stale
+hardcoded ten-call instruction. Unknown document references return already listed
+navigation metadata without creating citable evidence.
+
+Full offline suite: **1132 passed, 7 skipped**. Independent review ran 147 research,
+normalization and evaluation tests and approved the bounded capability without
+certifying economic quality. Exact source/test review:
+`state/testing-mode-20261109/correction-cycle-review.json`. No paid retry or
+production activation occurred during implementation; deployment remains pending.

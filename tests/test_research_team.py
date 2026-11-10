@@ -128,7 +128,7 @@ class TeamModel(BaseChatModel):
                 "valuation",
                 "adversarial",
             }:
-                assert not names
+                assert names <= {"request_correction"}
                 msg = AIMessage(content=json.dumps(self.decision))
             elif not self.omit_specialists and len(prior) < len(roles) and roles[len(prior)] == "parallel":
                 msg = AIMessage(
@@ -1194,7 +1194,7 @@ def test_compact_final_handoff_preserves_citation_repair(env, decision):
             if kwargs["response_format"]["json_schema"]["name"] == "Decision":
                 context = json.loads(messages[1].content)
                 if context.get("reports"):
-                    assert not kwargs["tools"]
+                    assert {t.name for t in kwargs["tools"]} <= {"request_correction"}
                     if len(messages) == 2:
                         bad = self.decision | {"evidence_ids": ["invented-source"]}
                         message = AIMessage(content=json.dumps(bad))
@@ -1358,6 +1358,7 @@ def test_source_instructions_cannot_turn_references_into_fetches(reference):
     assert unknown["available"] is False
     missing = tools["read_document"].invoke({"document_id": reference})
     assert missing["available"] is False
+    assert missing["listed_documents"] == []
     assert "id" not in missing and "content" not in missing
     assert set(desk.sources) == {"fixture-sec", "hostile-text"}
     assert not desk.calculations and not desk.reports
@@ -1452,7 +1453,14 @@ def test_unknown_document_is_recoverable_without_creating_evidence():
         desk.validate(Research, report)
     # A later correct listing/read still works; absence does not become a permanent negative cache.
     document = tools["filing_documents"].invoke({"symbol": "ACME", "accession": "0000000001-26-000001"})[0]
-    passage = tools["read_document"].invoke({"document_id": document["document_id"]})
+    correction = tools["search_document"].invoke(
+        {"document_id": "document-guessed", "queries": ["cash flow"]}
+    )
+    assert correction["listed_documents"] == [document]
+    assert correction["available"] is False and desk.sources == before
+    passage = tools["read_document"].invoke(
+        {"document_id": correction["listed_documents"][0]["document_id"]}
+    )
     assert passage["id"] in desk.sources and "cash flow" in passage["content"]
 
 
@@ -1687,3 +1695,77 @@ def test_larger_configured_tool_pool_reaches_specialists_with_lead_reserve():
     assert guard.specialist_allowance == 23
     assert len(ROLES) * (guard.specialist_allowance + 1) + guard.lead_allowance == 100
     assert guard.lead_allowance == 4
+
+
+def test_correction_invalidates_dependents_preserves_originals_and_rejects_replay():
+    import copy
+    import hashlib
+
+    from trader.models import dumps
+    from trader.research_team import ROLES
+
+    cfg = Settings()
+    provider = Evidence()
+    desk = ResearchDesk(cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None)
+    desk.reports = {name: {"value": name} for name in ROLES}
+    desk.report_times = {name: now().isoformat() for name in ROLES}
+    desk.calculations["original"] = {"value": "retained"}
+    before = copy.deepcopy(desk.reports)
+    tool = desk.correction_tool()
+    assert isinstance(tool.invoke({"role": "business", "report_sha256": "stale", "reason": "Missing concentration"}), str)
+    assert desk.reports == before and desk.correction is None
+    result = tool.invoke({"role": "business", "report_sha256": hashlib.sha256(dumps(before['business']).encode()).hexdigest(), "reason": "Missing concentration"})
+    assert result["invalidated"] == ["business", "valuation", "adversarial"]
+    assert set(desk.reports) == {"catalysts"}
+    assert desk.correction["reports"] == before
+    assert desk.calculations == {"original": {"value": "retained"}}
+    desk.reports.update(before)
+    with pytest.raises(ValueError, match="fresh critique"):
+        desk.result({})
+    assert isinstance(tool.invoke({"role": "business", "report_sha256": hashlib.sha256(dumps(before['business']).encode()).hexdigest(), "reason": "Again"}), str)
+    assert len([e for e in desk.budget.events if e[0] == "research_correction_requested"]) == 1
+    assert desk.budget.events[-1][1]["reports"] == before
+
+
+def test_recreated_guard_does_not_reset_role_tool_allowance():
+    from types import SimpleNamespace
+
+    from trader.research_team import Guard
+
+    budget = Budget(Settings(research_max_tool_calls=64))
+    original = Guard(budget, "valuation", {"read_source"})
+    original.tool_calls = original.specialist_allowance
+    revised = Guard(budget, "valuation", {"read_source"})
+    assert revised.tool_calls == revised.specialist_allowance == 14
+    reply = revised.wrap_tool_call(SimpleNamespace(tool_call={"name": "read_source", "id": "x"}), lambda _: pytest.fail("No quota reset"))
+    assert "exhausted" in reply.content and budget.tools == 0
+
+
+def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, decision):
+    class CorrectingLead(TeamModel):
+        _phase: int = PrivateAttr(default=0)
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            if kwargs["response_format"]["json_schema"]["name"] == "Decision":
+                context = json.loads(messages[1].content)
+                request = None
+                if self._phase == 0 and context.get("report_sha256"):
+                    request = ("request_correction", {"role": "business", "report_sha256": context["report_sha256"]["business"], "reason": "Recheck concentration against original evidence"})
+                    self._phase = 1
+                elif 1 <= self._phase <= 3:
+                    role = ["business", "valuation", "adversarial"][self._phase - 1]
+                    request = ("task", {"subagent_type": role, "description": "Address concentration correction"})
+                    self._phase += 1
+                elif self._phase == 4:
+                    assert not kwargs["tools"]
+                if request:
+                    message = AIMessage(content="", tool_calls=[{"name": request[0], "args": request[1], "id": f"correct-{self._phase}", "type": "tool_call"}])
+                    message.usage_metadata = {"input_tokens": 100, "output_tokens": 100, "total_tokens": 200}
+                    return ChatResult(generations=[ChatGeneration(message=message)])
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    research, original = team(env, decision)
+    research.model = CorrectingLead(decision=original.decision)
+    result = build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "correct-once"})
+    assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
+    assert research.model._phase == 4
