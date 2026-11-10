@@ -163,8 +163,9 @@ def test_invalid_normalization_is_not_a_supported_value(normalization, fault):
 
 @pytest.mark.parametrize("explicit_compensation", [False, True])
 @pytest.mark.parametrize("financial_reinvestment", [False, True])
+@pytest.mark.parametrize("noncommon_cash", [False, True])
 def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
-    normalization, explicit_compensation, financial_reinvestment
+    normalization, explicit_compensation, financial_reinvestment, noncommon_cash
 ):
     desk, source, bridge = normalization
     if explicit_compensation:
@@ -187,6 +188,17 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
         )
         per_share = "4.812500" if explicit_compensation else "5.062500"
         present_value = "4.38" if explicit_compensation else "4.60"
+    if noncommon_cash:
+        bridge["adjustments"].append(
+            {
+                "category": "noncommon_equity_cash_flows",
+                "annual_delta_usd": "-24",
+                "rationale": "Synthetic conditional NCI/common attribution outside starting cash, not historical earnings; retained minority ownership and terminal claims reserved separately",
+                "evidence_ids": ["assumptions"],
+            }
+        )
+        per_share = str((dec(per_share) - dec(".3")).quantize(dec(".000001")))
+        present_value = str((dec(per_share) / dec("1.1")).quantize(dec(".01")))
     tools = {t.name: t for t in desk.tools()}
     args = {
         "financial_source_id": source["id"],
@@ -221,9 +233,24 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
     candidate["calculations"] = {calc["calculation_id"]: calc}
     assert score(case, candidate)["acceptance"] == "pending_human_review"
     if financial_reinvestment:
-        calc["inputs"]["normalization_bridge"]["adjustments"][-1]["annual_delta_usd"] = "-41"
+        finance_row = next(
+            row
+            for row in calc["inputs"]["normalization_bridge"]["adjustments"]
+            if row["category"] == "financial_asset_reinvestment"
+        )
+        finance_row["annual_delta_usd"] = "-41"
         assert "unverified_financial_provenance" in score(case, candidate)["failures"]
-        calc["inputs"]["normalization_bridge"]["adjustments"][-1]["annual_delta_usd"] = "-40"
+        finance_row["annual_delta_usd"] = "-40"
+        assert score(case, candidate)["acceptance"] == "pending_human_review"
+    if noncommon_cash:
+        common_row = next(
+            row
+            for row in calc["inputs"]["normalization_bridge"]["adjustments"]
+            if row["category"] == "noncommon_equity_cash_flows"
+        )
+        common_row["annual_delta_usd"] = "-25"
+        assert "unverified_financial_provenance" in score(case, candidate)["failures"]
+        common_row["annual_delta_usd"] = "-24"
         assert score(case, candidate)["acceptance"] == "pending_human_review"
     # The baseline stays frozen even when a supported bridge changes forecast input.
     case["expected"]["cash_flow_per_share"] = per_share
@@ -516,3 +543,156 @@ def test_financial_reinvestment_keeps_category_and_source_guards(normalization, 
         row["annual_delta_usd"] = "NaN"
     with pytest.raises(ValueError):
         normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+
+
+@pytest.mark.parametrize("amount", ["-24", "12", "0"])
+@pytest.mark.parametrize("future_compensation", [False, True, "allocated"])
+def test_noncommon_cash_applied_once_separately_from_lending_and_future_compensation(
+    normalization, amount, future_compensation
+):
+    desk, source, bridge = normalization
+    if future_compensation:
+        bridge["compensation_policy"] = {
+            "annual_cash_usd": "60",
+            "rationale": "Synthetic future service cost",
+            "legacy_award_treatment": "Existing awards already reserved, no duplicate charge",
+            "evidence_ids": ["assumptions"],
+        }
+    if future_compensation == "allocated":
+        source["content"]["facts"]["AllocatedShareBasedCompensationExpense"] = {
+            "USD": [{**source["content"]["facts"][CFO]["USD"][0], "val": 75}]
+        }
+        source["content"]["fact_taxonomies"] = {"AllocatedShareBasedCompensationExpense": "us-gaap"}
+        bridge["compensation_source_tag"] = "AllocatedShareBasedCompensationExpense"
+    bridge["adjustments"].extend(
+        [
+            {
+                "category": "financial_asset_reinvestment",
+                "annual_delta_usd": "-40",
+                "rationale": "Incremental consolidated lending assets outside CFO/PPE, financing separately stated",
+                "evidence_ids": ["assumptions"],
+            },
+            {
+                "category": "noncommon_equity_cash_flows",
+                "annual_delta_usd": amount,
+                "rationale": "Synthetic incremental common attribution; negative removes ownership entitlement, positive only a separately assumed cash reversal/release; historical earnings are not cash and minority retained/terminal claims persist",
+                "evidence_ids": ["assumptions"],
+            },
+        ]
+    )
+    result = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    expected = dec("425" if future_compensation else "445") - 40 + dec(amount)
+    assert result["bridge_version"] == 4 and result["noncommon_equity_cash_flows_usd"] == amount
+    assert result["financial_asset_reinvestment_usd"] == "-40"
+    assert dec(result["bridged_equity_cash_flow_usd"]) == expected
+    assert any(
+        "Free-text policy and arithmetic do not independently validate" in note
+        for note in result["limitations"]
+    )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "duplicate",
+        "missing_core",
+        "unknown_category",
+        "unknown_evidence",
+        "future_evidence",
+        "blank_rationale",
+        "nonfinite",
+    ],
+)
+def test_noncommon_cash_preserves_original_citation_and_category_guards(normalization, fault):
+    desk, source, bridge = normalization
+    desk.sources["noncommon-source"] = {
+        "id": "noncommon-source",
+        "source": "SEC EDGAR filing passage",
+        "content": "Synthetic ownership/attribution source; not an investment claim",
+    }
+    row = {
+        "category": "noncommon_equity_cash_flows",
+        "annual_delta_usd": "-24",
+        "rationale": "Conditional common cash attribution, baseline coverage and retained/terminal minority interests reconciled",
+        "evidence_ids": ["noncommon-source"],
+    }
+    bridge["adjustments"].append(row)
+    if fault == "duplicate":
+        bridge["adjustments"].append(copy.deepcopy(row))
+    elif fault == "missing_core":
+        bridge["adjustments"].pop(0)
+    elif fault == "unknown_category":
+        row["category"] = "minority_accounting_earnings_is_cash"
+    elif fault == "unknown_evidence":
+        row["evidence_ids"] = ["invented"]
+    elif fault == "future_evidence":
+        desk.sources["noncommon-source"]["published_at"] = "2027-01-01T00:00:00Z"
+    elif fault == "blank_rationale":
+        row["rationale"] = " "
+    else:
+        row["annual_delta_usd"] = "NaN"
+    with pytest.raises(ValueError):
+        normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+
+
+def test_synthetic_preferred_conversion_and_cash_claim_policies_are_distinct(normalization):
+    desk, source, base = normalization
+    converted = copy.deepcopy(base)
+    converted["valuation_shares"] = "100"
+    converted["share_rationale"] = (
+        "80 dated common plus20 assumed converted preferred; no second preferred cash deduction. Existing employee awards separately reserved."
+    )
+    converted["financing_and_claims"] = (
+        "Synthetic preferred conversion changes denominator; minority retained ownership and terminal entitlement remain. Not a historical source claim."
+    )
+    converted["adjustments"].append(
+        {
+            "category": "noncommon_equity_cash_flows",
+            "annual_delta_usd": "-10",
+            "rationale": "Only conditional minority entitlement; preferred converted into20shares, so no preferred dividend deduction",
+            "evidence_ids": ["assumptions"],
+        }
+    )
+    first = normalized_cash_flow(source, "2025-12-31", CUTOFF, converted, desk.sources)
+    cash = copy.deepcopy(base)
+    cash["financing_and_claims"] = (
+        "Preferred stays outside common denominator with20conditional annualcash plus10minority attribution; no capitalized/redemption duplicate, minority retained ownership and terminal claims separately reserved."
+    )
+    cash["adjustments"].append(
+        {
+            "category": "noncommon_equity_cash_flows",
+            "annual_delta_usd": "-30",
+            "rationale": "20conditional cash preferred plus10minority attribution outside baseline; not earnings-as-cash or recurring issuance",
+            "evidence_ids": ["assumptions"],
+        }
+    )
+    second = normalized_cash_flow(source, "2025-12-31", CUTOFF, cash, desk.sources)
+    assert first["bridged_equity_cash_flow_usd"] == "435" and first["cash_flow_per_share"] == "4.350000"
+    assert second["bridged_equity_cash_flow_usd"] == "415" and second["cash_flow_per_share"] == "5.187500"
+    assert (
+        first["assumptions"]["valuation_shares"] == "100"
+        and second["assumptions"]["valuation_shares"] == "80"
+    )
+
+
+def test_noncommon_absence_preserves_approved_financial_asset_v3_payload(normalization):
+    import hashlib
+
+    from trader.models import dumps
+
+    desk, source, bridge = normalization
+    bridge["adjustments"].append(
+        {
+            "category": "financial_asset_reinvestment",
+            "annual_delta_usd": "-40",
+            "rationale": "Synthetic incremental finance asset deployment; not working capital or net funding",
+            "evidence_ids": ["assumptions"],
+        }
+    )
+    result = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
+    assert result["bridge_version"] == 3 and "noncommon_equity_cash_flows_usd" not in result
+    # Payload recorded independently from approved9fc7d06 before adding the new category.
+    assert (
+        hashlib.sha256(dumps(result).encode()).hexdigest()
+        == "9f0135633edd2922ed976a18b3e1eb53a0faf7df92375e832834195228a9353c"
+    )

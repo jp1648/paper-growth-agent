@@ -16,6 +16,7 @@ class CashFlowAdjustment(Model):
         "capital_expenditure",
         "net_borrowing",
         "financial_asset_reinvestment",
+        "noncommon_equity_cash_flows",
     ]
     annual_delta_usd: str
     rationale: str = Field(min_length=1)
@@ -34,7 +35,7 @@ class CompensationPolicy(Model):
 class NormalizationBridge(Model):
     """Explicit equity cash-flow assumptions; arithmetic does not certify economics."""
 
-    adjustments: list[CashFlowAdjustment] = Field(min_length=4, max_length=5)
+    adjustments: list[CashFlowAdjustment] = Field(min_length=4, max_length=6)
     valuation_shares: str
     share_base_date: str
     share_evidence_ids: list[str] = Field(min_length=1)
@@ -71,10 +72,10 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
     if (
         not categories <= set(selected)
         or len(set(selected)) != len(selected)
-        or not set(selected) <= categories | {"financial_asset_reinvestment"}
+        or not set(selected) <= categories | {"financial_asset_reinvestment", "noncommon_equity_cash_flows"}
     ):
         raise ValueError(
-            "Require each of the four core normalization categories exactly once, including zeros, and at most one optional financial_asset_reinvestment"
+            "Require each of the four core normalization categories exactly once, including zeros, and at most one of each optional financial_asset_reinvestment and noncommon_equity_cash_flows"
         )
     refs = set(bridge["share_evidence_ids"])
     policy = bridge.get("compensation_policy")
@@ -149,6 +150,16 @@ def normalized_cash_flow(source, period_end, cutoff, bridge, sources):
         )
         result["limitations"].append(
             "Financial-asset reinvestment is a signed incremental cash flow outside the consolidated CFO-minus-PPE baseline: negative deploys capital, positive releases it. Reconcile operating reclassifications and eliminations; do not duplicate working capital, leased/PPE investment or loan funding. Borrowing is separate funding, not recurring income. Sustainable lending, losses and financing require independent economic review."
+        )
+    if "noncommon_equity_cash_flows" in selected:
+        result["bridge_version"] = 4
+        result["noncommon_equity_cash_flows_usd"] = next(
+            row["annual_delta_usd"]
+            for row in bridge["adjustments"]
+            if row["category"] == "noncommon_equity_cash_flows"
+        )
+        result["limitations"].append(
+            "Noncommon-equity cash flows are signed incremental attribution outside the starting consolidated cash stream, not accounting minority earnings. Negative removes other owners' cash entitlement; positive needs an explicit release/reversal or funding basis, not recurring income by label. Reconcile minority retained ownership and terminal claims. Preferred conversion in the denominator must not also incur the same preferred dividend/claim deduction; equity contributions, issuance and redemptions are capital transfers, not perpetual distributable earnings. Avoid overlap with debt, operating cash, financial assets and employee/legacy compensation. Free-text policy and arithmetic do not independently validate economic attribution."
         )
     if compensation_tag == "AllocatedShareBasedCompensationExpense":
         result.update(
