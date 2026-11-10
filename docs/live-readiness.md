@@ -4454,3 +4454,30 @@ Combined offline validation:1257 tests passed,7 skipped; lint/format checks pass
 No successful full P&G acceptance, active trial or new order follows from these
 source changes. The next testing allowance must cover measured requirements and
 confirmed credit; ordinary spending history remains counted without resets.
+
+### Calculation continuity after the second observed P&G regression
+
+The next observed regression completed four reports and WATCH with zero shares in
+383 seconds, costing a settled estimated $4.5999425 with no unknown calls.
+Independent review still rejected economic completion: available preferred-share
+claim terms were unread, and revised reports incorrectly described previously
+completed signed arithmetic as unverified. Original results remain failed;
+mechanical completion and appropriate abstention are not research acceptance.
+
+Successful arithmetic records now persist through corrections, saved finalization,
+cached thesis reuse and evaluation output. Prompt views are bounded, with omitted
+records available through the existing source-reading tool as explicitly derived
+arithmetic. Restored records are checked with the original arithmetic tools before
+model calls; neither the results nor their retrieval handle become primary
+citations. Raw prior-thesis arithmetic is excluded from prompts until validated.
+Dated-claim guidance requires the original equity/employee-plan/minority notes,
+reconciled denominators and economic bases, or supported quantitative bounds.
+
+The recorded path required a peak conservative reservation of $5.7513925, despite
+its lower final cost. A reviewed proposal aligns the per-run cap with the existing
+$6 daily allowance and raises tools/context to 64/240000; it is not yet applied
+and does not guarantee future completion. Testing charges remain counted.
+A fresh, independently reviewed replacement funding allocation of $11 is installed
+with the $15 buffer and original November 29 expiry intact. No charge or prior
+allocation history was erased. Daily capacity remains exhausted, and no active
+paper study or new order follows from this work.

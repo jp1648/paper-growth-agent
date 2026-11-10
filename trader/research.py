@@ -30,6 +30,7 @@ class GraphState(TypedDict, total=False):
     team_reports: dict
     team_report_times: dict
     calculations: dict
+    arithmetic_records: list[dict]
     reused_reports: list
     decision: dict
     risk: list[str]
@@ -214,6 +215,7 @@ def build_graph(service, team):
                     "team_report_times": result.get("team_report_times", {}),
                     "research_sources": result["evidence"]["sources"],
                     "research_calculations": result.get("calculations", {}),
+                    "research_arithmetic_records": result.get("arithmetic_records", []),
                 },
                 "thesis",
             )

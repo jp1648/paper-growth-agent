@@ -550,6 +550,7 @@ def run_case(cfg, store, case, model, run_key):
         "decision": output["decision"] if output else None,
         "reports": desk.reports,
         "calculations": desk.calculations,
+        "arithmetic_records": desk.arithmetic_records(),
         "metrics": metrics,
         "stages": stages,
         "failure_category": error,

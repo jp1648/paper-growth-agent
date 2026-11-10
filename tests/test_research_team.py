@@ -1949,7 +1949,23 @@ def test_impossible_correction_preserves_completed_reports(role, spent):
     assert budget.tools == spent and budget.correction_tool_limits == {}
 
 
-def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, decision):
+def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, decision, monkeypatch):
+    original_specialist = ResearchDesk.specialist
+
+    def seed_arithmetic(desk, role, task):
+        if role == "business" and desk.correction is None:
+            tools = {tool.name: tool for tool in desk.tools()}
+            tools["sum_cash_flows"].invoke(
+                {
+                    "period_end": "2025-12-31",
+                    "components": [{"label": "Cash", "amount_usd": "-10", "evidence_id": "fixture-sec"}],
+                }
+            )
+            tools["multiply_values"].invoke({"left": "2", "right": "3"})
+        return original_specialist(desk, role, task)
+
+    monkeypatch.setattr(ResearchDesk, "specialist", seed_arithmetic)
+
     class CorrectingLead(TeamModel):
         _phase: int = PrivateAttr(default=0)
 
@@ -1957,11 +1973,20 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
             if kwargs["response_format"]["json_schema"]["name"] == "Critique":
                 context = json.loads(messages[1].content)
                 if context.get("correction"):
+                    assert [r["event"] for r in context["arithmetic"]["records"]] == [
+                        "cash_flow_sum",
+                        "decimal_product",
+                    ]
+                    assert context["arithmetic"]["records"][0]["result"]["total_usd"] == "-10"
                     provenance = context["correction"]["correction_valuation_provenance"]
                     assert provenance["calculation_inputs_unchanged"] is True
                     assert provenance["original_calculation_id"] == provenance["current_calculation_id"]
             if kwargs["response_format"]["json_schema"]["name"] == "Decision":
                 context = json.loads(messages[1].content)
+                assert [r["event"] for r in context["arithmetic"]["records"]] == [
+                    "cash_flow_sum",
+                    "decimal_product",
+                ]
                 request = None
                 if self._phase == 0 and context.get("report_sha256"):
                     request = (
@@ -1999,6 +2024,10 @@ def test_actual_graph_runs_one_correction_and_fresh_downstream_reports(env, deci
     result = build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "correct-once"})
     assert set(result["team_reports"]) == {"business", "catalysts", "valuation", "adversarial"}
     assert research.model._phase == 2
+    audit = env[0].store.get("correct-once", "research_audit")
+    assert audit["arithmetic_records"] == result["arithmetic_records"]
+    assert env[0].store.get("ACME", "thesis")["research_arithmetic_records"] == result["arithmetic_records"]
+    assert [r["event"] for r in result["arithmetic_records"]] == ["cash_flow_sum", "decimal_product"]
     costs = [event["body"] for event in env[0].store.events("model_cost")]
     assert sum(cost["stage"] == "research_lead" for cost in costs) == 2
     delegations = [event["body"] for event in env[0].store.events("research_tool_result")]

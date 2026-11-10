@@ -165,7 +165,7 @@ ROLES = {
             "For an explicit equity normalization bridge, source SBC is deducted once as the default cash-equivalent compensation proxy. An explicit compensation_policy replaces that deduction with annual_cash_usd for FUTURE service only, with retained evidence, rationale and legacy_award_treatment. Reconcile existing awards separately: never also deduct their remaining accounting expense, future-service cost, gross dilution and offsetting repurchases for the same claim. New-grant quantities and grant-date values can anchor a conditional replacement policy; they are not verified future cash costs. "
             "Provide four annual USD adjustments (cash_taxes, working_capital, capital_expenditure, net_borrowing), each with rationale and retained evidence, including justified zeros. "
             "Tax/working-capital/capex amounts are DELTAS relative to their effects already in historical CFO-capex; net_borrowing is an additional equity financing flow. "
-            "Supply a dated valuation share base, evidence and rationale for constant shares under cash-equivalent compensation; address existing award claims and financing. "
+            "Supply a dated valuation share base, evidence and rationale for constant shares under cash-equivalent compensation; address existing award claims and financing. Read the original equity, employee-plan and noncontrolling-interest notes before calling historical claim terms unavailable; an EPS table alone may omit period-end quantities and conversion terms. Reconcile common shares, convertible/preferred claims, legacy awards and minority interests by date and economic basis, identifying which claims already enter the denominator or cash flows. Use a source-supported quantitative alternative or bound when treatment is uncertain, without double counting; genuinely unavailable terms remain gaps. Distinguish contractual debt payments from carrying balances instead of labeling a basis difference an error without reconciliation. "
             "Do not also deduct SBC-offset repurchases or mechanically add excess cash/subtract debt. The tool computes a provisional per-share bridge, not approval of assumptions. "
             "Complete this workflow before deciding to withhold valuation: (1) Reconcile observed historical cash-flow inputs, including signed operating working-capital components for each available comparison year using sum_cash_flows. Separate cash payments from accounting provisions and identify any unresolved tax/escrow attribution; do not invent a decomposition. "
             "(2) For EVERY bridge adjustment and the share/award treatment, state in assumptions: observed source anchor; classification as observed fact, chosen forward policy, or unresolved historical attribution; explicit proposed amount/formula; economic rationale; and an adverse alternative. Management need not have announced your hypothetical financing, reinvestment or compensation policy. Label analyst choices as conditional assumptions, never observed facts. "
@@ -637,6 +637,7 @@ class ResearchDesk:
             self.context = copy.deepcopy(context)
             prior_prompt = self.context["portfolio"]["prior_thesis"]
             prior_prompt.pop("research_sources", None)
+            prior_prompt.pop("research_arithmetic_records", None)
             if "execution" in prior_prompt:
                 prior_prompt["execution"] = {
                     key: value
@@ -742,6 +743,16 @@ class ResearchDesk:
             if offset < 0:
                 raise ValueError("Negative source offset")
             with self.lock:
+                if source_id == "derived-arithmetic-history":
+                    text = dumps(self.arithmetic_records())
+                    return {
+                        "kind": "derived_arithmetic_history",
+                        "original_source": False,
+                        "note": "Retained arithmetic only; not original evidence or verification of source inputs/economic interpretation. Never cite this handle in evidence_ids.",
+                        "offset": offset,
+                        "content": text[offset : offset + 6000],
+                        "truncated": offset + 6000 < len(text),
+                    }
                 if source_id in self.calculations:
                     text = dumps(self.calculations[source_id])
                     return {
@@ -1240,6 +1251,7 @@ class ResearchDesk:
                 **self.context,
                 "reports": copy.deepcopy(self.reports),
                 "calculations": copy.deepcopy(self.calculations),
+                "arithmetic": self.arithmetic_context(),
                 "evidence": self.source_previews(self.sources.values()),
                 "assignment": task["messages"][-1].content,
             }
@@ -1295,6 +1307,8 @@ class ResearchDesk:
                                 self.report_times[saved] = self.prior["team_report_times"][saved]
                                 self.reused.append(saved)
                     self.calculations.update(copy.deepcopy(self.prior.get("research_calculations", {})))
+                    if self.reused:
+                        self.restore_arithmetic(self.prior.get("research_arithmetic_records", []))
                 self.budget.events.append(("specialist_result", {"role": role, "result": self.reports[role]}))
                 return {"messages": [AIMessage(content=dumps(self.reports[role]))]}
         finally:
@@ -1466,6 +1480,54 @@ class ResearchDesk:
             "instruction": "Deterministic comparison of saved records, not primary evidence or economic approval. Report wording can change without changing calculation inputs. Inspect calculations by the recorded IDs before alleging a changed model; preserve genuine unsupported assumptions.",
         }
 
+    def arithmetic_records(self):
+        with self.budget.lock:
+            return copy.deepcopy(
+                [
+                    {"event": kind, "result": result}
+                    for kind, result in self.budget.events
+                    if kind in {"cash_flow_sum", "decimal_product"}
+                ]
+            )
+
+    def arithmetic_context(self):
+        records = self.arithmetic_records()
+        visible, size = [], 0
+        for record in reversed(records[-20:]):
+            size += len(dumps(record).encode())
+            if size > 12000:
+                break
+            visible.insert(0, record)
+        return {
+            "records": visible,
+            "omitted_records": len(records) - len(visible),
+            "history_handle": "derived-arithmetic-history",
+            "retrieval_hint": "Permitted specialists can page the complete chronological history with read_source(history_handle, offset), 6000 characters per page; no recomputation or new source evidence.",
+            "note": "Retained successful arithmetic only, not primary evidence or validation of input transcription, units, signs, periods, classification, completeness or economic support. This is not blanket verification of historical inputs. Omitted records are outside this bounded view, NOT missing or unperformed operations; the full audit/history retains them. Do not call a retained operation uncomputed; distinguish its exact arithmetic from unresolved source/economic questions and any new inspection not yet performed.",
+        }
+
+    def restore_arithmetic(self, records):
+        if not isinstance(records, list):
+            raise TypeError("Saved arithmetic records must be a list")
+        tools = {tool.name: tool for tool in self.tools()}
+        for record in records:
+            if not isinstance(record, dict) or set(record) != {"event", "result"}:
+                raise ValueError("Invalid saved arithmetic record")
+            result = record["result"]
+            if record["event"] == "cash_flow_sum":
+                actual = tools["sum_cash_flows"].invoke(
+                    {
+                        "period_end": result["period_end"],
+                        "components": result["components"],
+                    }
+                )
+            elif record["event"] == "decimal_product":
+                actual = tools["multiply_values"].invoke({"left": result["left"], "right": result["right"]})
+            else:
+                raise ValueError("Unknown saved arithmetic operation")
+            if actual != result:
+                raise ValueError("Saved arithmetic provenance or values differ")
+
     def final_context(self):
         return {
             **self.context,
@@ -1479,6 +1541,7 @@ class ResearchDesk:
             "correction_instruction": "Before finalizing, inspect missing coverage and material objections across all reports. When several repairable defects exist, target the earliest incomplete dependency: available but unread business disclosures require business correction before downstream valuation repair. Carry all relevant critique defects into the correction reason so rebuilt valuation and critique address them together; do not spend the sole correction on valuation alone while required upstream business coverage remains unread. Use request_correction only when the defect can be repaired with remaining budgets; otherwise preserve the gap in the final decision. A correction requires new downstream reports and critique; it does not grant acceptance.",
             "report_times": self.report_times,
             "calculations": self.calculations,
+            "arithmetic": self.arithmetic_context(),
             "evidence": [
                 {
                     **{key: value for key, value in source.items() if key != "content"},
@@ -1503,6 +1566,7 @@ class ResearchDesk:
             actual = calculator.invoke(calculation["inputs"])
             if actual != calculation or actual["calculation_id"] != identifier:
                 raise ValueError("Saved calculation provenance or values differ")
+        self.restore_arithmetic(audit.get("arithmetic_records", []))
         self.reports = {
             role: self.validate(ROLES[role][0], report) for role, report in audit["reports"].items()
         }
@@ -1580,6 +1644,7 @@ class ResearchDesk:
                 "sources": list(self.sources.values()),
             },
             "calculations": self.calculations,
+            "arithmetic_records": self.arithmetic_records(),
             "reused_reports": self.reused,
             "team_report_times": self.report_times,
         }
@@ -1702,6 +1767,7 @@ class DeepResearchTeam:
                     "sources": list(desk.sources.values()) if desk else [],
                     "reports": desk.reports if desk else {},
                     "calculations": desk.calculations if desk else {},
+                    "arithmetic_records": desk.arithmetic_records() if desk else [],
                     "model_calls": budget.models,
                     "tool_calls": budget.tools,
                     "estimated_usd": budget.reserved,
