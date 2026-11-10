@@ -4095,3 +4095,44 @@ normalization and evaluation tests and approved the bounded capability without
 certifying economic quality. Exact source/test review:
 `state/testing-mode-20261109/correction-cycle-review.json`. No paid retry or
 production activation occurred during implementation; deployment remains pending.
+
+### Corrective workflow release a9da8ec and run6
+
+CI caught formatting-only differences in b0ba414 before deployment. Formatting was
+corrected in a9da8ec; AST equivalence and refreshed independent source bindings
+were verified. Both exact-head checks passed (42743132280 and 42743124996), and
+Cloud Build e24dac6f-11ff-4e12-83d0-1636425b355c succeeded. The paused executor now
+runs image `sha256:61a2b2f7508c6cfa62e7d4094b09553dd3024385e5071599424b5ba4bcdc97d2`;
+all 36 running source hashes match. The stricter all-settled release preflight
+passed, with original experiment/configuration and intent/order/activity counts
+preserved. Fresh heartbeat and reconciliation are healthy; the held AAPL review
+is still overdue, so overall readiness is not green.
+
+The first run6 invocation stopped before reservation/model calls because release
+preflight created its new lock file as root. Changing that existing file's owner
+to executor UID 501 preserved the lock inode and allowed the next invocation.
+Future privileged release procedures must preserve the planned directory owner's
+ownership when creating launch locks; do not delete/recreate a live lock file.
+
+`annual-testing-v3-dev-20261109-6` terminated at the valuation context guard
+(185,822 bytes versus 180,000), before critique or final decision. Its estimated
+$3.2195350 cost is settled in the global ledger with no unknown charge. No broker
+orders, study activation or unattended funding allocation occurred.
+Run5 now also has a separate hash-bound semantic review and reviewed-results.json:
+one mechanical completion, one reviewed economic failure, zero pending reviews.
+Original outputs remain unchanged.
+
+### Run6 accounting diagnosis and correction
+
+Independent inspection of the retained request and installed Responses converter
+found exactly mirrored tool calls counted twice by the local guard but sent once
+to the provider. Accounting now excludes only unambiguous matching ID, name and
+arguments from a separate copy. Encrypted reasoning, full passages, transmitted
+messages and original telemetry remain intact. Malformed, mismatched or duplicate
+IDs retain the conservative full count. The limit remains 180,000 bytes.
+
+Captured run6 replay: 185,822 serialized history bytes, 174,410 accounted bytes;
+provider input and audit history byte-equivalent. Research tests: 88 passed.
+This resolves a premature rejection, not investment acceptance or guaranteed
+completion of later turns. Direct user confirmation that only Trader uses the
+credits is retained privately; a bounded unattended allocation is not yet installed.

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import os
 import re
 import threading
@@ -312,6 +313,41 @@ class Guard(AgentMiddleware):
             result.append(message)
         return result
 
+    @staticmethod
+    def request_bytes(payload):
+        # Responses sends mirrored function calls once; keep the original audit and request intact.
+        counted = copy.deepcopy(payload)
+        for message in counted["messages"]:
+            if message.get("type") != "ai" or not isinstance(message.get("content"), list):
+                continue
+            mirrors = []
+            blocks = [
+                block
+                for block in message["content"]
+                if isinstance(block, dict) and block.get("type") == "function_call"
+            ]
+            calls = message.get("tool_calls", [])
+            for block in blocks:
+                try:
+                    arguments = json.loads(block["arguments"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if (
+                    block.get("call_id")
+                    and block.get("name")
+                    and isinstance(arguments, dict)
+                    and sum(b.get("call_id") == block["call_id"] for b in blocks) == 1
+                    and sum(c.get("id") == block["call_id"] for c in calls) == 1
+                ):
+                    mirrors.append((block["call_id"], block["name"], json.dumps(arguments, sort_keys=True)))
+            message["tool_calls"] = [
+                call
+                for call in calls
+                if (call.get("id"), call.get("name"), json.dumps(call.get("args"), sort_keys=True))
+                not in mirrors
+            ]
+        return len(dumps(counted).encode())
+
     @traced("model.call", inputs=lambda self, request, handler: {"role": self.role})
     def wrap_model_call(self, request, handler):
         messages = self.bounded_messages(request.messages)
@@ -357,6 +393,7 @@ class Guard(AgentMiddleware):
             ],
             "output_schema": request.response_format.schema_spec.json_schema,
         }
+        request_bytes = self.request_bytes(payload)
         # Keep compact size diagnostics in the ledger; full redacted payloads go to telemetry.
         groups = {}
         for message in messages:
@@ -370,14 +407,15 @@ class Guard(AgentMiddleware):
                         "role": self.role,
                         "messages": len(messages),
                         "message_bytes_by_type": groups,
-                        "total_bytes": len(dumps(payload).encode()),
+                        "total_bytes": request_bytes,
+                        "serialized_history_bytes": len(dumps(payload).encode()),
                         "tool_schema_bytes": len(dumps(payload["tools"]).encode()),
                         "output_schema_bytes": len(dumps(payload["output_schema"]).encode()),
                     },
                 )
             )
         self.trace("model.request", {"role": self.role, "payload": payload})
-        reserved = self.budget.model(len(dumps(payload).encode()), self.role)
+        reserved = self.budget.model(request_bytes, self.role)
         started = time.monotonic()
         try:
             response = handler(request.override(tools=tools, messages=messages))

@@ -631,6 +631,51 @@ def test_context_shortens_only_old_source_results_without_mutating_history():
     assert "Re-read the original" in result[0].content
 
 
+@pytest.mark.parametrize(
+    "variant",
+    ["exact", "args", "name", "duplicate_block", "duplicate_call", "invalid", "boolean", "unmirrored"],
+)
+def test_request_accounting_deducts_only_unambiguous_mirrors_without_changing_provider_input(variant):
+    import copy
+
+    from langchain_openai.chat_models.base import _construct_responses_api_input
+
+    from trader.models import dumps
+    from trader.research_team import Guard
+
+    block = {"type": "function_call", "call_id": "call_1", "name": "calculate", "arguments": '{"n": 1}'}
+    call = {"id": "call_1", "name": "calculate", "args": {"n": 1}}
+    if variant == "args":
+        call["args"] = {"n": 2}
+    elif variant == "boolean":
+        call["args"] = {"n": True}
+    elif variant == "name":
+        call["name"] = "other"
+    elif variant == "invalid":
+        block["arguments"] = "not json"
+    elif variant == "unmirrored":
+        block["call_id"] = "call_other"
+    content = [{"type": "reasoning", "encrypted_content": "retained"}, block]
+    if variant == "duplicate_block":
+        content.append(copy.deepcopy(block))
+    calls = [call, copy.deepcopy(call)] if variant == "duplicate_call" else [call]
+    messages = [
+        AIMessage(content=content, tool_calls=calls),
+        ToolMessage(content="full evidence", tool_call_id="call_1"),
+    ]
+    payload = {"messages": [m.model_dump() for m in messages], "tools": [{"schema": "retained"}]}
+    original = copy.deepcopy(payload)
+    provider_before = _construct_responses_api_input(messages, store=False)
+    size = Guard.request_bytes(payload)
+    expected = copy.deepcopy(payload)
+    if variant == "exact":
+        expected["messages"][0]["tool_calls"] = []
+    assert size == len(dumps(expected).encode())
+    assert payload == original
+    assert _construct_responses_api_input(messages, store=False) == provider_before
+    assert provider_before[-1]["call_id"] == "call_1"
+
+
 def test_prior_source_bodies_are_not_repeated_in_every_prompt():
     prior = {
         "research_sources": [{"id": "old", "content": "x" * 200000}],
