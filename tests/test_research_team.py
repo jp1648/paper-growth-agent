@@ -41,6 +41,7 @@ class Evidence:
             "sources": [
                 {
                     "id": "fixture-sec",
+                    "source": "SEC EDGAR",
                     "content": {
                         "facts": financial_facts(),
                         "filings": [
@@ -225,6 +226,20 @@ class TeamModel(BaseChatModel):
                             "sensitivity": "Growth",
                             "margin_of_safety": "Conditional",
                             "normalization_review": {
+                                "claims_coverage": {
+                                    name: {
+                                        "status": "supported_conditional_treatment",
+                                        "evidence_ids": refs[:1],
+                                        "as_of_date": "2025-12-31",
+                                        "treatment_or_gap": "Synthetic fixture only: all claims explicitly treated; not issuer evidence",
+                                    }
+                                    for name in (
+                                        "common_shares",
+                                        "preferred_or_convertible",
+                                        "legacy_awards",
+                                        "noncontrolling_interests",
+                                    )
+                                },
                                 "cash_flow_basis": "Synthetic fixture proxy; not real company evidence",
                                 "debt_and_cash": "Fixture assumes no debt or excess cash",
                                 "dilution_and_sbc": "Fixture assumes stable diluted shares and no SBC",

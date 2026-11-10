@@ -194,6 +194,7 @@ def test_actual_research_desk_runs_frozen_tools_without_broker(tmp_path, monkeyp
         "facts": financial_facts(),
         "filings": [{"accessionNumber": "0000000001-26-000001", "form": "10-K", "filingDate": "2026-01-01"}],
     }
+    case["inputs"]["sources"][0]["source"] = "SEC EDGAR"  # Synthetic live fixture, not the saved replay.
     case["inputs"]["documents"] = [
         {
             "available_at": "2026-01-01T00:00:00Z",

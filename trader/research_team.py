@@ -31,6 +31,7 @@ from langsmith import tracing_context
 from pydantic import Field
 
 from .alpaca import safe_error
+from .claims import ClaimsCoverage, claim_gaps, validate_claim_coverage
 from .evidence import EvidenceTooLarge
 from .financials import (
     MissingAnnualFact,
@@ -66,6 +67,7 @@ class Research(Model):
 
 
 class NormalizationReview(Model):
+    claims_coverage: ClaimsCoverage | None = None
     cash_flow_basis: str = Field(min_length=1)
     debt_and_cash: str = Field(min_length=1)
     dilution_and_sbc: str = Field(min_length=1)
@@ -172,7 +174,7 @@ ROLES = {
             "(2) For EVERY bridge adjustment and the share/award treatment, state in assumptions: observed source anchor; classification as observed fact, chosen forward policy, or unresolved historical attribution; explicit proposed amount/formula; economic rationale; and an adverse alternative. Management need not have announced your hypothetical financing, reinvestment or compensation policy. Label analyst choices as conditional assumptions, never observed facts. "
             "(3) Model an economically justified conditional bridge and scenarios with the calculation tools. Unknown future policy alone is not grounds to omit calculations. If historical attribution remains uncertain, assess whether a source-supported combined treatment or bounded sensitivity avoids double counting; do not silently set an unknown item to zero. If even bounded modeling would mislead, identify the exact missing historical input and explain why the uncertainty cannot be bounded, rather than merely listing unanswered forecasts. "
             "A preferred recovery adjustment needs a forecast of operating funding needs anchored in the filing, not simply a fraction of historical outflow. When that preference cannot be justified, label the alternative cases without claiming a preferred normalized estimate. Explain each cash-flow growth scenario through disclosed business mix, margins and reinvestment; explain terminal multiples through post-horizon growth, maturity and competitive risk. Merely calling numbers analyst choices or a bracket is not an economic rationale. Use multiply_values for derived products such as award quantities times grant-date values, and cite the original inputs separately. "
-            "All bridge evidence must appear in the valuation report. The historical proxy does not establish normalized earnings. Zero deltas require a specific scenario rationale, never a default to satisfy the schema. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Preserve unresolved_material_gaps for genuinely unsupported material historical inputs or assumptions; calculating a conditional sensitivity does not resolve such gaps or authorize BUY/ADD. A missing or unresolved normalization review blocks BUY/ADD. Return the calculation_id and exact bear/base/bull values when computed. "
+            "All bridge evidence must appear in the valuation report. The historical proxy does not establish normalized earnings. Zero deltas require a specific scenario rationale, never a default to satisfy the schema. Explicitly provide normalization_review.claims_coverage with exactly common_shares, preferred_or_convertible, legacy_awards, noncontrolling_interests. Each needs status (supported_conditional_treatment, supported_not_applicable, unread, not_disclosed_in_inspected_sources, unsupported_treatment), evidence_ids, canonical as_of_date or null, and treatment_or_gap explaining quantitative treatment/double counting or exact missing work. Supported closure requires inspected original disclosure, never search absence; common-share treatment requires a supported point date, not an EPS average period. These are runtime diagnostics, not economic approval. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Preserve unresolved_material_gaps for genuinely unsupported material historical inputs or assumptions; calculating a conditional sensitivity does not resolve such gaps or authorize BUY/ADD. A missing or unresolved normalization review blocks BUY/ADD. Return the calculation_id and exact bear/base/bull values when computed. "
             "Use inspect_cash_flow for annual accounting diagnostics or pass the proposed normalization_bridge to obtain its exact per-share result before calling value_scenarios with that same bridge. Missing inputs are gaps; arithmetic does not establish economic support. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Quantify material normalization alternatives with calculation tools as well as growth/multiple sensitivities. Vary one supported compensation, combined tax/operating-movement or reinvestment assumption at a time; do not combine overlapping tax and working-capital recoveries or capitalize a one-time debt maturity as a perpetual annual drain. Preserve the chosen main calculation_id and identify alternatives separately. "
@@ -1086,6 +1088,10 @@ class ResearchDesk:
     )
     def validate(self, schema, output):
         result = schema.model_validate(output).model_dump(mode="json")
+        if schema is Valuation and isinstance(output, dict):
+            original_review = output.get("normalization_review")
+            if isinstance(original_review, dict) and "claims_coverage" not in original_review:
+                result["normalization_review"].pop("claims_coverage", None)
         unknown = sorted(set(result["evidence_ids"]) - self.sources.keys())
         empty = sorted(
             identifier
@@ -1122,6 +1128,7 @@ class ResearchDesk:
             review = result.get("normalization_review")
             if review and not set(review["evidence_ids"]).issubset(result["evidence_ids"]):
                 raise ValueError("Normalization review must cite valuation evidence")
+            validate_claim_coverage(result, self.sources, self.evaluation_at or now())
             if result["calculation_id"] is None:
                 if any(result[k] is not None for k in ("bear_value", "base_value", "bull_value")):
                     raise ValueError("Unsupported valuation must leave all values unknown")
@@ -1255,12 +1262,14 @@ class ResearchDesk:
                 "arithmetic": self.arithmetic_context(),
                 "evidence": self.source_previews(self.sources.values()),
                 "assignment": task["messages"][-1].content,
+                "claims_coverage": self.claims_coverage(),
             }
             if self.correction:
                 context["correction"] = {
                     "reason": self.correction["reason"],
                     "previous_report": self.correction["reports"].get(role),
                     "original_critique": self.correction["reports"]["adversarial"],
+                    "claims_coverage": self.claims_coverage(self.correction["reports"].get("valuation")),
                     "correction_valuation_provenance": self.correction_valuation_provenance(),
                     "instruction": "Address the cited defect using original evidence and calculation tools. Retain unsupported gaps; do not change a conclusion just to gain approval.",
                 }
@@ -1529,6 +1538,15 @@ class ResearchDesk:
             if actual != result:
                 raise ValueError("Saved arithmetic provenance or values differ")
 
+    def claims_coverage(self, valuation=None):
+        valuation = self.reports.get("valuation", {}) if valuation is None else valuation
+        gaps = claim_gaps(valuation)
+        return {
+            "contract": "runtime-claims-coverage-v1",
+            "unresolved": gaps,
+            "instruction": "Unresolved claims block BUY/ADD even if a report says no material gaps. Use the existing single correction, targeting valuation unless a business prerequisite is itself incomplete; preserve honest unknowns when repair is unavailable. This diagnostic does not prove economic treatment or source interpretation and does not change frozen replay/scoring criteria.",
+        }
+
     def final_context(self):
         return {
             **self.context,
@@ -1538,6 +1556,7 @@ class ResearchDesk:
                 for name, report in self.reports.items()
             },
             "correction_available": self.correction is None,
+            "claims_coverage": self.claims_coverage(),
             "correction_valuation_provenance": self.correction_valuation_provenance(),
             "correction_instruction": "Before finalizing, inspect missing coverage and material objections across all reports. When several repairable defects exist, target the earliest incomplete dependency: available but unread business disclosures require business correction before downstream valuation repair. Carry all relevant critique defects into the correction reason so rebuilt valuation and critique address them together; do not spend the sole correction on valuation alone while required upstream business coverage remains unread. Use request_correction only when the defect can be repaired with remaining budgets; otherwise preserve the gap in the final decision. A correction requires new downstream reports and critique; it does not grant acceptance.",
             "report_times": self.report_times,
@@ -1551,7 +1570,7 @@ class ResearchDesk:
                 for source in self.sources.values()
             ],
             "targeted_news_review": bool(self.targeted),
-            "instruction": "All four specialist reports are complete. Return the final Decision using these reports and their cited evidence. The evidence index contains metadata and content hashes only; original content remains in the audit, not this synthesis request. Do not treat the index as independently inspected evidence. Reconcile differences between reports: when a later specialist supplies cited original evidence for an earlier unread gap, incorporate that supported finding rather than repeating the stale gap. Distinguish secondhand specialist findings from your own inspection. Preserve genuinely unresolved uncertainties and conflicting interpretations; do not invent additional evidence.",
+            "instruction": "All four specialist reports have returned; unresolved claim diagnostics still mean incomplete evidence. Return the final Decision using these reports and their cited evidence. The evidence index contains metadata and content hashes only; original content remains in the audit, not this synthesis request. Do not treat the index as independently inspected evidence. Reconcile differences between reports: when a later specialist supplies cited original evidence for an earlier unread gap, incorporate that supported finding rather than repeating the stale gap. Distinguish secondhand specialist findings from your own inspection. Preserve genuinely unresolved uncertainties and conflicting interpretations; do not invent additional evidence.",
         }
 
     def finalize(self, audit, report_times):
@@ -1616,13 +1635,15 @@ class ResearchDesk:
             self.reports["adversarial"]["unresolved_material_gaps"]
             or self.reports["valuation"]["calculation_id"] is None
             or not normalization_supported(self.reports["valuation"])
+            or bool(self.claims_coverage()["unresolved"])
         )
         if gap and decision["action"] in {"BUY", "ADD"}:
             self.budget.events.append(
                 (
                     "research_veto",
                     {
-                        "reason": "Material evidence gap, missing normalization review or no supported calculated valuation",
+                        "reason": "Material evidence gap, unreviewed claims, missing normalization review or no supported calculated valuation",
+                        "claims_coverage": self.claims_coverage(),
                         "action": decision["action"],
                     },
                 )

@@ -8,6 +8,7 @@ import httpx
 
 from .accounting import LedgerError, replay, reserved, validate_fill_type
 from .alpaca import safe_error
+from .claims import claim_gaps, validate_claim_coverage
 from .evidence import EvidenceProvider
 from .executor_owner import ExecutionFenceError
 from .financials import normalization_supported
@@ -403,6 +404,19 @@ class Service:
                 ):
                     research_reasons.append("Valuation normalization review is missing or unresolved")
                 if decision.action in {"BUY", "ADD"}:
+                    try:
+                        validate_claim_coverage(
+                            research.get("valuation", {}),
+                            {
+                                source["id"]: source
+                                for source in research.get("evidence", {}).get("sources", [])
+                            },
+                            now(),
+                        )
+                        if claim_gaps(research.get("valuation", {})):
+                            research_reasons.append("Valuation claim coverage is unreviewed or unresolved")
+                    except (ValueError, TypeError):
+                        research_reasons.append("Valuation claim coverage is invalid")
                     critique = research.get("critique")
                     refs = critique.get("evidence_ids") if isinstance(critique, dict) else None
                     sources = {source["id"] for source in research.get("evidence", {}).get("sources", [])}

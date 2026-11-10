@@ -15,7 +15,7 @@ class Evidence:
         return {
             "symbol": symbol,
             "fetched_at": AT.isoformat(),
-            "sources": [{"id": "fixture-sec-1", "content": "Offline fixture"}],
+            "sources": [{"id": "fixture-sec-1", "source": "SEC EDGAR", "content": "Offline fixture"}],
         }
 
 
@@ -36,6 +36,20 @@ class FixtureTeam:
                 "base_value": "140",
                 "bull_value": "170",
                 "normalization_review": {
+                    "claims_coverage": {
+                        name: {
+                            "status": "supported_conditional_treatment",
+                            "evidence_ids": ref["evidence_ids"],
+                            "as_of_date": "2025-12-31",
+                            "treatment_or_gap": "Synthetic fixture: stable claims already treated; not issuer evidence",
+                        }
+                        for name in (
+                            "common_shares",
+                            "preferred_or_convertible",
+                            "legacy_awards",
+                            "noncontrolling_interests",
+                        )
+                    },
                     "cash_flow_basis": "Synthetic fixture proxy",
                     "debt_and_cash": "Fixture assumes none",
                     "dilution_and_sbc": "Fixture assumes none",

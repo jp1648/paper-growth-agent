@@ -120,3 +120,19 @@ also previews, retrievable with read_source. Each specialist has ten tool calls,
 then tools are removed and it must return a structured report with evidence gaps.
 The shared 48-tool, model-call, time and dollar guards still apply. A bounded report
 is not proof that the evidence is sufficient to trade.
+
+Structured claim coverage uses the runtime-only `runtime-claims-coverage-v1`
+completion contract inside the existing valuation normalization review. The four
+fixed categories are common shares, preferred/convertible claims, legacy awards,
+and noncontrolling interests. Supported treatment requires retained original SEC
+citations, a treatment explanation, and a point date for common shares; these
+checks establish neither semantic support nor correct economic treatment.
+Unread, undisclosed or unsupported claims remain valid incomplete research and
+block BUY/ADD even when a model clears its global gap flag. Legacy reports lacking
+coverage remain unreviewed; cached execution uses the same boundary. The existing
+single model-requested correction may repair valuation and rebuild its critic
+without resetting budgets. Compact claim gaps are propagated into that existing
+context; the diagnostic does not automatically schedule a correction or guarantee
+that remaining capacity is spent on repair. Missing evidence may still produce honest WATCH/abstention. Frozen
+replay candidates, original-case economics and the v8 scoring rubric are unchanged;
+this is a runtime diagnostic and execution gate, not a new economic score.
