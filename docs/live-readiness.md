@@ -4648,3 +4648,32 @@ Gross November 10 settled model estimates are now $33.3409800; remaining allocat
 is $22.5141225. Neither additional expenditure nor the successful cleanup establishes
 investment-quality acceptance. The prepared next PG regression remains blocked
 pending updated candidate bindings, fresh funding checks and independent review.
+
+### November 10 late evening: complete specialist reports, blocked final decision
+
+The deployed `f0ac275` held-AAPL attempt completed all four specialist reports but
+stopped before the first lead call: $4.0508225 settled model estimates plus the
+conservative next-call reservation exceeded the $6 cap ($6.6486225). Context was
+91864 bytes, within its limit. All charges are known; cleanup verified the exact
+pause, listener, source/configuration and unchanged order records. The broker
+still reports one AAPL share and no open orders. Gross November 10 model estimates
+are $37.3918025; the preserved allocation retains $18.4633000.
+
+Independent review found material concentration, ownership-claim and normalization
+gaps. Final-only recovery could record an incomplete disposition but could not
+repair those gaps or establish acceptance, so it was not launched. The source
+candidate now restricts the final metadata index to exact references throughout
+reports, calculations, arithmetic and portfolio context, explicitly counting
+unindexed originals. All originals remain retained. Independent actual-request
+replay is 81275 bytes and a $6.3838975 next total: useful savings, still above the
+same cap. The change is offline validated (1406 tests passed, seven external checks
+skipped), independently reviewed and not yet deployed or paid-validated.
+
+The prospective cost policy now has independent specification review: gross
+provider-billed consumption before promotional credits is primary; net cash cost
+is a separate sensitivity. Unknown amounts remain pending. Read-only resource
+metadata access succeeded, but resource ownership/allocation and complete provider
+cost coverage are not certified. Opening approval remains separate. The canonical
+November 10 daily-price capture cannot be made before November 11 midnight New
+York under the existing collector guard; this is not permission to backdate or
+substitute an earlier economic anchor.

@@ -1608,7 +1608,7 @@ class ResearchDesk:
         }
 
     def final_context(self):
-        return {
+        context = {
             **self.context,
             "reports": self.reports,
             "report_sha256": {
@@ -1622,16 +1622,38 @@ class ResearchDesk:
             "report_times": self.report_times,
             "calculations": self.calculations,
             "arithmetic": self.arithmetic_context(),
-            "evidence": [
-                {
-                    **{key: value for key, value in source.items() if key != "content"},
-                    "content_sha256": hashlib.sha256(dumps(source.get("content")).encode()).hexdigest(),
-                }
-                for source in self.sources.values()
-            ],
             "targeted_news_review": bool(self.targeted),
             "instruction": "All four specialist reports have returned; unresolved claim diagnostics still mean incomplete evidence. Return the final Decision using these reports and their cited evidence. The evidence index contains metadata and content hashes only; original content remains in the audit, not this synthesis request. Do not treat the index as independently inspected evidence. Reconcile differences between reports: when a later specialist supplies cited original evidence for an earlier unread gap, incorporate that supported finding rather than repeating the stale gap. Distinguish secondhand specialist findings from your own inspection. Preserve genuinely unresolved uncertainties and conflicting interpretations; do not invent additional evidence.",
         }
+
+        referenced = set()
+
+        def collect(value):
+            if isinstance(value, dict):
+                for item in value.values():
+                    collect(item)
+            elif isinstance(value, list):
+                for item in value:
+                    collect(item)
+            elif isinstance(value, str) and value in self.sources:
+                referenced.add(value)
+
+        collect(context)
+        context["evidence"] = [
+            {
+                **{key: value for key, value in source.items() if key != "content"},
+                "content_sha256": hashlib.sha256(dumps(source.get("content")).encode()).hexdigest(),
+            }
+            for identifier, source in self.sources.items()
+            if identifier in referenced
+        ]
+        context["unindexed_source_count"] = len(self.sources) - len(referenced)
+        context["evidence_index_note"] = (
+            "Nonexhaustive index: only exact source IDs referenced by the supplied reports, calculations, "
+            "arithmetic and portfolio context. Unindexed sources remain in the original audit and available "
+            "to permitted specialists; omission is not missing evidence or proof of review."
+        )
+        return context
 
     def finalize(self, audit, report_times):
         if set(audit["reports"]) != set(ROLES):

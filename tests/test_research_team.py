@@ -1618,12 +1618,26 @@ def test_final_context_indexes_evidence_without_mutating_reports_or_originals():
     )
     desk = ResearchDesk(cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, bundle, Budget(cfg), None)
     desk.reports = {"business": {"evidence_ids": ["passage-test"], "gap": "tax bridge incomplete"}}
-    desk.calculations = {"calculation-test": {"value": "12.34"}}
+    desk.calculations = {"calculation-test": {"value": "12.34", "inputs": {"source_id": "fixture-sec"}}}
+    desk.sources["unreferenced"] = {"id": "unreferenced", "content": "retained original"}
+    desk.budget.events.append(("decimal_product", {"source_id": "arithmetic-only"}))
+    desk.sources["arithmetic-only"] = {"id": "arithmetic-only", "content": "arithmetic provenance"}
+    desk.context["portfolio"] = {"prior_thesis": {"evidence_ids": ["portfolio-only"]}}
+    desk.sources["portfolio-only"] = {"id": "portfolio-only", "content": "prior source"}
     original = copy.deepcopy(desk.sources)
     context = desk.final_context()
     assert context["reports"] == desk.reports and context["calculations"] == desk.calculations
     assert desk.sources == original
-    for source, indexed in zip(original.values(), context["evidence"], strict=True):
+    assert {s["id"] for s in context["evidence"]} == {
+        "fixture-sec",
+        "passage-test",
+        "arithmetic-only",
+        "portfolio-only",
+    }
+    assert context["unindexed_source_count"] == 1
+    assert "Nonexhaustive" in context["evidence_index_note"]
+    for indexed in context["evidence"]:
+        source = original[indexed["id"]]
         assert "content" not in indexed
         assert indexed["id"] == source["id"]
         assert indexed["content_sha256"] == hashlib.sha256(dumps(source.get("content")).encode()).hexdigest()
