@@ -5074,3 +5074,56 @@ The next private PG11 proposal is frozen to `c92a977` and unchanged development
 suite bytes, has no launcher or installed funding, and is explicitly nonlaunchable.
 The requested one-run $6/day exception remains unanswered. No paid research,
 new study activation, broker order, or recurring automation was started.
+
+### November 11: authorized PG11 isolated experiment failed acceptance
+
+The user approved exactly one further $6 experiment and a November 11 gross
+ceiling of $11.01621. Fresh credit evidence and all 63 settled prior spending rows
+were verified. A new exact-$6 one-run allocation preserved the $15 buffer and
+expired at the end of November 11 in New York. The actual ledger transaction
+passed rollback validation before installation; independent review bound the
+source, frozen suite, launcher, funding and replay protections.
+
+GitHub continued to return queued candidate checks and inconsistent completed
+status for older runs. Production cutover remained withheld. Instead PG11 ran
+once in an isolated immutable `c92a977` container with the verified image above,
+read-only root filesystem, source/configuration binding and existing recorded
+provider. Production remained on `a4a1831`; no service restart or trading activation
+occurred. This tests the observed development research case, not production
+Temporal scheduling or a fresh unseen cohort.
+
+Run `annual-testing-pg-full-regression-20261111-11` started at 20:40:27 UTC and
+settled at 20:44:24. Recorded estimated model cost was $4.9367225, with no unknown
+calls or outstanding reservations. It used 35 model calls and 56 tools in about
+236 seconds; peak context was 211,679 bytes. The cost guard blocked the next
+valuation-correction call at a prospective $6.0454275 total. The actual blocked
+request had 209,693/240,000 context bytes and 35/60 model calls: neither of those
+limits was the stopping cause. No final decision or accepted research resulted.
+
+The initial business, catalyst, valuation and critique stages ran. The lead
+requested a valuation-only correction, preserving business/catalyst work. Material
+objections concerned the $108m recurring minority reserve inferred from net equity
+movements, finite-year restructuring cash payments and maximum PSU claims. The
+correction inspected more source passages but produced no revised calculation,
+valuation, renewed critique or final decision. This narrower correction scope is
+observable behavior, not proof of improved economic quality or reliable completion.
+
+The one-run allocation was automatically retired. Its $1.0632775 unspent remainder
+is not new spending authority. November 11 gross recorded spending is $9.9529325.
+All 63 previous spending bodies are byte-for-byte unchanged; exact original
+experiment, pause, configuration, intent/order/activity/acceptance/adjustment,
+research-result and durable-request/submission hashes are preserved. There is no
+active study, new order or automatic retry. Provider invoice reconciliation is
+separate from this settled local estimate. Full research, genuinely unseen,
+held-AAPL and opening acceptance remain incomplete.
+
+Independent economic review verified all 17 retained passages against the frozen
+original, reproduced all four signed arithmetic records and four valuation
+triples, and upheld non-acceptance. Correct arithmetic does not validate the
+ownership and normalization assumptions. Next work is offline: reconcile annual
+and terminal minority entitlement, finite-year restructuring cash versus baseline,
+and maximum award dilution; check whether the current scalar-growth calculation
+can represent finite-year costs without incorrectly perpetuating them into terminal
+value. Establish a complete revised-valuation/critique/final-decision cost envelope
+before another paid authorization. Do not respond with another blind retry or a
+small cap increase.
