@@ -4810,3 +4810,34 @@ passed 1422 tests with seven external checks skipped; subsequent additive repair
 integration cases passed with the 17 focused checks. This is an undeployed
 capacity mechanism, not evidence that source coverage or economic acceptance is
 complete. Changed-path source navigation and cost remain separate review gates.
+
+### November 10: ninth observed PG regression
+
+Candidate `a934566` was independently reviewed, passed CI, and deployed paused;
+38 installed Python source hashes matched and original configuration, experiment,
+funding, reservations and history were preserved. A real frozen-source navigation
+replay demonstrated a possible eight-read valuation path with unused prerequisite
+capacity transferred, and a separate cost assessment supported one bounded test.
+That feasibility evidence did not guarantee the model would follow the path.
+
+PG9 ran once under the unchanged $6 testing cap. All four specialist reports,
+including correction, completed, but no final decision was produced. The lead's
+next-call reservation was $6.2258775, so the cost guard correctly refused the call.
+Actual settled model estimate was $4.6189775 over 308.7 seconds, 46 model calls and
+64 tool calls, with zero unknown or unsettled charges. Lead context was 52,228
+bytes; neither the context limit nor the model-call limit caused the final refusal.
+
+Independent review verified 19 original passages and the three signed comparative
+operating-cash movement totals. Conditional valuation arithmetic was reproducible,
+but tax, working capital, minority-claim and compensation alternatives remained
+unquantified, and growth/multiple scenarios still lacked an operating-driver bridge.
+Specialist support for temporary abstention is not a completed final decision.
+This run fails research acceptance; no new order or active paper study was created.
+
+Post-run checks preserved pause, configuration and order/intent/activity counts.
+The allocated testing balance is $3.1080250, with the separate $15 buffer preserved;
+no automatic paid retry is authorized. Gross November 10 settled model estimates
+are $52.7470775, not a final provider invoice. Further work is offline diagnosis;
+held-position acceptance, unseen evaluation and final opening evidence remain open.
+The human's revised stop point is 25% total weekly Codex usage, separate from API
+spending limits; the last observed meter was 22%.
