@@ -66,7 +66,11 @@ jobs:
       - run: npm run build
       - run: node e2e/seed.mjs
       # Packaged Chrome has Ubuntu's AppArmor user-namespace profile.
-      - run: npx playwright install --with-deps chrome
+      - run: |
+          if ! command -v google-chrome >/dev/null 2>&1; then
+            npx playwright install --with-deps chrome
+          fi
+          google-chrome --version
       - run: npx playwright test
         env:
           TEST_START_SERVER: "1"
