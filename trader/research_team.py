@@ -224,10 +224,59 @@ class Budget:
         initial_pool = max(0, cfg.research_max_tool_calls - CORRECTION_RESERVE)
         self.initial_specialist_allowance = max(0, (initial_pool - len(ROLES)) // len(ROLES))
         self.lead_allowance = max(0, initial_pool - len(ROLES) * (1 + self.initial_specialist_allowance))
+        self.initial_valuation_allowance = self.initial_specialist_allowance
+        self.initial_valuation_grant_frozen = False
         self.reserved = dec(0)
         self.failed = False
         self.lock = threading.RLock()
         self.events = []
+
+    def specialist_limit(self, role):
+        if role in self.correction_tool_limits:
+            return self.correction_tool_limits[role]
+        return self.initial_valuation_allowance if role == "valuation" else self.initial_specialist_allowance
+
+    def freeze_initial_valuation_grant(self, reports, running, correction_active):
+        """Transfer only unused completed prerequisite slots within the initial pool."""
+        with self.lock:
+            prerequisites = {"business", "catalysts"}
+            if (
+                self.initial_valuation_grant_frozen
+                or correction_active
+                or not prerequisites.issubset(reports)
+                or prerequisites & running
+                or self.role_tool_calls.get("valuation", 0)
+            ):
+                return False
+            base = self.initial_specialist_allowance
+            spent = {role: self.role_tool_calls.get(role, 0) for role in sorted(prerequisites)}
+            unused = {role: max(0, base - count) for role, count in spent.items()}
+            initial_pool = max(0, self.cfg.research_max_tool_calls - CORRECTION_RESERVE)
+            # Four delegations, the critic, and the lead retain their original slots.
+            unclaimed_pool = max(
+                0,
+                initial_pool - len(ROLES) - self.lead_allowance - base * 2 - sum(spent.values()),
+            )
+            grant = min(sum(unused.values()), unclaimed_pool)
+            self.initial_valuation_allowance = base + grant
+            self.initial_valuation_grant_frozen = True
+            self.events.append(
+                (
+                    "research_initial_valuation_grant",
+                    {
+                        "completed_prerequisite_calls": spent,
+                        "unused_prerequisite_calls": unused,
+                        "base_valuation_allowance": base,
+                        "transferred_calls": grant,
+                        "frozen_valuation_allowance": self.initial_valuation_allowance,
+                        "initial_pool": initial_pool,
+                        "lead_allowance": self.lead_allowance,
+                        "critic_allowance": base,
+                        "correction_reserve": CORRECTION_RESERVE,
+                    },
+                )
+            )
+            return True
 
     def check(self):
         if self.failed or (
@@ -292,12 +341,11 @@ class Guard(AgentMiddleware):
         self.repair_available = repair_available
         self.running_tasks = set()
         # Initial work cannot consume the shared one-cycle repair reserve.
-        self.initial_specialist_allowance = budget.initial_specialist_allowance
         self.lead_allowance = budget.lead_allowance
 
     @property
     def specialist_allowance(self):
-        return self.budget.correction_tool_limits.get(self.role, self.initial_specialist_allowance)
+        return self.budget.specialist_limit(self.role)
 
     @property
     def tool_calls(self):
@@ -1306,7 +1354,7 @@ class ResearchDesk:
                 (
                     ""
                     if self.budget.unrestricted_research
-                    else f" You currently have at most {max(0, self.budget.correction_tool_limits.get(role, self.budget.initial_specialist_allowance) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
+                    else f" You currently have at most {max(0, self.budget.specialist_limit(role) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
                 )
                 + " Batch independent source searches, reads or arithmetic requests in one model turn when their inputs are already known; each operation still counts against the shared tool budget. Never guess a source ID or offset to batch a dependent lookup. Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
                 if role != "research_lead"
@@ -1351,15 +1399,19 @@ class ResearchDesk:
                 "valuation": {"business", "catalysts"},
                 "adversarial": {"business", "catalysts", "valuation"},
             }.get(role, set())
-            if prerequisites - self.reports.keys():
+            incomplete = (prerequisites - self.reports.keys()) | (prerequisites & self.running)
+            if incomplete:
                 return {
                     "messages": [
                         AIMessage(
-                            content="Run prerequisite specialists first: "
-                            + ", ".join(sorted(prerequisites - self.reports.keys()))
+                            content="Run prerequisite specialists first: " + ", ".join(sorted(incomplete))
                         )
                     ]
                 }
+            if role == "valuation" and self.correction is None:
+                self.budget.freeze_initial_valuation_grant(
+                    self.reports.keys(), self.running, correction_active=False
+                )
             self.running.add(role)
             context = {
                 **self.context,

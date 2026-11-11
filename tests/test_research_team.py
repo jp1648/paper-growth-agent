@@ -2033,6 +2033,108 @@ def test_larger_configured_tool_pool_reaches_specialists_with_lead_reserve():
     assert guard.lead_allowance == 2
 
 
+@pytest.mark.parametrize(
+    "business_calls,catalyst_calls,valuation_cap",
+    [(11, 6, 16), (11, 11, 11), (4, 7, 22)],
+)
+def test_initial_valuation_grant_transfers_only_completed_unused_calls(
+    business_calls, catalyst_calls, valuation_cap
+):
+    from trader.research_team import CORRECTION_RESERVE, Guard
+
+    budget = Budget(Settings(research_max_tool_calls=64))
+    prior_guard = Guard(budget, "valuation", {"read_source"})
+    budget.role_tool_calls.update({"business": business_calls, "catalysts": catalyst_calls})
+    assert not budget.freeze_initial_valuation_grant({"business"}, set(), False)
+    assert not budget.freeze_initial_valuation_grant({"business", "catalysts"}, {"business"}, False)
+    assert not budget.freeze_initial_valuation_grant({"business", "catalysts"}, set(), True)
+    assert prior_guard.specialist_allowance == 11
+    assert budget.freeze_initial_valuation_grant({"business", "catalysts"}, set(), False)
+    assert prior_guard.specialist_allowance == valuation_cap
+    assert Guard(budget, "valuation", {"read_source"}).specialist_allowance == valuation_cap
+    assert not budget.freeze_initial_valuation_grant({"business", "catalysts"}, set(), False)
+    events = [payload for kind, payload in budget.events if kind == "research_initial_valuation_grant"]
+    assert len(events) == 1
+    assert events[0]["transferred_calls"] == valuation_cap - 11
+    assert events[0]["frozen_valuation_allowance"] == valuation_cap
+    assert 4 + business_calls + catalyst_calls + valuation_cap + 11 + 2 + CORRECTION_RESERVE == 64
+    assert budget.specialist_limit("adversarial") == 11
+    assert budget.lead_allowance == 2
+    assert CORRECTION_RESERVE == 14
+    budget.correction_tool_limits["valuation"] = valuation_cap + 2
+    assert prior_guard.specialist_allowance == valuation_cap + 2
+
+
+def test_initial_valuation_grant_starts_with_actual_completed_reports(monkeypatch):
+    from trader.research_team import Guard
+
+    cfg = Settings(research_max_tool_calls=64)
+    provider = Evidence()
+    budget = Budget(cfg)
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    desk.reports = {"business": {"evidence_ids": []}, "catalysts": {"evidence_ids": []}}
+    budget.role_tool_calls.update({"business": 11, "catalysts": 6})
+    monkeypatch.setattr(desk, "claims_coverage", lambda *args: {})
+    captured = {}
+
+    def fake_agent(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr("trader.research_team.create_deep_agent", fake_agent)
+    monkeypatch.setattr(desk, "invoke_report", lambda *args: {"structured_response": {"evidence_ids": []}})
+    monkeypatch.setattr(desk, "validate", lambda schema, report: report)
+    desk.running.add("business")
+    waiting = desk.specialist("valuation", {"messages": [AIMessage(content="review")]})
+    assert "business" in waiting["messages"][0].content
+    assert not budget.initial_valuation_grant_frozen
+    desk.running.clear()
+    desk.specialist("valuation", {"messages": [AIMessage(content="review")]})
+    assert budget.initial_valuation_grant_frozen
+    assert Guard(budget, "valuation", {"read_source"}).specialist_allowance == 16
+    assert "16 tool calls remaining" in captured["system_prompt"]
+    assert len([kind for kind, _ in budget.events if kind == "research_initial_valuation_grant"]) == 1
+
+
+@pytest.mark.parametrize("max_calls", [4, 5, 18, 20])
+def test_initial_valuation_grant_respects_small_configured_pool(max_calls):
+    from trader.research_team import CORRECTION_RESERVE
+
+    budget = Budget(Settings(research_max_tool_calls=max_calls))
+    base = budget.initial_specialist_allowance
+    assert budget.freeze_initial_valuation_grant({"business", "catalysts"}, set(), False)
+    assert budget.specialist_limit("valuation") == base
+    assert budget.specialist_limit("adversarial") == base
+    assert budget.initial_valuation_allowance + 3 * base + 4 + budget.lead_allowance <= max(
+        4, max_calls - CORRECTION_RESERVE
+    )
+
+
+def test_initial_valuation_grant_does_not_reset_recreated_guards_or_global_limit():
+    from types import SimpleNamespace
+
+    from trader.research_team import Guard
+
+    budget = Budget(Settings(research_max_tool_calls=64))
+    budget.role_tool_calls.update({"business": 11, "catalysts": 6})
+    assert budget.freeze_initial_valuation_grant({"business", "catalysts"}, set(), False)
+    guard = Guard(budget, "valuation", {"read_source"})
+    request = SimpleNamespace(tool_call={"name": "read_source", "id": "read", "args": {}})
+    for _ in range(16):
+        guard.wrap_tool_call(request, lambda _: ToolMessage(content="source", tool_call_id="read"))
+    assert budget.role_tool_calls["valuation"] == 16
+    reply = Guard(budget, "valuation", {"read_source"}).wrap_tool_call(
+        request, lambda _: pytest.fail("No extra specialist allowance")
+    )
+    assert "exhausted" in reply.content
+    assert budget.tools == 16
+    budget.tools = 64
+    with pytest.raises(ResearchLimit, match="tool-call limit"):
+        budget.tool()
+
+
 def test_correction_invalidates_dependents_preserves_originals_and_rejects_replay(monkeypatch):
     import copy
     import hashlib
@@ -2394,7 +2496,10 @@ def test_correction_provenance_distinguishes_report_changes_inputs_and_missing_c
 
 
 @pytest.mark.parametrize("repair_role", ["business", "catalysts", "valuation"])
-def test_exhausted_initial_guards_retain_complete_repair_capacity(repair_role, monkeypatch):
+@pytest.mark.parametrize("catalyst_initial_calls", [6, 11])
+def test_initial_guards_with_optional_transfer_retain_complete_repair_capacity(
+    repair_role, catalyst_initial_calls, monkeypatch
+):
     import copy
     import hashlib
     from types import SimpleNamespace
@@ -2415,8 +2520,12 @@ def test_exhausted_initial_guards_retain_complete_repair_capacity(repair_role, m
     assert lead.tool_calls == lead.lead_allowance == 2
 
     def specialist(role, task):
+        if role == "valuation" and not desk.correction:
+            assert budget.freeze_initial_valuation_grant(desk.reports.keys(), desk.running, False)
         guard = Guard(budget, role, {"read_source"})
         remaining = guard.specialist_allowance - guard.tool_calls
+        if role == "catalysts" and not desk.correction:
+            remaining = catalyst_initial_calls
         for _ in range(remaining):
             guard.wrap_tool_call(source, lambda _: None)
         desk.reports[role] = {"phase": "corrected" if desk.correction else "initial", "role": role}
@@ -2426,6 +2535,10 @@ def test_exhausted_initial_guards_retain_complete_repair_capacity(repair_role, m
     desk.dispatch_roles(ROLES, "initial")  # Four real Guard-metered delegations.
     before = copy.deepcopy(desk.reports)
     assert budget.tools == 50 and sum(budget.role_tool_calls[r] for r in ROLES) == 44
+    assert budget.role_tool_calls["valuation"] == 22 - catalyst_initial_calls
+    assert budget.initial_valuation_allowance == 22 - catalyst_initial_calls
+    grant_events = [event for kind, event in budget.events if kind == "research_initial_valuation_grant"]
+    assert len(grant_events) == 1 and grant_events[0]["transferred_calls"] == 11 - catalyst_initial_calls
     tool = desk.correction_tool()
     args = {
         "role": repair_role,

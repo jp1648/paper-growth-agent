@@ -4797,3 +4797,16 @@ limits and acceptance criteria remain unchanged. The full suite passes 1413 test
 with seven external checks skipped. This is not deployed or economically accepted.
 The retained-path operation ledger remains above 64 calls even under optimistic
 ordering, so no further paid launch is approved by this offline evidence alone.
+
+Initial valuation can now receive only the unused tool allowance of completed,
+inactive business and catalyst researchers. The transfer freezes once and is
+recorded in the investigation audit. It never borrows from the critic, lead or
+correction reserve, and correction limits take precedence. The exact allocation
+also appears in the specialist's instructions. Independent review and metered
+integration tests verify both 11/11 prerequisites (no transfer) and 11/6
+prerequisites (valuation receives 16), with initial work capped at 50 calls and
+the existing correction allocator reaching at most 64. The full offline suite
+passed 1422 tests with seven external checks skipped; subsequent additive repair
+integration cases passed with the 17 focused checks. This is an undeployed
+capacity mechanism, not evidence that source coverage or economic acceptance is
+complete. Changed-path source navigation and cost remain separate review gates.
