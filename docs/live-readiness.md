@@ -5055,3 +5055,22 @@ was requested; no paid call or funding change is implied by preparation or deplo
 
 The combined candidate passed 1,563 offline tests with eight skips. The primary
 agent reviewed the diff, independent test evidence and release preparation.
+
+Release candidate `c92a977` built successfully as immutable image
+`sha256:1d955c1b5e67aeb30b0f201a057aae3d9ac7863ef1c29d91e8db4a6b7a7c2fe7`.
+The primary agent verified the exact 51-file committed build context and reviewed
+49 installed source/dependency hash checks. Fresh preflight found only the expected
+listener and worker, no running production research workflows, no active study,
+and all 63 costs settled with no unknown liabilities. The pause, funding, original
+configuration and execution history remain intact. No cutover was performed:
+GitHub checks for the candidate were still queued at the last observation.
+The active image remains `a4a1831`. Resume with fresh CI/runtime checks before
+cutover; use the retained environment-only rollback, never restore an older ledger.
+
+The refreshed provider screen showed $158.64 available through November 29;
+the proposed funding calculation retains only a conservative $24.72 after PG10,
+with the $15 buffer intact. This observation does not renew spending authority.
+The next private PG11 proposal is frozen to `c92a977` and unchanged development
+suite bytes, has no launcher or installed funding, and is explicitly nonlaunchable.
+The requested one-run $6/day exception remains unanswered. No paid research,
+new study activation, broker order, or recurring automation was started.
