@@ -59,7 +59,7 @@ reduces the allocation. A settlement replaces its reservation in the same record
 unknown costs, edited/deleted baseline records or malformed amounts block work.
 Renewal requires fresh credit evidence and a complete settled baseline, not a
 reset of prior consumption. The existing reservation transaction checks funding
-and inserts the new reservation atomically. Ordinary $6/day and $5/run study
+and inserts the new reservation atomically. Ordinary $6/day and $6/run study
 limits still apply, as do acceptance, pause, ownership and broker risk gates.
 No receipt is installed by this document. Funding through one allocation does not
 prove funding through the full study or authorize a different study scope.

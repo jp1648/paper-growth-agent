@@ -87,6 +87,22 @@ def test_scheduled_run_consumed_once_and_journaled(runtime):
     )
 
 
+@pytest.mark.parametrize("run_cap,day_cap", [("6", "6"), ("6.01", "6"), ("6", "6.01")])
+def test_approved_six_dollar_study_ceilings(runtime, run_cap, day_cap):
+    runner, study, _, calls, _ = runtime
+    runner.cfg.research_max_cost_usd = dec(run_cap)
+    runner.cfg.research_daily_cost_usd = dec(day_cap)
+    study["config_sha256"] = fingerprint(runner.cfg.model_dump(mode="json"))
+    if run_cap == day_cap == "6":
+        assert "mechanically completed" in run(runtime)["status"]
+        assert len(calls) == 1
+    else:
+        with pytest.raises(ValueError, match="approved run/day ceilings"):
+            run(runtime)
+        assert calls == []
+        assert runner.store.items("paper_slot") == []
+
+
 def test_failure_after_claim_never_retries(runtime):
     runner, _, _, calls, _ = runtime
 

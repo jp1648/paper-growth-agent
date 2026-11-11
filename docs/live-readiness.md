@@ -5029,3 +5029,29 @@ Validation: the full offline suite passed (1,560 tests, 8 skipped). Independent
 review found no weakened gates; its final clarity suggestion to explicitly retain
 catalyst findings as valuation inputs was applied. The focused research suite was
 rerun after that wording change. No new paid research or broker action occurred.
+
+### November 11: subagent opening audit and approved cap alignment
+
+GPT-6.1 Sol agents independently prepared release evidence, the next research
+experiment and a fresh read-only opening audit; the primary agent reviewed each.
+The audit found the study dispatcher still capped research runs at $5 despite the
+approved $6 runtime limit. The dispatcher now permits $6/run and $6/day; either
+ceiling above $6 is rejected before a slot claim or model invocation. Frozen
+approval, source/configuration binding, funding, pause and risk gates are unchanged.
+Independent review found no actionable issue in the one-line change or boundary tests.
+
+The fresh broker snapshot matched the ledger: one AAPL share, $99,655.66 cash and
+no open orders. Reconciliation and daily-loss checks passed; held-AAPL research
+remains overdue. No paper study or experiment extension is active. A future full
+study schedule requires an audited extension beyond the original January 21 end;
+the elapsed November 11 opening schedule cannot be reused or backdated.
+
+Microsoft and PG are already observed evaluation cases, so neither can establish
+fresh unseen acceptance. A new independently selected and frozen cohort must follow
+development acceptance. PG11 preparation remains private and blocked: the completed
+PG10 allocation does not authorize another attempt, and November 11 has only
+$0.983790 of ordinary daily headroom. A specific one-run funding/daily exception
+was requested; no paid call or funding change is implied by preparation or deployment.
+
+The combined candidate passed 1,563 offline tests with eight skips. The primary
+agent reviewed the diff, independent test evidence and release preparation.
