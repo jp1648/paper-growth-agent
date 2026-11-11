@@ -4985,3 +4985,15 @@ execution-history comparisons show no new or modified intents, orders, activitie
 acceptances or adjustments. Trading stays paused with no active study. No retry
 was performed. This observed development regression does not satisfy unseen,
 held-position, paper-opening or live-money acceptance requirements.
+
+Independent post-run review confirms this was not an accepted WATCH. The initial
+conditional valuation produced $72.68/$99.59/$127.19 bear/base/bull values; a
+batched $451 million additional annual reinvestment sensitivity produced
+$70.25/$96.26/$122.94. The critic challenged treating $91 million of minority
+earnings as a perpetual cash reserve, gross award shares without exercise proceeds,
+and historical tax/working-capital sums without normalization. The business
+correction added sourced financing detail but did not resolve the remaining claims
+and award terms. The next offline task is earlier, decision-material source
+inspection and bounded conditional treatments, not another blind paid retry or a
+5.6-cent cap increase: revised valuation, renewed critique and the final lead
+response were all still outstanding.
