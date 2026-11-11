@@ -1,0 +1,21 @@
+[Unit]
+Description=Private Cloud SQL connection for Temporal
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=trader-temporal
+Group=trader-temporal
+EnvironmentFile=/etc/trader-temporal.env
+ExecStart=/usr/local/bin/cloud-sql-proxy --address 127.0.0.1 --port 15432 ${CLOUD_SQL_INSTANCE}
+Restart=on-failure
+RestartSec=10
+MemoryMax=128M
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

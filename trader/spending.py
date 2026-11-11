@@ -108,11 +108,61 @@ def research_cost_summary(store):
 
 
 class DailyReservation:
-    def __init__(self, store, cfg, run_key, *, unrestricted_research=False, testing=False):
+    @classmethod
+    def for_durable_run(cls, store, cfg, run_key):
+        return cls(store, cfg, run_key, durable=True)
+
+    def __init__(self, store, cfg, run_key, *, unrestricted_research=False, testing=False, durable=False):
         self.store, self.key = store, str(uuid4())
         # Reserve before any API call; a crash keeps the full allowance charged to this day.
         with store.db:
             store.db.execute("BEGIN IMMEDIATE")
+            if durable:
+                from .paper_dispatch import fingerprint, funding_gate
+
+                existing = store.db.execute(
+                    "SELECT key,body FROM documents WHERE scope='global' AND kind='research_spend' "
+                    "AND json_extract(body,'$.run_key')=? AND json_extract(body,'$.experiment_id')=?",
+                    (run_key, store.scope),
+                ).fetchall()
+                if existing:
+                    if len(existing) != 1:
+                        raise DailyBudgetExceeded("Durable run has conflicting spending records")
+                    import json
+
+                    key, body = existing[0]
+                    record = json.loads(body)
+                    if (
+                        not record.get("durable")
+                        or record.get("config_sha256") != fingerprint(cfg)
+                        or record.get("status") != "reserved"
+                        or record.get("unknown_total")
+                    ):
+                        raise DailyBudgetExceeded(
+                            "Durable reservation needs reconciliation or is already settled"
+                        )
+                    self.key, self.record = key, record
+                    self.allowance = dec(record["durable_allowance"])
+                    self.unrestricted_research = False
+                    status = spending_status(store, cfg.research_daily_cost_usd)
+                    if record["day"] != status["day"]:
+                        raise DailyBudgetExceeded("Durable run cannot renew its daily authority on resume")
+                    if any(
+                        status[name]
+                        for name in (
+                            "unknown_usage_runs",
+                            "unresolved_testing_runs",
+                            "unbounded_unknown_runs",
+                        )
+                    ):
+                        raise DailyBudgetExceeded("Outstanding model charges require reconciliation")
+                    reason = funding_gate(store, cfg, now(), reservation_key=key)
+                    if reason:
+                        raise DailyBudgetExceeded(reason)
+                    return
+                reason = funding_gate(store, cfg, now())
+                if reason:
+                    raise DailyBudgetExceeded(reason)
             if testing and (unrestricted_research or store.get("active", "paper_study") is not None):
                 raise DailyBudgetExceeded("Testing overrides require bounded runs outside an active study")
             if (
@@ -164,6 +214,10 @@ class DailyReservation:
                 "unknown_total": unrestricted_research,
                 "status": "reserved",
             }
+            if durable:
+                self.record.update(
+                    durable=True, durable_allowance=self.allowance, config_sha256=fingerprint(cfg)
+                )
             store.db.execute(
                 "INSERT INTO documents(scope,kind,key,body) VALUES ('global','research_spend',?,?)",
                 (self.key, dumps(self.record)),

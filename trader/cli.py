@@ -372,11 +372,29 @@ def dispatch(args):
                     )
                 return
             else:
+                research_client = None
+                if cfg.temporal_address is not None:
+                    from .research_client import TemporalResearchClient
+
+                    if testing_research or getattr(args, "finalize_from", None):
+                        raise ValueError(
+                            "Temporal research retains its original bounded run; legacy testing/finalize overrides are unsupported"
+                        )
+                    research_client = TemporalResearchClient(
+                        cfg,
+                        store,
+                        root=Path(cfg.database).resolve().parent / "research-runs",
+                        address=cfg.temporal_address,
+                        namespace=cfg.temporal_namespace,
+                        task_queue=cfg.temporal_task_queue,
+                        tls=cfg.temporal_tls,
+                    )
                 graph = build_graph(
                     service,
                     DeepResearchTeam(
                         cfg, store, EvidenceProvider(cfg, store, service.data), testing=testing_research
                     ),
+                    research_client=research_client,
                 )
                 if args.command == "research":
                     result = graph.invoke(
@@ -392,6 +410,20 @@ def dispatch(args):
                     result = Runner(service, graph).tick(args.event)
         print(dumps(result))
     except Exception as error:  # noqa: BLE001 - persist failure at the execution boundary
+        from .research_client import ResearchPending
+
+        if isinstance(error, ResearchPending):
+            print(
+                dumps(
+                    {
+                        "status": "research pending",
+                        "state": error.state,
+                        "stage": error.stage,
+                        **error.reference,
+                    }
+                )
+            )
+            return 0
         emit(
             "command.failure",
             {"error_type": type(error).__name__, "error": str(error), "traceback": traceback.format_exc()},

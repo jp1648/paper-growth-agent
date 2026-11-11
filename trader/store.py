@@ -87,7 +87,7 @@ class Store:
             emit("document.adjustment", {"key": item["id"], "value": item}, experiment_id=self.scope)
             emit("explicit_adjustment", item, experiment_id=self.scope)
 
-    def claim_paper_slot(self, study_id, slot_id, receipt, *, kind="paper_slot"):
+    def claim_paper_slot(self, study_id, slot_id, receipt, *, kind="paper_slot", pending=None):
         """Consume a scheduled slot once; a crash cannot grant a second paid attempt."""
         if not isinstance(study_id, str) or not study_id or not isinstance(slot_id, str) or not slot_id:
             raise ValueError("Require study and slot identities")
@@ -95,6 +95,18 @@ class Store:
             raise ValueError("Receipt cannot override claim identity or status")
         if kind not in {"paper_slot", "paper_invocation"}:
             raise ValueError("Unknown study claim kind")
+        if pending is not None and (
+            kind != "paper_slot"
+            or not isinstance(pending, dict)
+            or pending.get("status") != "starting"
+            or pending.get("slot") != slot_id
+            or pending.get("study_id") != study_id
+            or pending.get("schedule_sha256") != receipt.get("schedule_sha256")
+            or not isinstance(pending.get("state"), dict)
+            or pending["state"].get("run_key") != slot_id
+            or pending["state"].get("symbol") != receipt.get("symbol")
+        ):
+            raise ValueError("Pending invocation must match the original scheduled slot")
         key = dumps([study_id, slot_id])
         body = dumps({"study_id": study_id, "slot_id": slot_id, "status": "claimed", **receipt})
         with self.db:
@@ -102,6 +114,11 @@ class Store:
             if self.get(key, kind) is not None:
                 return False
             self.db.execute("INSERT INTO documents VALUES (?,?,?,?)", (self.scope, kind, key, body))
+            if pending is not None:
+                self.db.execute(
+                    "INSERT INTO documents VALUES (?,?,?,?)",
+                    (self.scope, "paper_slot_pending", slot_id, dumps(pending)),
+                )
             self.db.execute(
                 "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
                 (self.scope, now().isoformat(), kind + "_claimed", body),

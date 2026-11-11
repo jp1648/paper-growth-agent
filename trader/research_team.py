@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from decimal import localcontext
 from zoneinfo import ZoneInfo
 
+import httpx
 from deepagents import create_deep_agent
 from deepagents.backends import StateBackend
 from deepagents.middleware.subagents import SubAgentMiddleware
@@ -201,6 +202,10 @@ class ResearchLimit(RuntimeError):
     pass
 
 
+class ResearchStageYield(BaseException):
+    """A durable correction was recorded; its prerequisite stages must run next."""
+
+
 class UnknownEvidence(ValueError):
     pass
 
@@ -211,6 +216,20 @@ CORRECTION_RESERVE = 1 + 3 + 2 + 6 + 2
 
 
 class Budget:
+    STATE_FIELDS = (
+        "models",
+        "tools",
+        "role_tool_calls",
+        "correction_tool_limits",
+        "initial_specialist_allowance",
+        "lead_allowance",
+        "initial_valuation_allowance",
+        "initial_valuation_grant_frozen",
+        "reserved",
+        "failed",
+        "events",
+    )
+
     def __init__(self, cfg, limit=None, *, unrestricted_research=False):
         self.cfg = cfg
         # Supervised tests rely on the external watchdog; transport and permission guards remain active.
@@ -230,6 +249,27 @@ class Budget:
         self.failed = False
         self.lock = threading.RLock()
         self.events = []
+
+    def checkpoint(self):
+        with self.lock:
+            return {
+                **copy.deepcopy({name: getattr(self, name) for name in self.STATE_FIELDS}),
+                "elapsed_seconds": time.monotonic() - self.started,
+                "day": self.day.isoformat(),
+                "limit": self.limit,
+                "unrestricted_research": self.unrestricted_research,
+            }
+
+    def restore(self, saved):
+        if saved["limit"] != self.limit or saved["unrestricted_research"] != self.unrestricted_research:
+            raise ValueError("Research checkpoint changed its budget authority")
+        if saved["elapsed_seconds"] < 0 or saved["models"] < 0 or saved["tools"] < 0:
+            raise ValueError("Invalid research checkpoint counters")
+        with self.lock:
+            for name in self.STATE_FIELDS:
+                setattr(self, name, copy.deepcopy(saved[name]))
+            self.started = time.monotonic() - saved["elapsed_seconds"]
+            self.day = date.fromisoformat(saved["day"])
 
     def specialist_limit(self, role):
         if role in self.correction_tool_limits:
@@ -278,7 +318,7 @@ class Budget:
             )
             return True
 
-    def check(self):
+    def check(self, *, latch=True):
         if self.failed or (
             not self.unrestricted_research
             and (
@@ -286,12 +326,13 @@ class Budget:
                 or now().astimezone(ZoneInfo("America/New_York")).date() != self.day
             )
         ):
-            self.failed = True
+            if latch:
+                self.failed = True
             raise ResearchLimit("Research stopped: budget exhausted, deadline reached or a call failed")
 
-    def model(self, size, role="research_lead"):
+    def model(self, size, role="research_lead", *, admit_only=False):
         with self.lock:
-            self.check()
+            self.check(latch=not admit_only)
             route = self.cfg.research_model(role)
             # UTF-8 byte count plus framing reserve intentionally overestimates ordinary text tokens.
             reserve = (
@@ -303,21 +344,25 @@ class Budget:
                 or self.models >= self.cfg.research_max_model_calls
                 or self.reserved + reserve > self.limit
             ):
-                self.failed = True
+                if not admit_only:
+                    self.failed = True
                 raise ResearchLimit(
                     f"Research model-call, context or estimated cost limit reached: role={role}, calls={self.models}/{self.cfg.research_max_model_calls}, context_bytes={size}/{self.cfg.research_max_input_bytes}, estimated_total_with_next_call={self.reserved + reserve}/{self.limit}"
                 )
-            self.models += 1
-            self.reserved += reserve
+            if not admit_only:
+                self.models += 1
+                self.reserved += reserve
             return reserve
 
-    def tool(self):
+    def tool(self, *, admit_only=False):
         with self.lock:
-            self.check()
+            self.check(latch=not admit_only)
             if not self.unrestricted_research and self.tools >= self.cfg.research_max_tool_calls:
-                self.failed = True
+                if not admit_only:
+                    self.failed = True
                 raise ResearchLimit("Research tool-call limit reached")
-            self.tools += 1
+            if not admit_only:
+                self.tools += 1
 
 
 class NoDelegation(AgentMiddleware):
@@ -334,11 +379,14 @@ class NoHiddenSummaries(AgentMiddleware):
 
 
 class Guard(AgentMiddleware):
-    def __init__(self, budget, role, allowed, reports=None, final_context=None, repair_available=None):
+    def __init__(
+        self, budget, role, allowed, reports=None, final_context=None, repair_available=None, checkpoint=None
+    ):
         self.budget, self.role, self.allowed = budget, role, allowed
         self.reports = reports if reports is not None else {}
         self.final_context = final_context
         self.repair_available = repair_available
+        self.checkpoint = checkpoint
         self.running_tasks = set()
         # Initial work cannot consume the shared one-cycle repair reserve.
         self.lead_allowance = budget.lead_allowance
@@ -422,6 +470,35 @@ class Guard(AgentMiddleware):
 
     @traced("model.call", inputs=lambda self, request, handler: {"role": self.role})
     def wrap_model_call(self, request, handler):
+        if self.checkpoint is not None:
+            payload = {
+                "messages": [m.model_dump() for m in request.messages],
+                "system": request.system_message.model_dump() if request.system_message else None,
+                "tools": [
+                    t
+                    if isinstance(t, dict)
+                    else {
+                        "name": t.name,
+                        "description": t.description,
+                        "schema": t.get_input_schema().model_json_schema(),
+                    }
+                    for t in request.tools
+                ],
+                "output_schema": request.response_format.schema_spec.json_schema,
+            }
+            return self.checkpoint.call(
+                "model",
+                self.role,
+                self.checkpoint.model_identity(payload),
+                payload,
+                lambda: self._wrap_model_call(request, handler),
+                preflight=lambda: self.budget.model(
+                    self.request_bytes(self._model_request(request)[2]), self.role, admit_only=True
+                ),
+            )
+        return self._wrap_model_call(request, handler)
+
+    def _model_request(self, request):
         messages = self.bounded_messages(request.messages)
         tools = [
             t for t in request.tools if (t.get("name") if isinstance(t, dict) else t.name) in self.allowed
@@ -469,6 +546,10 @@ class Guard(AgentMiddleware):
             ],
             "output_schema": request.response_format.schema_spec.json_schema,
         }
+        return messages, tools, payload
+
+    def _wrap_model_call(self, request, handler):
+        messages, tools, payload = self._model_request(request)
         request_bytes = self.request_bytes(payload)
         # Keep compact size diagnostics in the ledger; full redacted payloads go to telemetry.
         groups = {}
@@ -492,10 +573,27 @@ class Guard(AgentMiddleware):
             )
         self.trace("model.request", {"role": self.role, "payload": payload})
         reserved = self.budget.model(request_bytes, self.role)
+        settings = dict(getattr(request, "model_settings", {}) or {})
+        if self.checkpoint is not None:
+            route = self.budget.cfg.research_model(self.role)
+            identifier = self.checkpoint.record_dispatch(
+                {
+                    "provider": "openai",
+                    "model": route.model,
+                    "reasoning_effort": route.reasoning_effort,
+                    "max_output_tokens": self.budget.cfg.research_max_output_tokens,
+                    "service_tier": "default",
+                    "projected_request": payload,
+                }
+            )
+            settings["extra_headers"] = {
+                **settings.get("extra_headers", {}),
+                "X-Client-Request-Id": identifier,
+            }
         started = time.monotonic()
         try:
             try:
-                response = handler(request.override(tools=tools, messages=messages))
+                response = handler(request.override(tools=tools, messages=messages, model_settings=settings))
             except StructuredOutputValidationError as error:
                 message = error.ai_message
                 blocks = message.content if isinstance(message.content, list) else []
@@ -608,6 +706,36 @@ class Guard(AgentMiddleware):
 
     @traced("tool.call", inputs=lambda self, request, handler: {"role": self.role, "tool": request.tool_call})
     def wrap_tool_call(self, request, handler):
+        if self.checkpoint is not None and request.tool_call["name"] != "task":
+            result = self.checkpoint.call(
+                "tool",
+                self.role,
+                request.tool_call["id"],
+                request.tool_call,
+                lambda: self._wrap_tool_call(request, handler),
+                preflight=lambda: self._tool_preflight(request),
+            )
+            if (
+                request.tool_call["name"] == "request_correction"
+                and self.checkpoint.desk.defer_correction
+                and self.checkpoint.desk.correction
+                and set(self.checkpoint.desk.reports) != set(ROLES)
+            ):
+                raise ResearchStageYield()
+            return result
+        return self._wrap_tool_call(request, handler)
+
+    def _tool_preflight(self, request):
+        name = request.tool_call["name"]
+        if name not in self.allowed:
+            raise ResearchLimit("Tool outside research role permissions")
+        if not (self.role == "research_lead" and name == "request_correction"):
+            allowance = self.lead_allowance if self.role == "research_lead" else self.specialist_allowance
+            if not self.budget.unrestricted_research and self.tool_calls >= allowance:
+                return  # The handler returns an allowance message without dispatching the tool.
+        self.budget.tool(admit_only=True)
+
+    def _wrap_tool_call(self, request, handler):
         name = request.tool_call["name"]
         if name not in self.allowed:
             self.budget.failed = True
@@ -680,7 +808,59 @@ class Guard(AgentMiddleware):
 class ResearchDesk:
     """One bounded investigation. Workers share evidence, never the SQLite connection or broker."""
 
-    def __init__(self, cfg, provider, context, evidence, budget, model, *, evaluation_at=None):
+    STATE_FIELDS = (
+        "sources",
+        "companies",
+        "documents",
+        "texts",
+        "unavailable_documents",
+        "calculations",
+        "reports",
+        "report_times",
+        "report_dependencies",
+        "correction",
+        "reused",
+        "agent_prompts",
+        "continuation",
+    )
+
+    def checkpoint(self):
+        with self.lock:
+            return {
+                "version": 1,
+                "context": copy.deepcopy(self.context),
+                "started_at": self.started_at.isoformat(),
+                "evaluation_at": self.evaluation_at.isoformat() if self.evaluation_at else None,
+                "targeted": bool(self.targeted),
+                "desk": copy.deepcopy({name: getattr(self, name) for name in self.STATE_FIELDS}),
+                "budget": self.budget.checkpoint(),
+            }
+
+    def restore(self, saved):
+        if saved["version"] != 1 or saved["context"] != self.context:
+            raise ValueError("Research checkpoint belongs to different frozen inputs")
+        with self.lock:
+            self.budget.restore(saved["budget"])
+            for name in self.STATE_FIELDS:
+                setattr(self, name, copy.deepcopy(saved["desk"][name]))
+            self.started_at = dt(saved["started_at"])
+            self.evaluation_at = dt(saved["evaluation_at"]) if saved["evaluation_at"] else None
+            self.targeted = saved["targeted"]
+            self.running.clear()
+
+    def __init__(
+        self,
+        cfg,
+        provider,
+        context,
+        evidence,
+        budget,
+        model,
+        *,
+        evaluation_at=None,
+        checkpoint_factory=None,
+        defer_correction=False,
+    ):
         self.started_at = now()
         self.evaluation_at = dt(evaluation_at) if evaluation_at else None
         self.cfg, self.provider, self.context, self.budget, self.model = cfg, provider, context, budget, model
@@ -694,6 +874,11 @@ class ResearchDesk:
         self.correction = None
         self.reused = []
         self.running = set()
+        self.checkpoint_factory = checkpoint_factory
+        self.checkpoints = {}
+        self.agent_prompts = {}
+        self.continuation = {}
+        self.defer_correction = defer_correction
         self.prior = context["portfolio"].get("prior_thesis") or {}
         if self.prior:
             self.context = copy.deepcopy(context)
@@ -1306,7 +1491,8 @@ class ResearchDesk:
         return result
 
     def invoke_report(self, agent, schema, state, config):
-        output = agent.invoke(state, config)
+        checkpoint = self.checkpoints.get(getattr(agent, "name", None))
+        output = checkpoint.invoke(agent, state, config) if checkpoint else agent.invoke(state, config)
         try:
             self.validate(schema, output.get("structured_response"))
         except UnknownEvidence:
@@ -1316,50 +1502,68 @@ class ResearchDesk:
             self.budget.events.append(
                 ("research_citation_correction", {"schema": schema.__name__, "rejected_ids": unknown})
             )
-            output = agent.invoke(
-                {
-                    "messages": [
-                        *output["messages"],
-                        {
-                            "role": "user",
-                            "content": dumps(
-                                {
-                                    "validation_error": "Unknown original-source citations. Correct the report once; do not invent support or change claims just to pass validation. Document navigation and calculation IDs are not evidence IDs. Use only supporting registered sources, and disclose unsupported claims as gaps.",
-                                    "rejected_ids": unknown,
-                                    "registered_source_ids": sorted(self.sources),
-                                }
-                            ),
-                        },
-                    ]
-                },
-                config,
+            repair_state = {
+                "messages": [
+                    *output["messages"],
+                    {
+                        "role": "user",
+                        "content": dumps(
+                            {
+                                "validation_error": "Unknown original-source citations. Correct the report once; do not invent support or change claims just to pass validation. Document navigation and calculation IDs are not evidence IDs. Use only supporting registered sources, and disclose unsupported claims as gaps.",
+                                "rejected_ids": unknown,
+                                "registered_source_ids": sorted(self.sources),
+                            }
+                        ),
+                    },
+                ]
+            }
+            output = (
+                checkpoint.invoke(agent, repair_state, config, resume=False)
+                if checkpoint
+                else agent.invoke(repair_state, config)
             )
             self.validate(schema, output.get("structured_response"))
         return output
+
+    def agent_prompt(self, role, prompt):
+        checkpoint = self.checkpoints.get(role)
+        if checkpoint is None:
+            return prompt
+        # The original prompt must survive counter changes when a worker resumes.
+        key = f"{checkpoint.phase}:{role}"
+        return self.agent_prompts.setdefault(key, prompt)
 
     def agent(self, role, schema, instructions, tools, subagents=()):
         backend = StateBackend()
         virtual = {"ls", "read_file", "write_file", "edit_file", "glob", "grep", "write_todos"}
         allowed = {t.name for t in tools} | virtual | ({"task"} if subagents else set())
         delegation = SubAgentMiddleware(backend=backend, subagents=subagents) if subagents else NoDelegation()
+        checkpoint = self.checkpoint_factory(role) if self.checkpoint_factory else None
+        if checkpoint:
+            checkpoint.attach_desk(self, restore=False)
+            self.checkpoints[role] = checkpoint
         return create_deep_agent(
             model=self.model[role] if isinstance(self.model, dict) else self.model,
             name=role,
             tools=tools,
             backend=backend,
             subagents=subagents,
-            system_prompt=MANDATE
-            + instructions
-            + (
-                (
-                    ""
-                    if self.budget.unrestricted_research
-                    else f" You currently have at most {max(0, self.budget.specialist_limit(role) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
-                )
-                + " Batch independent source searches, reads or arithmetic requests in one model turn when their inputs are already known; each operation still counts against the shared tool budget. Never guess a source ID or offset to batch a dependent lookup. Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
-                if role != "research_lead"
-                else ""
+            system_prompt=self.agent_prompt(
+                role,
+                MANDATE
+                + instructions
+                + (
+                    (
+                        ""
+                        if self.budget.unrestricted_research
+                        else f" You currently have at most {max(0, self.budget.specialist_limit(role) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
+                    )
+                    + " Batch independent source searches, reads or arithmetic requests in one model turn when their inputs are already known; each operation still counts against the shared tool budget. Never guess a source ID or offset to batch a dependent lookup. Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
+                    if role != "research_lead"
+                    else ""
+                ),
             ),
+            checkpointer=checkpoint.saver if checkpoint else None,
             response_format=ProviderStrategy(schema, strict=True),
             middleware=[
                 delegation,
@@ -1372,6 +1576,7 @@ class ResearchDesk:
                     self.reports,
                     self.final_context if role == "research_lead" else None,
                     (lambda: self.correction is None) if role == "research_lead" else None,
+                    checkpoint=checkpoint,
                 ),
             ],
         )
@@ -1549,11 +1754,12 @@ class ResearchDesk:
                     self.report_dependencies.pop(name, None)
                     if name in self.reused:
                         self.reused.remove(name)
-            self.dispatch_roles(invalidated, "correction")
+            if not self.defer_correction:
+                self.dispatch_roles(invalidated, "correction")
             return {
                 "invalidated": invalidated,
                 "tool_allocations": allocations,
-                "instruction": "Required corrected reports and fresh critique are rebuilt. Review their reasoning before deciding; rebuilding is not acceptance. Original reports remain audited; remaining shared budgets still apply.",
+                "instruction": "Required corrected reports and fresh critique must finish before deciding; rebuilding is not acceptance. Original reports remain audited; remaining shared budgets still apply.",
             }
 
         request_correction.handle_tool_error = True
@@ -1593,6 +1799,9 @@ class ResearchDesk:
     def run(self):
         order = ("catalysts", "business", "valuation", "adversarial") if self.targeted else tuple(ROLES)
         self.dispatch_roles(order, "initial")
+        return self.run_lead()
+
+    def run_lead(self):
         if set(self.reports) != set(ROLES):
             raise ValueError("Initial research omitted a required specialist")
         subagents = [
@@ -1895,7 +2104,7 @@ class DeepResearchTeam:
         self.unrestricted_research = unrestricted_research
         self.testing = testing
 
-    def models(self, *, finalizing=False):
+    def models(self, *, finalizing=False, durable=False):
         cfg = self.cfg
         routes = {
             role: cfg.research_model(role)
@@ -1905,6 +2114,8 @@ class DeepResearchTeam:
             return self.model
         if not os.getenv("OPENAI_API_KEY"):
             raise ValueError("Set OPENAI_API_KEY and a tool/structured-output capable OpenAI model")
+        from .research_transport import ResearchTransport
+
         return {
             role: ChatOpenAI(
                 model=route.model,
@@ -1917,6 +2128,7 @@ class DeepResearchTeam:
                 max_retries=0,
                 timeout=180 if role == "research_lead" else 60,
                 max_tokens=cfg.research_max_output_tokens,
+                **({"http_client": httpx.Client(transport=ResearchTransport())} if durable else {}),
             )
             for role, route in routes.items()
         }

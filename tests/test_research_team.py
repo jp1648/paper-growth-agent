@@ -73,6 +73,254 @@ class Evidence:
         return "Revenue and cash flow grew. Customer concentration creates risk."
 
 
+def test_research_checkpoint_restores_evidence_correction_and_cumulative_budget():
+    import copy
+
+    cfg = Settings()
+    provider = Evidence()
+    context = {"symbol": "ACME", "portfolio": {}, "run_key": "durable-test"}
+    budget = Budget(cfg)
+    desk = ResearchDesk(cfg, provider, context, provider.get("ACME"), budget, None)
+    desk.texts["document"] = "Exact original evidence"
+    desk.documents["document"] = {"url": "https://www.sec.gov/Archives/fixture.htm"}
+    desk.calculations["calculation"] = {"inputs": {"cash_flow": "5"}}
+    desk.report_times["business"] = now().isoformat()
+    desk.report_dependencies["valuation"] = {"business": "original-hash"}
+    desk.correction = {"role": "valuation", "invalidated": ["valuation", "adversarial"]}
+    budget.tools, budget.models, budget.reserved = 17, 4, dec("1.25")
+    budget.role_tool_calls = {"valuation": 7}
+    budget.correction_tool_limits = {"valuation": 12}
+    budget.initial_valuation_allowance = 16
+    budget.initial_valuation_grant_frozen = True
+    budget.events = [("cash_flow_sum", {"result": "123"})]
+    saved = desk.checkpoint()
+    original = copy.deepcopy(saved)
+    restored = ResearchDesk(cfg, provider, context, provider.get("ACME"), Budget(cfg), None)
+    restored.running.add("valuation")
+    restored.restore(saved)
+    actual = restored.checkpoint()
+    assert actual["budget"].pop("elapsed_seconds") >= saved["budget"]["elapsed_seconds"]
+    expected = copy.deepcopy(saved)
+    expected["budget"].pop("elapsed_seconds")
+    assert actual == expected
+    assert not restored.running
+    restored.sources.clear()
+    restored.budget.role_tool_calls["valuation"] += 1
+    assert saved == original
+    assert desk.sources and desk.budget.role_tool_calls["valuation"] == 7
+
+
+def test_research_checkpoint_cannot_reset_authority_failed_state_or_clock():
+    import copy
+
+    cfg = Settings()
+    budget = Budget(cfg)
+    saved = budget.checkpoint()
+    saved["failed"] = True
+    budget.restore(saved)
+    with pytest.raises(ResearchLimit):
+        budget.check()
+    changed = copy.deepcopy(saved)
+    changed["limit"] += 1
+    with pytest.raises(ValueError, match="budget authority"):
+        budget.restore(changed)
+    saved["failed"] = False
+    saved["elapsed_seconds"] = cfg.research_max_seconds + 1
+    budget.restore(saved)
+    with pytest.raises(ResearchLimit):
+        budget.check()
+    saved["elapsed_seconds"] = 0
+    saved["day"] = "2000-01-01"
+    budget.restore(saved)
+    with pytest.raises(ResearchLimit):
+        budget.check()
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    saved_desk = desk.checkpoint()
+    saved_desk["context"]["symbol"] = "OTHER"
+    with pytest.raises(ValueError, match="frozen inputs"):
+        desk.restore(saved_desk)
+
+
+@pytest.mark.parametrize("crash_at", ["model", "source"])
+def test_actual_specialist_resumes_after_journal_commit_without_repeating_tool(tmp_path, decision, crash_at):
+    from langchain_core.messages import HumanMessage
+
+    from trader.research_checkpoint import ResearchCheckpoint
+    from trader.research_journal import Journal
+
+    class CountingEvidence(Evidence):
+        reads = 0
+
+        def document(self, metadata):
+            self.reads += 1
+            return super().document(metadata)
+
+    class WorkerStopped(BaseException):
+        pass
+
+    provider, cfg = CountingEvidence(), Settings(input_cost_per_million="1", output_cost_per_million="1")
+    context = {"symbol": "ACME", "portfolio": {}, "run_key": "resumable-business"}
+    model = TeamModel(decision=decision.model_dump(mode="json"))
+    root = tmp_path / "private"
+    journal = Journal(root / "operations.sqlite", {"run": context["run_key"]})
+    task = {"messages": [HumanMessage(content="Investigate")]}
+    with journal.lease():
+        checkpoint = ResearchCheckpoint(
+            journal, root / "graph.sqlite", phase="initial", role="business", thread_id=context["run_key"]
+        )
+        desk = ResearchDesk(
+            cfg,
+            provider,
+            context,
+            provider.get("ACME"),
+            Budget(cfg),
+            model,
+            checkpoint_factory=lambda role: checkpoint,
+        )
+        checkpoint.attach_desk(desk)
+        original_complete = journal.complete
+
+        # Kill immediately after the original passage and mutations become durable.
+        def crash_on_read(key, request_hash, result, state):
+            original_complete(key, request_hash, result, state)
+            if (crash_at == "source" and provider.reads) or (crash_at == "model" and model.calls):
+                raise WorkerStopped()
+
+        journal.complete = crash_on_read
+        try:
+            with pytest.raises(WorkerStopped):
+                desk.specialist("business", task)
+        finally:
+            checkpoint.close()
+    calls_before = len(model.calls)
+    assert provider.reads == (1 if crash_at == "source" else 0)
+    with Journal(root / "operations.sqlite", {"run": context["run_key"]}).lease() as reopened:
+        checkpoint = ResearchCheckpoint(
+            reopened, root / "graph.sqlite", phase="initial", role="business", thread_id=context["run_key"]
+        )
+        restored = ResearchDesk(
+            cfg,
+            provider,
+            context,
+            provider.get("ACME"),
+            Budget(cfg),
+            model,
+            checkpoint_factory=lambda role: checkpoint,
+        )
+        checkpoint.attach_desk(restored)
+        calls = restored.budget.models
+        try:
+            restored.specialist("business", task)
+            assert set(restored.reports["business"]["evidence_ids"]).issubset(restored.sources)
+            assert restored.budget.models == calls + (1 if crash_at == "source" else 2)
+        finally:
+            checkpoint.close()
+    assert provider.reads == 1
+    assert len(model.calls) == calls_before + (1 if crash_at == "source" else 2)
+
+
+@pytest.mark.parametrize("kind", ["model", "tool"])
+def test_local_admission_rejection_does_not_leave_ambiguous_operation(tmp_path, decision, kind):
+    from types import SimpleNamespace
+
+    from langchain_core.messages import HumanMessage
+
+    from trader.research_checkpoint import ResearchCheckpoint
+    from trader.research_journal import Journal
+    from trader.research_team import Guard
+
+    cfg = Settings(input_cost_per_million="1", output_cost_per_million="1", research_max_cost_usd="0.000001")
+    provider, model = Evidence(), TeamModel(decision=decision.model_dump(mode="json"))
+    context = {"symbol": "ACME", "portfolio": {}, "run_key": "no-dispatch"}
+    root = tmp_path / "private"
+    with Journal(root / "operations.sqlite", {"run": "no-dispatch"}).lease() as journal:
+        checkpoint = ResearchCheckpoint(
+            journal, root / "graph.sqlite", phase="initial", role="business", thread_id="no-dispatch"
+        )
+        desk = ResearchDesk(
+            cfg,
+            provider,
+            context,
+            provider.get("ACME"),
+            Budget(cfg),
+            model,
+            checkpoint_factory=lambda role: checkpoint,
+        )
+        checkpoint.attach_desk(desk)
+        try:
+            if kind == "model":
+                with pytest.raises(ResearchLimit, match="estimated cost"):
+                    desk.specialist("business", {"messages": [HumanMessage(content="Investigate")]})
+                assert not model.calls and desk.budget.models == 0
+            else:
+                desk.budget.tools = cfg.research_max_tool_calls
+                guard = Guard(desk.budget, "business", {"read_source"}, checkpoint=checkpoint)
+                request = SimpleNamespace(tool_call={"name": "read_source", "id": "one", "args": {}})
+                with pytest.raises(ResearchLimit, match="tool-call limit"):
+                    guard.wrap_tool_call(request, lambda _: pytest.fail("tool dispatched"))
+                assert desk.budget.tools == cfg.research_max_tool_calls
+            assert journal._connection().execute("SELECT COUNT(*) FROM operations").fetchone()[0] == 0
+        finally:
+            checkpoint.close()
+
+
+def test_durable_model_request_sends_saved_correlation_header(tmp_path):
+    from types import SimpleNamespace
+
+    from langchain.agents.middleware.types import ModelResponse
+    from langchain_core.messages import HumanMessage
+
+    from trader.research_checkpoint import ResearchCheckpoint
+    from trader.research_journal import Journal
+    from trader.research_team import Guard
+
+    cfg = Settings(input_cost_per_million="1", output_cost_per_million="1")
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    path = tmp_path / "private" / "operations.sqlite"
+    with Journal(path, {"run": "correlation"}).lease() as journal:
+        checkpoint = ResearchCheckpoint(
+            journal, path.parent / "graph.sqlite", phase="initial", role="business", thread_id="correlation"
+        )
+        checkpoint.attach_desk(desk)
+        guard = Guard(desk.budget, "business", set(), checkpoint=checkpoint)
+        request = SimpleNamespace(
+            messages=[HumanMessage(content="Investigate")],
+            tools=[],
+            system_message=None,
+            model_settings={"extra_headers": {"existing": "kept"}},
+            response_format=SimpleNamespace(schema_spec=SimpleNamespace(json_schema={})),
+            override=lambda **kwargs: SimpleNamespace(**kwargs),
+        )
+        headers = []
+
+        def handler(updated):
+            headers.append(updated.model_settings["extra_headers"])
+            pending = journal.inspect_operations()["pending_operations"][0]
+            assert headers[-1]["X-Client-Request-Id"] == pending["dispatches"][0]["client_request_id"]
+            return ModelResponse(
+                result=[
+                    AIMessage(
+                        content="Saved",
+                        usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+                    )
+                ]
+            )
+
+        try:
+            first = guard.wrap_model_call(request, handler)
+            assert guard.wrap_model_call(request, handler) == first
+            assert len(headers) == 1 and headers[0]["existing"] == "kept"
+            assert desk.budget.models == 1
+        finally:
+            checkpoint.close()
+
+
 class TeamModel(BaseChatModel):
     """Exercises real Deep Agents graphs/tool execution; all model replies are offline scripts."""
 

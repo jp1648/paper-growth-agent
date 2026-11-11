@@ -99,7 +99,7 @@ def research_input(service, symbol, *, deferred):
     return {"quote": service.data.quote(symbol).model_dump(mode="json"), "research_reference": None}
 
 
-def build_graph(service, team):
+def build_graph(service, team, *, research_client=None):
     store = service.store
 
     def portfolio(s):
@@ -126,13 +126,22 @@ def build_graph(service, team):
                 if (
                     not s["run_key"].startswith(s["study_id"] + ":safety:")
                     or not job
-                    or job.get("status") != "running"
+                    or job.get("status") not in ({"running", "pending"} if research_client else {"running"})
                 ):
                     raise RuntimeError("Safety graph has no matching running study job")
             if not store.claim_paper_slot(
-                s["study_id"], s["run_key"], {"symbol": s["symbol"], "at": now()}, kind="paper_invocation"
+                s["study_id"],
+                s["run_key"],
+                {
+                    "symbol": s["symbol"],
+                    "at": now(),
+                    "schedule_sha256": study["schedule_sha256"],
+                },
+                kind="paper_invocation",
             ):
-                raise RuntimeError("Study graph invocation already consumed; no automatic retry")
+                claim = store.get(dumps([s["study_id"], s["run_key"]]), "paper_invocation")
+                if not research_client or not research_client.same_invocation(s, claim):
+                    raise RuntimeError("Study graph invocation already consumed; no automatic retry")
         snap = service.reconcile()
         previous = store.get(s["symbol"], "thesis")
         return {
@@ -148,14 +157,24 @@ def build_graph(service, team):
         }
 
     def research(s):
+        if research_client is not None:
+            reference = research_client.reference_for(s)
+            if reference is not None:
+                result = research_client.poll(reference)
+                commit_research(s, result)
+                return result
         cached = store.get(s["run_key"], "research_result")
         if cached:
+            if research_client is not None:
+                raise ValueError("Cached research lacks a verified durable workflow reference")
             if cached["decision"]["symbol"] != s["symbol"]:
                 raise ValueError("Research run key belongs to another symbol")
             commit_research(s, cached)
             return cached
         pricing = research_input(service, s["symbol"], deferred=bool(s.get("research_only")))
         context = {**s, **pricing, "current_timestamp": now().isoformat()}
+        if research_client is not None:
+            return research_client.start(context)
         result = (
             team.run(context, finalize_from=s["finalize_from"])
             if s.get("finalize_from")
@@ -277,4 +296,6 @@ def build_graph(service, team):
         graph.add_edge(previous, name)
         previous = name
     graph.add_edge(previous, END)
-    return graph.compile()
+    compiled = graph.compile()
+    compiled.research_client = research_client
+    return compiled

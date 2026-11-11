@@ -209,23 +209,41 @@ class AlpacaData:
             halt_checked_at=checked,
         )
 
-    def news(self, symbol, since):
+    def news(self, symbol, since, *, end=None, acquisition_callback=None):
         result, seen = [], set()
         params = {
             "symbols": symbol,
             "start": since,
-            "end": now().isoformat(),
+            "end": end if end is not None else now().isoformat(),
             "limit": 50,
             "sort": "desc",
             "include_content": "true",
         }
-        for _ in range(100):
-            page = self.get("/v1beta1/news", params)
+        for page_index in range(100):
+            request_params = params.copy()
+            response = (
+                acquisition_callback(
+                    f"news_page_{page_index}",
+                    {"path": "/v1beta1/news", "params": request_params},
+                    lambda request_params=request_params: {
+                        "page": self.get("/v1beta1/news", request_params),
+                        "retrieved_at": now().isoformat(),
+                    },
+                )
+                if acquisition_callback is not None
+                else {"page": self.get("/v1beta1/news", request_params)}
+            )
+            page = response["page"]
             if not isinstance(page, dict) or not isinstance(page.get("news"), list):
                 raise TypeError("Malformed news page")
             if any(not isinstance(article, dict) for article in page["news"]):
                 raise ValueError("Malformed news article")
-            result.extend(page["news"])
+            if acquisition_callback is not None:
+                result.extend(
+                    {**article, "_retrieved_at": response["retrieved_at"]} for article in page["news"]
+                )
+            else:
+                result.extend(page["news"])
             token = page.get("next_page_token")
             if token is None or token == "":
                 return result

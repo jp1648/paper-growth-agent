@@ -45,6 +45,47 @@ def test_research_once_and_pause(env, decision):
     assert service.kill_path.read_text() == "operator pause"
 
 
+def test_durable_acceptance_reenters_original_context_and_preserves_pause(env, decision, monkeypatch):
+    from trader.research_client import ResearchPending, TemporalResearchClient
+
+    service, _, _ = env
+    prepare(service, decision)
+    service.cfg = service.cfg.model_copy(update={"temporal_address": "127.0.0.1:7233"})
+    pause_stat = service.kill_path.stat().st_mtime_ns
+    contexts = []
+
+    def start(self, context):
+        contexts.append(context)
+        if len(contexts) == 1:
+            raise ResearchPending({"run_key": "durable", "manifest_hash": "a" * 64})
+        return {
+            "team_reports": {key: {} for key in ("business", "catalysts", "valuation", "adversarial")},
+            "decision": decision.model_dump(mode="json"),
+        }
+
+    monkeypatch.setattr(TemporalResearchClient, "start", start)
+    assert acceptance.run(service, "research", "ACME", "durable")["status"] == "pending"
+    # Re-entry must not fetch a new quote or retain the caller's account lock.
+    monkeypatch.setattr(acceptance, "research_input", lambda *a, **kw: pytest.fail("new context"))
+    with service.lock():
+        pass
+    assert acceptance.run(service, "research", "ACME", "durable")["status"] == "complete"
+    assert acceptance.dumps(contexts[0]) == acceptance.dumps(contexts[1])
+    assert service.kill_path.stat().st_mtime_ns == pause_stat
+    assert not service.store.items("intent")
+    with pytest.raises(RuntimeError, match="already attempted"):
+        acceptance.run(service, "research", "ACME", "durable")
+
+
+def test_durable_acceptance_rejects_limit_overrides(env, decision):
+    service, _, _ = env
+    prepare(service, decision)
+    service.cfg = service.cfg.model_copy(update={"temporal_address": "127.0.0.1:7233"})
+    with pytest.raises(ValueError, match="configured limits"):
+        acceptance.run(service, "research", "ACME", "durable", unrestricted_research=True)
+    assert service.store.get("durable", "acceptance") is None
+
+
 @pytest.mark.parametrize("stage", ["before", "after"])
 def test_paper_failure_restores_pause_and_does_not_retry(env, decision, monkeypatch, stage):
     service, broker, _ = env

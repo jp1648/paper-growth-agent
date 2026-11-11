@@ -14,6 +14,82 @@ from trader.store import Store
 from trader.streams import listen, run_command
 
 
+def test_durable_reservation_reuses_original_authority_without_new_spending(env, monkeypatch):
+    monkeypatch.setattr("trader.paper_dispatch.funding_gate", lambda *a, **kw: None)
+    service, _, _ = env
+    first = DailyReservation.for_durable_run(service.store, service.cfg, "durable-one")
+    reopened = Store(service.cfg.database)
+    try:
+        second = DailyReservation.for_durable_run(reopened, service.cfg, "durable-one")
+        assert second.key == first.key and second.allowance == first.allowance
+        assert (
+            reopened.db.execute("SELECT COUNT(*) FROM documents WHERE kind='research_spend'").fetchone()[0]
+            == 1
+        )
+        changed = service.cfg.model_copy(update={"research_max_cost_usd": dec("6")})
+        with pytest.raises(DailyBudgetExceeded, match="reconciliation"):
+            DailyReservation.for_durable_run(reopened, changed, "durable-one")
+        second.finish(dec("1.2"))
+        with pytest.raises(DailyBudgetExceeded, match="already settled"):
+            DailyReservation.for_durable_run(reopened, service.cfg, "durable-one")
+    finally:
+        reopened.db.close()
+
+
+def test_durable_reservation_cannot_adopt_legacy_or_unknown_spend(env, monkeypatch):
+    monkeypatch.setattr("trader.paper_dispatch.funding_gate", lambda *a, **kw: None)
+    service, _, _ = env
+    legacy = DailyReservation(service.store, service.cfg, "legacy")
+    with pytest.raises(DailyBudgetExceeded, match="reconciliation"):
+        DailyReservation.for_durable_run(service.store, service.cfg, "legacy")
+    legacy.finish(dec("0.1"))
+    durable = DailyReservation.for_durable_run(service.store, service.cfg, "durable")
+    durable.finish(dec("0.2"), unknown=True)
+    with pytest.raises(DailyBudgetExceeded, match="reconciliation"):
+        DailyReservation.for_durable_run(service.store, service.cfg, "durable")
+
+
+def test_durable_resume_rechecks_other_liabilities_and_original_day(env, monkeypatch):
+    monkeypatch.setattr("trader.paper_dispatch.funding_gate", lambda *a, **kw: None)
+    service, _, _ = env
+    monkeypatch.setattr("trader.spending.now", lambda: AT)
+    DailyReservation.for_durable_run(service.store, service.cfg, "durable")
+    service.store.put(
+        "other",
+        {"day": AT.date().isoformat(), "usd": "0.1", "status": "unknown", "unknown_total": True},
+        "research_spend",
+        scope="global",
+    )
+    with pytest.raises(DailyBudgetExceeded, match="reconciliation"):
+        DailyReservation.for_durable_run(service.store, service.cfg, "durable")
+    service.store.put(
+        "other",
+        {"day": AT.date().isoformat(), "usd": "0.1", "status": "settled", "unknown_total": False},
+        "research_spend",
+        scope="global",
+    )
+    assert DailyReservation.for_durable_run(service.store, service.cfg, "durable").allowance == 5
+    monkeypatch.setattr("trader.spending.now", lambda: AT + timedelta(days=1))
+    with pytest.raises(DailyBudgetExceeded, match="daily authority"):
+        DailyReservation.for_durable_run(service.store, service.cfg, "durable")
+
+
+def test_durable_funding_checked_inside_reservation_transaction(env, monkeypatch):
+    service, _, _ = env
+
+    def denied(store, cfg, current, **kwargs):
+        assert store.db.in_transaction
+        return "not funded"
+
+    monkeypatch.setattr("trader.paper_dispatch.funding_gate", denied)
+    with pytest.raises(DailyBudgetExceeded, match="not funded"):
+        DailyReservation.for_durable_run(service.store, service.cfg, "denied")
+    assert (
+        service.store.db.execute("SELECT COUNT(*) FROM documents WHERE kind='research_spend'").fetchone()[0]
+        == 0
+    )
+
+
 def test_daily_reservations_survive_restart_and_unknown_usage(env, monkeypatch):
     service, _, _ = env
     cfg = service.cfg

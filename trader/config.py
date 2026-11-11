@@ -52,6 +52,10 @@ class Settings(Model):
     poll_seconds: int = Field(default=60, ge=15)
     trigger_minutes: int = Field(default=15, ge=1)
     research_cache_hours: int = Field(default=12, ge=1)
+    temporal_address: str | None = None
+    temporal_namespace: str = Field(default="default", min_length=1)
+    temporal_task_queue: str = Field(default="trader-research", min_length=1)
+    temporal_tls: bool = False
     event_debounce_minutes: int = Field(default=15, ge=1)
     price_trigger: Decimal = Field(default=Decimal("0.05"), gt=0)
     preopen_minutes: int = Field(default=45, ge=1)
@@ -101,6 +105,12 @@ class Settings(Model):
 
     @model_validator(mode="after")
     def paper_only(self):
+        if self.temporal_address is not None and (
+            not self.temporal_address.strip()
+            or not self.temporal_tls
+            and self.temporal_address not in {"localhost:7233", "127.0.0.1:7233", "[::1]:7233"}
+        ):
+            raise ValueError("Remote Temporal connections require TLS; address must be nonempty")
         if self.universe.keys() & self.research_only_universe.keys():
             raise ValueError("Research-only symbols must not overlap the execution universe")
         if self.executor_fence and not self.checkpoint_bucket:

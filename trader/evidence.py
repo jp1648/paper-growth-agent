@@ -99,25 +99,41 @@ class EvidenceProvider:
                 return httpx.Response(200, content=b"".join(chunks))
 
     @traced("evidence.get")
-    def get(self, symbol, fresh=False):
+    def get(self, symbol, fresh=False, *, acquisition_callback=None, cutoff=None):
         if symbol not in self.cfg.research_universe:
             raise ValueError("Symbol outside configured research universe")
-        cached = self.store.get(symbol, "evidence_cache")
-        if (
-            cached
-            and cached.get("sec_schema") == 7
-            and not fresh
-            and timedelta(0)
-            <= now() - dt(cached["fetched_at"])
-            < timedelta(hours=self.cfg.research_cache_hours)
-        ):
+        started_at = dt(cutoff) if cutoff is not None else now()
+
+        def choose_cache():
+            cached = self.store.get(symbol, "evidence_cache")
+            if (
+                cached
+                and cached.get("sec_schema") == 7
+                and not fresh
+                and timedelta(0)
+                <= started_at - dt(cached["fetched_at"])
+                < timedelta(hours=self.cfg.research_cache_hours)
+            ):
+                return cached
+            return None
+
+        cached = (
+            acquisition_callback(
+                "evidence_cache_choice",
+                {"symbol": symbol, "fresh": fresh, "cutoff": started_at.isoformat()},
+                choose_cache,
+            )
+            if acquisition_callback is not None
+            else choose_cache()
+        )
+        if cached is not None:
             return cached
-        bundle = self.fetch(symbol)
+        bundle = self.fetch(symbol, started_at=started_at, acquisition_callback=acquisition_callback)
         self.store.put(symbol, bundle, "evidence_cache")
         return bundle
 
-    def fetch(self, symbol):
-        started_at = now()
+    def fetch(self, symbol, *, started_at=None, acquisition_callback=None):
+        started_at = started_at or now()
         if symbol not in self.cfg.research_universe:
             raise ValueError("Symbol outside configured research universe")
         if not self.cfg.sec_user_agent or "@" not in self.cfg.sec_user_agent:
@@ -150,8 +166,19 @@ class EvidenceProvider:
             ("facts", f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"),
             ("filings", f"https://data.sec.gov/submissions/CIK{cik}.json"),
         ):
-            response = self.request(url)
-            raw = response.json(parse_float=dec)
+            response = (
+                acquisition_callback(
+                    "sec_" + kind,
+                    {"url": url, "symbol": symbol, "cutoff": started_at.isoformat()},
+                    lambda url=url: {
+                        "raw": self.request(url).json(parse_float=dec),
+                        "retrieved_at": now().isoformat(),
+                    },
+                )
+                if acquisition_callback is not None
+                else {"raw": self.request(url).json(parse_float=dec), "retrieved_at": now()}
+            )
+            raw = response["raw"]
             if str(raw.get("cik", "")).zfill(10) != cik:
                 raise ValueError("SEC response company identity does not match configured CIK")
             if kind == "facts":
@@ -197,25 +224,35 @@ class EvidenceProvider:
                     "id": identifier,
                     "url": url,
                     "source": "SEC EDGAR",
-                    "retrieved_at": now(),
+                    "retrieved_at": response["retrieved_at"],
                     "content": content,
                 }
             )
-        news = self.data.news(symbol, (started_at - timedelta(days=7)).isoformat())
+        news = (
+            self.data.news(
+                symbol,
+                (started_at - timedelta(days=7)).isoformat(),
+                end=started_at.isoformat(),
+                acquisition_callback=acquisition_callback,
+            )
+            if acquisition_callback is not None
+            else self.data.news(symbol, (started_at - timedelta(days=7)).isoformat())
+        )
         for article in news:
             if not started_at - timedelta(days=7) <= news_time(article) <= started_at:
                 continue
+            article_content = {k: v for k, v in article.items() if k != "_retrieved_at"}
             sources.append(
                 {
                     "id": "news-"
                     + str(article["id"])
                     + "-"
-                    + hashlib.sha256(dumps(article).encode()).hexdigest()[:12],
+                    + hashlib.sha256(dumps(article_content).encode()).hexdigest()[:12],
                     "source": article.get("source", "Alpaca news"),
                     "url": article.get("url"),
                     "published_at": article.get("created_at"),
                     "updated_at": article.get("updated_at", article["created_at"]),
-                    "retrieved_at": now(),
+                    "retrieved_at": article.get("_retrieved_at", now()),
                     "content": {k: article.get(k) for k in ("headline", "summary", "content")},
                 }
             )

@@ -101,6 +101,49 @@ def test_failure_after_claim_never_retries(runtime):
     assert len(calls) == 1 and len(runner.store.events("paper_slot_failed")) == 1
 
 
+def test_pending_scheduled_slot_resumes_same_claim_after_window(runtime):
+    from trader.research_client import ResearchPending
+
+    runner, study, broker, calls, _ = runtime
+    slot = study["schedule"]["opportunities"][0]
+    reference = {"run_key": slot["id"], "manifest_hash": "a" * 64}
+
+    def invoke(payload):
+        calls.append(payload)
+        if len(calls) == 1:
+            raise ResearchPending(reference, "running", "valuation")
+        return {"decision": {"action": "WATCH"}, "execution": {"status": "watch"}}
+
+    runner.graph.invoke = invoke
+    assert run(runtime)["status"] == "scheduled research pending"
+    assert len(runner.store.items("paper_slot")) == 1
+    broker.at = dt(slot["claim_before"]) + timedelta(minutes=1)
+    assert "mechanically completed" in run(runtime)["status"]
+    assert calls[0] == calls[1]
+    assert len(runner.store.items("paper_slot")) == 1
+    assert len(runner.store.events("paper_slot_claimed")) == 1
+    assert len(runner.store.events("paper_slot_completed")) == 1
+
+
+def test_durable_scheduled_claim_records_payload_before_graph(runtime):
+    from trader.research_client import ResearchPending
+
+    runner, study, _, calls, _ = runtime
+    runner.graph.research_client = object()
+    slot = study["schedule"]["opportunities"][0]
+
+    def invoke(payload):
+        saved = runner.store.get(slot["id"], "paper_slot_pending")
+        assert saved["status"] == "starting"
+        assert saved["state"] == payload
+        calls.append(payload)
+        raise ResearchPending({"run_key": slot["id"], "manifest_hash": "a" * 64})
+
+    runner.graph.invoke = invoke
+    assert run(runtime)["status"] == "scheduled research pending"
+    assert len(runner.store.events("paper_slot_claimed")) == 1
+
+
 @pytest.mark.parametrize("boundary,expected", [("before", 0), ("open", 1), ("cutoff", 0)])
 def test_claim_window_boundaries(runtime, boundary, expected):
     runner, study, broker, calls, funding = runtime
@@ -366,6 +409,37 @@ def allocated_runtime(runtime):
     }
     runner.store.put("confirmed", funding, "research_funding", scope="global")
     return runtime
+
+
+def test_durable_funding_reuses_only_its_reserved_allowance(allocated_runtime):
+    from trader.paper_dispatch import funding_gate
+
+    runner, _, _, _, _ = allocated_runtime
+    record = {
+        "durable": True,
+        "experiment_id": runner.store.scope,
+        "config_sha256": fingerprint(runner.cfg),
+        "status": "reserved",
+        "unknown_total": False,
+        "day": AT.date().isoformat(),
+        "usd": "5",
+        "durable_allowance": "5",
+    }
+    runner.store.put("held", record, "research_spend", scope="global")
+    assert funding_gate(runner.store, runner.cfg, AT) == "daily allowance cannot fund full capped run"
+    assert funding_gate(runner.store, runner.cfg, AT, reservation_key="held") is None
+    assert funding_gate(runner.store, runner.cfg, AT, reservation_key="missing") is not None
+    assert funding_gate(runner.store, runner.cfg, AT + timedelta(days=1), reservation_key="held") is not None
+    runner.store.put(
+        "other",
+        {"status": "settled", "unknown_total": False, "usd": "2", "day": AT.date().isoformat()},
+        "research_spend",
+        scope="global",
+    )
+    assert (
+        funding_gate(runner.store, runner.cfg, AT, reservation_key="held")
+        == "daily allowance cannot fund full capped run"
+    )
 
 
 def test_allocation_survives_settlement_and_subtracts_all_experiments(allocated_runtime):

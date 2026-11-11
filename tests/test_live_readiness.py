@@ -265,12 +265,15 @@ def test_future_evidence_cache_is_not_reused(env, monkeypatch):
     service, _, data = env
     monkeypatch.setattr("trader.evidence.now", lambda: AT)
     service.store.put(
-        "ACME", {"fetched_at": (AT + timedelta(hours=1)).isoformat(), "sources": []}, "evidence_cache"
+        "ACME",
+        {"sec_schema": 7, "fetched_at": (AT + timedelta(hours=1)).isoformat(), "sources": []},
+        "evidence_cache",
     )
     provider = EvidenceProvider(service.cfg, service.store, data)
     calls = []
 
-    def fetch(symbol):
+    def fetch(symbol, *, started_at, acquisition_callback):
+        assert started_at == AT and acquisition_callback is None
         calls.append(symbol)
         return {"fetched_at": AT.isoformat(), "sources": [{"id": "fresh"}]}
 

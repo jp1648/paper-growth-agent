@@ -81,7 +81,7 @@ class XDiscovery:
             return request(client)
 
     @traced("x.snapshot")
-    def snapshot(self, symbol):
+    def snapshot(self, symbol, *, acquisition_callback=None):
         if symbol not in self.cfg.research_universe or not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
             raise ValueError("Invalid research symbol")
         if not self.cfg.x_enabled:
@@ -90,7 +90,16 @@ class XDiscovery:
         with path.open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             try:
-                return [self._search(symbol, p) for p in ("discussion", "contrary")]
+                return [
+                    acquisition_callback(
+                        "x_" + perspective,
+                        {"symbol": symbol, "perspective": perspective},
+                        lambda perspective=perspective: self._search(symbol, perspective),
+                    )
+                    if acquisition_callback is not None
+                    else self._search(symbol, perspective)
+                    for perspective in ("discussion", "contrary")
+                ]
             finally:
                 fcntl.flock(lock, fcntl.LOCK_UN)
 

@@ -126,11 +126,21 @@ class Runner:
 
     def _tick(self, event):
         self.maintain()
+        pending = self.resume_pending_research()
+        if pending is not None:
+            return pending
         current = now()
         clock = self.service.broker.clock()
         local = current.astimezone(ZoneInfo("America/New_York"))
         date = local.date().isoformat()
         days = self.service.broker.calendar(date, date)
+        study = self.store.get("active", "paper_study")
+        if study is not None and any(
+            item.get("status") in {"starting", "pending"} for item in self.store.items("paper_slot_pending")
+        ):
+            from .paper_dispatch import dispatch
+
+            return dispatch(self, study, clock, days[0] if days else None)
         if not days:
             return {"status": "non-trading day; reconciled"}
         day = days[0]
@@ -152,7 +162,6 @@ class Runner:
                 "status": "experiment ended; positions remain open",
                 "report": portfolio_report(self.service),
             }
-        study = self.store.get("active", "paper_study")
         if study is not None:
             from .paper_dispatch import dispatch
 
@@ -173,7 +182,9 @@ class Runner:
         if phase == "postclose":
             report = daily_report(self.service)
             if local.weekday() == 4 and not self.service.kill_path.exists():
-                self.research_batch(date + ":weekly", "weekly")
+                weekly = self.research_batch(date + ":weekly", "weekly")
+                if weekly.get("pending"):
+                    return {"status": "weekly research pending", "report": report, "research": weekly}
                 self.store.log(
                     "weekly_strategy_review",
                     {
@@ -184,11 +195,44 @@ class Runner:
             self.store.put(slot, {"status": "complete", "at": now()}, "job")
             return report
         result = self.research_batch(slot, phase)
-        self.store.put(slot, {"status": "complete", "at": now()}, "job")
+        if not result.get("pending"):
+            self.store.put(slot, {"status": "complete", "at": now()}, "job")
         return result
+
+    def resume_pending_research(self):
+        """Poll one saved invocation before opening another research admission."""
+        from .research_client import ResearchPending
+
+        pending = sorted(
+            (
+                job
+                for job in self.store.items("job")
+                if job.get("status") in {"running", "pending"} and isinstance(job.get("state"), dict)
+            ),
+            key=lambda job: job.get("at", ""),
+        )
+        if not pending:
+            return None
+        job = pending[0]
+        key, payload = job["key"], job["state"]
+        try:
+            state = self.graph.invoke(payload)
+        except ResearchPending as pending_result:
+            return {
+                "status": "research pending",
+                "run_key": pending_result.reference["run_key"],
+                "stage": pending_result.stage,
+            }
+        except Exception as error:  # noqa: BLE001 - preserve the frozen claim for operator review
+            self.store.log("error", {"run_key": key, "error": safe_error(error)})
+            return {"status": "research pending; review required", "run_key": key}
+        self.store.put(key, {"status": "complete", "at": now(), "key": key}, "job")
+        return {"status": "pending research completed", "run_key": key, "result": state}
 
     @traced("runner.research_batch")
     def research_batch(self, slot, phase, symbols=None, study_id=None):
+        from .research_client import ResearchPending
+
         snap = self.store.get("snapshot")
         if symbols is None:
             symbols = set(self.cfg.research_universe) | {p["symbol"] for p in snap["positions"]}
@@ -204,6 +248,9 @@ class Runner:
             job = self.store.get(key, "job")
             if job and job["status"] == "complete":
                 continue
+            if job and job["status"] == "pending":
+                outcomes.append({"symbol": symbol, "status": "pending"})
+                break
             try:
                 thesis = self.store.get(symbol, "thesis")
                 pending = (
@@ -250,20 +297,22 @@ class Runner:
                     self.store.log(
                         "interruption", {"run_key": key, "note": "Recovering interrupted finite graph"}
                     )
-                self.store.put(key, {"status": "running", "at": now()}, "job")
+                payload = {
+                    "symbol": symbol,
+                    "run_key": run_key,
+                    "research_only": phase in {"preopen", "weekly"}
+                    or symbol in self.cfg.research_only_universe,
+                    "trigger": reason,
+                    "fresh": phase in {"preopen", "weekly"} or reason == "new news evidence",
+                    **({"study_id": study_id, "study_stratum": "safety"} if study_id else {}),
+                }
+                running = {"status": "running", "at": now()}
+                if getattr(self.graph, "research_client", None) is not None:
+                    running.update(key=key, state=payload)
+                self.store.put(key, running, "job")
                 if not cached:
                     self.store.put(symbol, {"at": now()}, "research_attempt")
-                state = self.graph.invoke(
-                    {
-                        "symbol": symbol,
-                        "run_key": run_key,
-                        "research_only": phase in {"preopen", "weekly"}
-                        or symbol in self.cfg.research_only_universe,
-                        "trigger": reason,
-                        "fresh": phase in {"preopen", "weekly"} or reason == "new news evidence",
-                        **({"study_id": study_id, "study_stratum": "safety"} if study_id else {}),
-                    }
-                )
+                state = self.graph.invoke(payload)
                 self.store.put(key, {"status": "complete", "at": now()}, "job")
                 d = state["decision"]
                 outcomes.append(
@@ -275,6 +324,14 @@ class Runner:
                         "trigger": reason,
                     }
                 )
+            except ResearchPending as pending_result:
+                self.store.put(
+                    key,
+                    {"status": "pending", "at": now(), "key": key, "state": payload},
+                    "job",
+                )
+                outcomes.append({"symbol": symbol, "status": "pending", "stage": pending_result.stage})
+                break
             except Exception as error:  # noqa: BLE001 - persist failure at the execution boundary
                 self.store.put(key, {"status": "failed", "at": now()}, "job")
                 self.store.log("error", {"run_key": key, "error": safe_error(error)})
@@ -282,4 +339,8 @@ class Runner:
         # Ranking is an explicit qualitative model score, not a promise of expected return.
         outcomes.sort(key=lambda x: dec(x.get("confidence", "0")), reverse=True)
         self.store.log("opportunity_ranking", {"slot": slot, "outcomes": outcomes})
-        return {"slot": slot, "outcomes": outcomes}
+        return {
+            "slot": slot,
+            "outcomes": outcomes,
+            "pending": any(o.get("status") == "pending" for o in outcomes),
+        }

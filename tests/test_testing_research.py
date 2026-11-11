@@ -42,7 +42,7 @@ def test_cli_testing_changes_only_in_memory_cap_and_passes_deferred_context(env,
         return {"status": "deferred"}
 
     monkeypatch.setattr(cli, "DeepResearchTeam", team)
-    monkeypatch.setattr(cli, "build_graph", lambda *args: SimpleNamespace(invoke=invoke))
+    monkeypatch.setattr(cli, "build_graph", lambda *args, **kwargs: SimpleNamespace(invoke=invoke))
     assert (
         cli.main(
             ["research", "ACME", "--run-key", "bounded", "--testing", "--defer-execution", "--max-cost", "3"]

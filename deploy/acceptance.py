@@ -6,6 +6,7 @@ import time
 from contextlib import contextmanager
 from datetime import timedelta
 from decimal import ROUND_DOWN
+from pathlib import Path
 
 import httpx
 
@@ -19,6 +20,71 @@ from trader.research_team import DeepResearchTeam
 from trader.service import Service
 from trader.spending import spending_status
 from trader.store import Store
+
+
+def durable_research(service, symbol, run_key):
+    from trader.research_client import ResearchPending, TemporalResearchClient
+
+    store, cfg = service.store, service.cfg
+    client = TemporalResearchClient(
+        cfg,
+        store,
+        root=Path(cfg.database).resolve().parent / "research-runs",
+        address=cfg.temporal_address,
+        namespace=cfg.temporal_namespace,
+        task_queue=cfg.temporal_task_queue,
+        tls=cfg.temporal_tls,
+    )
+    # Only bounded start/query work holds these locks; the worker owns research.
+    with exclusive(service), service.lock():
+        if symbol not in cfg.research_universe:
+            raise ValueError("Symbol outside configured research universe")
+        record = store.get(run_key, "acceptance")
+        if record is None:
+            if any(
+                store.get(run_key, kind) for kind in ("research_request", "research_audit", "research_result")
+            ):
+                raise RuntimeError("Acceptance run ID already attempted; inspect its saved evidence")
+            snapshot = service.reconcile()
+            context = {
+                "symbol": symbol,
+                "run_key": run_key,
+                "fresh": True,
+                "research_only": True,
+                **research_input(service, symbol, deferred=True),
+                "current_timestamp": now().isoformat(),
+                "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": None},
+            }
+            record = {
+                "mode": "research",
+                "symbol": symbol,
+                "status": "started",
+                "at": now(),
+                "context": context,
+                "durable": True,
+            }
+            store.put(run_key, record, "acceptance")
+            store.log("acceptance_started", {"run_key": run_key, **record})
+        elif (
+            record.get("mode") != "research"
+            or record.get("symbol") != symbol
+            or record.get("durable") is not True
+            or record.get("status") not in {"started", "pending"}
+        ):
+            raise RuntimeError("Acceptance run ID already attempted; inspect its saved evidence")
+        try:
+            result = client.start(record["context"])
+        except ResearchPending as pending:
+            record.update(status="pending", workflow=pending.reference, workflow_state=pending.state)
+        else:
+            if set(result["team_reports"]) != {"business", "catalysts", "valuation", "adversarial"}:
+                raise ValueError("Incomplete specialist team")
+            if Decision.model_validate(result["decision"]).symbol != symbol:
+                raise ValueError("Research decision changed the requested symbol")
+            store.put(run_key, result, "acceptance_research")
+            record.update(status="complete", estimated_cap_usd=cfg.research_max_cost_usd)
+        store.put(run_key, record, "acceptance")
+        return record
 
 
 @contextmanager
@@ -64,6 +130,10 @@ def run(
     service.require_experiment()
     if not service.kill_path.exists():
         raise RuntimeError("Acceptance requires the persistent trading pause")
+    if mode == "research" and cfg.temporal_address:
+        if unrestricted_research or finalize_from or team is not None:
+            raise ValueError("Temporal acceptance requires configured limits and the original full team")
+        return durable_research(service, symbol, run_key)
     original_pause = service.kill_path.read_bytes()
     cid = service.client_order_id("explicit-paper-smoke:" + symbol)
     attempted_order = False

@@ -1,0 +1,19 @@
+[Unit]
+Description=Resumable research worker (no broker order submission)
+After=docker.service temporal-server.service always-on-proxy.service
+Requires=docker.service temporal-server.service always-on-proxy.service
+RequiresMountsFor=@TRADER_ROOT@ @TRADER_CONTROL@
+ConditionPathExists=@TRADER_ROOT@/state/ledger.sqlite
+ConditionPathExists=@TRADER_ROOT@/.env
+
+[Service]
+EnvironmentFile=/etc/always-on.env
+ExecStart=/usr/bin/docker run --rm --name trader-research-worker --init --network host --user 501:501 --read-only --cap-drop ALL --security-opt no-new-privileges --log-opt max-size=10m --log-opt max-file=3 --pids-limit 128 --memory 1g --cpus 1 --tmpfs /tmp:mode=1777 --env HOME=@TRADER_HOME@ --workdir @TRADER_ROOT@ --mount type=bind,src=/run/trader-cloudsql,dst=/run/trader-cloudsql,readonly --mount type=bind,src=@TRADER_ROOT@/state,dst=@TRADER_ROOT@/state --mount type=bind,src=@TRADER_CONTROL@,dst=@TRADER_CONTROL@ --mount type=bind,src=@TRADER_ROOT@/config.toml,dst=/run/config.toml,readonly --mount type=bind,src=@TRADER_ROOT@/.env,dst=/run/secrets/trader_env,readonly --entrypoint /usr/local/bin/uv ${TRADER_IMAGE} run --no-project --env-file /run/secrets/trader_env /opt/venv/bin/python -m trader.research_runtime --config /run/config.toml --root @TRADER_ROOT@/state/research-runs --namespace trader-research worker --allow-paid
+ExecStop=/usr/bin/docker stop --time 240 trader-research-worker
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=260
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
