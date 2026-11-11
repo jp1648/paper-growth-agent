@@ -1625,26 +1625,86 @@ def test_final_context_indexes_evidence_without_mutating_reports_or_originals():
     desk.sources["unreferenced"] = {"id": "unreferenced", "content": "retained original"}
     desk.budget.events.append(("decimal_product", {"source_id": "arithmetic-only"}))
     desk.sources["arithmetic-only"] = {"id": "arithmetic-only", "content": "arithmetic provenance"}
-    desk.context["portfolio"] = {"prior_thesis": {"evidence_ids": ["portfolio-only"]}}
-    desk.sources["portfolio-only"] = {"id": "portfolio-only", "content": "prior source"}
+    desk.context["portfolio"] = {
+        "prior_thesis": {
+            "evidence_ids": ["portfolio-only", "portfolio-claimed", "missing-historical"],
+            "decision": {"evidence_ids": ["portfolio-claimed"]},
+            "valuation": {"evidence_ids": ["prior-valuation"]},
+        }
+    }
+    desk.context["other_claim"] = {"evidence_ids": ["other-only"]}
+    for identifier in ("portfolio-only", "portfolio-claimed", "prior-valuation", "other-only"):
+        desk.sources[identifier] = {"id": identifier, "content": "prior source"}
     original = copy.deepcopy(desk.sources)
     context = desk.final_context()
     assert context["reports"] == desk.reports and context["calculations"] == desk.calculations
+    assert context["portfolio"]["prior_thesis"]["evidence_ids"] == [
+        "portfolio-only",
+        "portfolio-claimed",
+        "missing-historical",
+    ]
     assert desk.sources == original
     assert {s["id"] for s in context["evidence"]} == {
         "fixture-sec",
         "passage-test",
         "arithmetic-only",
-        "portfolio-only",
+        "portfolio-claimed",
+        "prior-valuation",
+        "other-only",
     }
-    assert context["unindexed_source_count"] == 1
-    assert "Nonexhaustive" in context["evidence_index_note"]
+    assert context["unindexed_source_count"] == 2
+    assert "catalog-only IDs" in context["evidence_index_note"]
     for indexed in context["evidence"]:
         source = original[indexed["id"]]
         assert "content" not in indexed
         assert indexed["id"] == source["id"]
         assert indexed["content_sha256"] == hashlib.sha256(dumps(source.get("content")).encode()).hexdigest()
     assert len(dumps(context["evidence"])) < len(dumps(desk.source_previews(original.values())))
+
+
+def test_final_context_projects_only_identical_calculation_provenance():
+    import copy
+
+    from trader.models import dumps
+
+    cfg = Settings()
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    identical = {"source_id": "fixture-sec", "period_end": "2026-09-30", "facts": ["cash flow"] * 100}
+    different = {"source_id": "fixture-sec", "period_end": "2025-09-30"}
+    desk.calculations = {
+        "calculation-equal": {
+            "calculation_id": "calculation-equal",
+            "financial_provenance": identical,
+            "normalization_bridge": {"historical_provenance": copy.deepcopy(identical)},
+        },
+        "calculation-unequal": {
+            "calculation_id": "calculation-unequal",
+            "financial_provenance": different,
+            "normalization_bridge": {"historical_provenance": copy.deepcopy(identical)},
+        },
+    }
+    desk.reports["valuation"] = {"calculation_id": "calculation-equal", "evidence_ids": ["fixture-sec"]}
+    original = copy.deepcopy(desk.calculations)
+    context = desk.final_context()
+    equal = context["calculations"]["calculation-equal"]
+    unequal = context["calculations"]["calculation-unequal"]
+    assert equal["financial_provenance"]["same_as"] == "normalization_bridge.historical_provenance"
+    assert "read_source(calculation-equal)" in equal["financial_provenance"]["note"]
+    assert equal["normalization_bridge"]["historical_provenance"] == identical
+    restored = copy.deepcopy(equal)
+    restored["financial_provenance"] = restored["normalization_bridge"]["historical_provenance"]
+    assert restored == original["calculation-equal"]
+    assert unequal == original["calculation-unequal"]
+    assert context["reports"]["valuation"]["calculation_id"] == "calculation-equal"
+    reader = next(tool for tool in desk.tools() if tool.name == "read_source")
+    saved = reader.invoke({"source_id": "calculation-equal"})
+    assert json.loads(saved["content"]) == original["calculation-equal"]
+    assert desk.calculations == original
+    assert desk.final_context()["calculations"] == context["calculations"]
+    assert len(dumps(context["calculations"])) < len(dumps(original))
 
 
 def test_filing_search_is_bounded_navigation_then_citable_read():

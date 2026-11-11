@@ -4745,3 +4745,16 @@ with seven external checks skipped. Independent PG7 request replay fits the same
 $6, without assuming fewer calls. That narrow margin does not prove a future run
 will fit. Held-AAPL's saved path still requires $6.3838975; no successful held
 review or deployed validation of this new candidate is claimed.
+
+The final offline consolidation distinguishes the prior thesis's saved source
+catalogue from actual claim citations without removing either from the audit or
+portfolio context. Final synthesis also references an identical provenance object
+already present in the same calculation; unequal values and full tool outputs
+remain unchanged. Independent replay reproduces all 70 original request sizes,
+restores the projected calculations exactly, and preserves the prior portfolio.
+Conservative fixed-path reservation envelopes are now $5.9198525 for PG and
+$5.9788375 for held AAPL under the unchanged $6 limit. These narrow margins are
+feasibility evidence, not guarantees of future model behavior or economic quality.
+Final offline verification: 1413 tests passed, seven external checks skipped;
+lint, formatting and diff checks passed. Deployment and new real-run acceptance
+remain pending.

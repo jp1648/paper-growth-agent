@@ -1660,6 +1660,19 @@ class ResearchDesk:
         }
 
     def final_context(self):
+        calculations = copy.deepcopy(self.calculations)
+        for identifier, calculation in calculations.items():
+            bridge = calculation.get("normalization_bridge")
+            if (
+                isinstance(bridge, dict)
+                and "financial_provenance" in calculation
+                and "historical_provenance" in bridge
+                and calculation["financial_provenance"] == bridge["historical_provenance"]
+            ):
+                calculation["financial_provenance"] = {
+                    "same_as": "normalization_bridge.historical_provenance",
+                    "note": f"Final-context projection only; read_source({identifier}) returns the full saved calculation.",
+                }
         context = {
             **self.context,
             "reports": self.reports,
@@ -1672,7 +1685,7 @@ class ResearchDesk:
             "correction_valuation_provenance": self.correction_valuation_provenance(),
             "correction_instruction": "Before finalizing, inspect missing coverage and material objections across all reports. When several repairable defects exist, target the earliest incomplete dependency: available but unread business disclosures require business correction before downstream valuation repair. Carry all relevant critique defects into the correction reason so rebuilt valuation and critique address them together; do not spend the sole correction on valuation alone while required upstream business coverage remains unread. Use request_correction only when the defect can be repaired with remaining budgets; otherwise preserve the gap in the final decision. A correction requires new downstream reports and critique; it does not grant acceptance.",
             "report_times": self.report_times,
-            "calculations": self.calculations,
+            "calculations": calculations,
             "arithmetic": self.arithmetic_context(),
             "targeted_news_review": bool(self.targeted),
             "instruction": "All four specialist reports have returned; unresolved claim diagnostics still mean incomplete evidence. Return the final Decision using these reports and their cited evidence. The evidence index contains metadata and content hashes only; original content remains in the audit, not this synthesis request. Do not treat the index as independently inspected evidence. Reconcile differences between reports: when a later specialist supplies cited original evidence for an earlier unread gap, incorporate that supported finding rather than repeating the stale gap. Distinguish secondhand specialist findings from your own inspection. Preserve genuinely unresolved uncertainties and conflicting interpretations; do not invent additional evidence.",
@@ -1680,13 +1693,15 @@ class ResearchDesk:
 
         referenced = set()
 
-        def collect(value):
+        def collect(value, path=()):
             if isinstance(value, dict):
-                for item in value.values():
-                    collect(item)
+                for key, item in value.items():
+                    if path == ("portfolio", "prior_thesis") and key == "evidence_ids":
+                        continue
+                    collect(item, (*path, key))
             elif isinstance(value, list):
                 for item in value:
-                    collect(item)
+                    collect(item, path)
             elif isinstance(value, str) and value in self.sources:
                 referenced.add(value)
 
@@ -1702,8 +1717,10 @@ class ResearchDesk:
         context["unindexed_source_count"] = len(self.sources) - len(referenced)
         context["evidence_index_note"] = (
             "Nonexhaustive index: only exact source IDs referenced by the supplied reports, calculations, "
-            "arithmetic and portfolio context. Unindexed sources remain in the original audit and available "
-            "to permitted specialists; omission is not missing evidence or proof of review."
+            "arithmetic and portfolio claims. The prior thesis's top-level evidence_ids is a saved source "
+            "catalog, so catalog-only IDs do not pull metadata into this index. The catalog and original "
+            "sources remain in the saved audit; historical references are not current verified evidence. "
+            "Omission is not missing evidence or proof of review."
         )
         return context
 
