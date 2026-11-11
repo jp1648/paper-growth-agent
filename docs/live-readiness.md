@@ -4847,7 +4847,7 @@ assumption object from the final synthesis request, replacing it with a referenc
 to the full sibling object. Saved calculations, source retrieval and unequal values
 remain unchanged. A reconstruction regression and all 153 research-team tests pass;
 lint, formatting and diff checks pass. Exact replay of both PG9 lead requests saves
-4,305 bytes, reducing the denied reservation only to $6.1828275. This is not enough
+4,305 bytes, reducing the denied reservation only to $6.1182525. This is not enough
 to admit that request under $6 and does not resolve economic gaps or authorize a
 paid retry. The change is not deployed. PG9 used 47 initial and 17 correction calls;
 the combined record includes a critic-run valuation diagnostic, but still lacks
