@@ -1,4 +1,4 @@
-# Resumable research (implementation in progress)
+# Resumable research (deployed; readiness review in progress)
 
 Temporal coordinates durable research stages around the existing Deep Agents /
 LangGraph research team. It does not submit broker orders or activate trading.
@@ -164,7 +164,8 @@ empty database volume were removed; unrelated Docker resources were preserved.
 The executor's boot disk also had only 1.2 GiB free when checked. Its separate
 `/mnt/trader-state` disk has 16 GiB available (rechecked November 11), providing a
 possible isolated verification location without removing existing images.
-Full deployed research-worker acceptance remains pending.
+Full deployed fixture recovery checks are recorded below; investment acceptance
+and the paper-readiness trial remain separate gates.
 
 The official Linux AMD64 1.32.2 release archive is staged in the executor's private
 `/mnt/trader-state/temporal-verification` directory. Its SHA-256 matched the
@@ -211,8 +212,9 @@ root-only `/etc/trader-temporal.env`. Both units passed `systemd-analyze verify`
 the running coordinator passed the SDK health check and returned the earlier
 seven-stage workflow result from Cloud SQL. Evidence is saved as
 `state/temporal-verification/permanent-service-check.json`.
-No research worker is enabled yet, and Trader's configuration and pause remain
-unchanged. The coordinator alone cannot make model calls or submit broker orders.
+At this initial coordinator check, no research worker was enabled and Trader's
+configuration and pause were unchanged. The coordinator alone cannot make model
+calls or submit broker orders. The later paused cutover is recorded below.
 
 Worker shutdown now handles SIGTERM/SIGINT by leaving Temporal's worker context
 and awaiting SDK shutdown, rather than terminating immediately. Existing activity
@@ -222,13 +224,48 @@ after each stage on success or failure. A worker service must allow longer than
 the 180-second lead-request timeout before forced termination; abrupt host loss
 still leaves any unsaved provider outcome ambiguous and blocks blind retries.
 
-`deploy/temporal-worker.service` is prepared but not enabled. It uses the existing
-digest-pinned Trader image, private environment and original ledger/control paths,
+`deploy/temporal-worker.service` uses a separate
+digest-pinned image setting in `/etc/trader-research-worker.env`, the existing
+private application environment and original ledger/control paths,
 with one activity at a time. Its Docker stop grace is 240 seconds and service stop
 timeout 260 seconds. The rendered unit passed systemd validation on the executor.
 Control-directory access remains writable so existing reconciliation can persist
 a stop marker on a fault. Run the full deployed recovery check before enabling
 normal research submissions.
+
+Worker startup acceptance passed on November 11 using image
+`sha256:f0fc66ed7da92dd9146dad83c175801fc5575f297188ffc7c69c8a0305c86d42`
+from commit `bc923bb7a7c3`. All 49 source/dependency files in the image matched the
+clean build context. In the empty `trader-research` namespace, the real container
+polled both workflow and activity queues, with no workflow submissions. It was
+then stopped for the remaining full-stage recovery checks; boot enablement remains
+off. The existing trading executor's image/configuration were not changed.
+
+Executor full-stage fixture acceptance also passed: the deployed image ran
+`test_temporal_worker_restart_replays_saved_stage_receipt` against the persistent
+server in namespace `trader-verification`, run
+`executor-full-stage-recovery-20261111-1`. After a deliberately lost business
+receipt acknowledgement, a replacement SDK Worker completed the real stage engine
+without repeating business model work or evidence acquisition. The test verified
+one spend record, a WATCH result, and no thesis, graph decision or order intent.
+It used a separate fixture ledger and fake model/provider responses; no application
+credentials or real ledger were mounted. Worker replacement here occurs within
+one fixture process, not an abrupt container kill. Server-process restart was
+verified separately. Evidence: `state/temporal-verification/executor-stage-recovery.json`.
+
+Abrupt container-loss acceptance then passed in fixture run
+`executor-container-kill-20261111-2`. After the business receipt was durable, the
+worker killed itself with SIGKILL; Docker reported exit 137. A fresh container
+loaded the same journal/ledger and completed all seven stages: 3 model calls
+before the kill, 5 afterward, zero repeated acquisitions or completed business
+calls, one spending row, and no execution artifacts. Evidence:
+`state/temporal-verification/container-crash-recovery.json`; fixture source is
+`state/temporal-verification/crash_worker.py`. The first attempt (`...-1`) is
+preserved but is not crash evidence: without Docker `--init`, Python was PID 1,
+its self-sent SIGKILL was ignored, and the workflow completed uninterrupted.
+All responses were fixtures; no provider credentials or production ledger were
+mounted. This does not certify investment quality or resolve unknown provider
+outcomes when a response never reaches the local journal.
 
 ## Documentation reviewed
 
@@ -257,3 +294,19 @@ Temporal's [error-handling guidance](https://docs.temporal.io/develop/python/bes
 requires retry-safe activities; a workflow alone does not make paid calls
 exactly-once. [Self-hosting guidance](https://docs.temporal.io/self-hosted-guide)
 distinguishes local development from a persistent production service.
+
+## Paused production cutover
+
+After the fixture recovery checks, the dispatcher and worker were switched to
+image `sha256:f0fc66ed7da92dd9146dad83c175801fc5575f297188ffc7c69c8a0305c86d42`.
+The existing remote config was preserved, adding only `temporal_address` set to
+`127.0.0.1:7233` and namespace `trader-research`. The worker is enabled; the
+coordinator, worker and dispatcher all reported active with zero restarts.
+The trading pause remains set. Before cutover there was no active study, pending
+job, or unfinished durable submission.
+
+Backups of config, old image setting and a consistent ledger snapshot are under
+`/mnt/trader-state/temporal/cutover-bc923bb7a7c3` (private). Post-start comparisons
+verified identical experiment data, pause content, all 62 spending records, both
+research results, and zero order intents. No paid research or orders were started.
+Evidence: `state/temporal-verification/paused-cutover.json`.

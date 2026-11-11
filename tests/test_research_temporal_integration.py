@@ -1,7 +1,11 @@
 import asyncio
+import os
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from threading import Lock
+from types import SimpleNamespace
 
+from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from test_research_stages import X
@@ -18,6 +22,18 @@ from trader.research_workflow import (
     start_research_workflow,
 )
 from trader.store import Store
+
+
+@asynccontextmanager
+async def temporal_environment():
+    address = os.environ.get("TEMPORAL_TEST_ADDRESS")
+    if address:
+        if address != "127.0.0.1:7233" or not os.environ.get("TEMPORAL_TEST_RUN_KEY"):
+            raise ValueError("Deployed fixture requires loopback and a unique explicit run key")
+        yield SimpleNamespace(client=await Client.connect(address, namespace="trader-verification"))
+    else:
+        async with await WorkflowEnvironment.start_local() as environment:
+            yield environment
 
 
 async def wait_for(handle, stage, state):
@@ -38,7 +54,8 @@ def test_temporal_worker_restart_replays_saved_stage_receipt(tmp_path, monkeypat
         store = Store(db)
         store.put("active", {"id": "experiment-one"}, scope="global")
         store.db.close()
-        context = {"run_key": "temporal-real", "symbol": "ACME", "portfolio": {}, "research_only": True}
+        run_key = os.environ.get("TEMPORAL_TEST_RUN_KEY", "temporal-real")
+        context = {"run_key": run_key, "symbol": "ACME", "portfolio": {}, "research_only": True}
         binding = {
             "run_key": context["run_key"],
             "experiment_id": "experiment-one",
@@ -95,16 +112,16 @@ def test_temporal_worker_restart_replays_saved_stage_receipt(tmp_path, monkeypat
                 raise StageAmbiguous("fixture response lost after receipt commit")
             return receipt
 
-        async with await WorkflowEnvironment.start_local() as env:
+        async with temporal_environment() as env:
             activities = ResearchActivities(handler)
             async with Worker(
                 env.client,
-                task_queue="research-stage-restart",
+                task_queue=run_key,
                 workflows=[ResearchWorkflow],
                 activities=[activities.research_stage],
             ):
                 handle = await start_research_workflow(
-                    env.client, context["run_key"], engine.manifest_hash, "research-stage-restart"
+                    env.client, context["run_key"], engine.manifest_hash, run_key
                 )
                 await wait_for(handle, "business", "blocked")
                 calls_before = len(model.calls)
@@ -112,7 +129,7 @@ def test_temporal_worker_restart_replays_saved_stage_receipt(tmp_path, monkeypat
                 assert counts["provider"] == 1
             async with Worker(
                 env.client,
-                task_queue="research-stage-restart",
+                task_queue=run_key,
                 workflows=[ResearchWorkflow],
                 activities=[activities.research_stage],
             ):
