@@ -5294,3 +5294,23 @@ new $20 daily ceiling. This does not authorize a $20 additional run today.
 Funding, pause, source, economic-acceptance and broker gates remain unchanged.
 Targeted dispatch/accounting checks passed (99 tests); deployment and new funding
 installation require their separate exact-image/preflight evidence.
+
+
+### November 11: $20 ceilings deployed and verified
+
+Candidate `f6b6c5dca95c5befa062d63ae781f826a7a65d7b` passed both CI runs
+43120499418 and 43120493055. Its 51 image build inputs are byte-identical to
+9153f67; the installed immutable image is
+`sha256:2e7a4aecd0ca8e5f390866e2967f2ded309e955730aec75e9659023f30a3b1ec`.
+Both executor and research worker load $20/run and $20/day. Trading remains
+paused. Protected financial/research records and the original journal prefix
+were verified unchanged. An initial deployment was rolled back because the
+old verification incorrectly rejected normal restart journal appends; the
+reviewed replacement permits only expected restart/reconciliation events and
+timestamp-only operational refreshes, preserving every financial value.
+
+Ten unused registry-backed cached images were removed after reference checks;
+current, candidate and rollback images were retained. No accounting history
+was deleted. The next observed PG12 regression remains individually capped at
+$10 so today's existing $9.9529325 plus its reservation cannot exceed $20.
+Deployment is not research acceptance or paper-trial activation.
