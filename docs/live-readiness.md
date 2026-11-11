@@ -5220,5 +5220,5 @@ requirements were relaxed.
 
 Validation: the full offline suite passed 1,585 tests with eight external checks
 skipped. Targeted independent reviews covered correction admission, valuation
-arithmetic/replay and cap boundaries. All 17 safety mutations were caught; lint,
+arithmetic/replay and cap boundaries. All 16 safety mutations were caught; lint,
 format checks and a redacted diff secret scan passed. No paid research was rerun.
