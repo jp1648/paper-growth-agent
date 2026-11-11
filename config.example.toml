@@ -42,7 +42,7 @@ research_max_tool_calls = 48
 research_max_seconds = 600
 research_max_input_bytes = 180000
 research_max_output_tokens = 3000
-research_max_cost_usd = "5" # Estimated ceiling, not a spending target or billing guarantee.
+research_max_cost_usd = "10" # Estimated ceiling, not a spending target or billing guarantee.
 research_daily_cost_usd = "10" # Shared across runs/restarts; New York date when each run starts.
 sec_user_agent = "" # Your application name and contact email, as required by SEC.
 # Budget ceilings in USD / million tokens, verified 2026-11-08.

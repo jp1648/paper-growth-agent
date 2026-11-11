@@ -69,7 +69,7 @@ class Settings(Model):
     research_max_seconds: int = Field(default=600, ge=30, le=1800)
     research_max_input_bytes: int = Field(default=180000, ge=10000, le=500000)
     research_max_output_tokens: int = Field(default=3000, ge=256, le=8000)
-    research_max_cost_usd: Decimal = Field(default=Decimal(5), gt=0, le=100)
+    research_max_cost_usd: Decimal = Field(default=Decimal(10), gt=0, le=100)
     research_daily_cost_usd: Decimal = Field(default=Decimal(10), ge=0, le=1000)
     x_enabled: bool = False
     x_daily_calls: int = Field(default=6, ge=0, le=30)

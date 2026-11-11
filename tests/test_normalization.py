@@ -18,9 +18,15 @@ def normalization():
     provider = Evidence()
     bundle = provider.get("ACME")
     source = bundle["sources"][0]
+    source["content"]["cik"] = "1"
     facts = source["content"]["facts"]
     facts["ShareBasedCompensation"] = {"USD": [{**facts[CFO]["USD"][0], "val": 40}]}
-    support = {"id": "assumptions", "content": "Synthetic share-base and adjustment evidence only."}
+    support = {
+        "id": "assumptions",
+        "content": "Synthetic share-base and adjustment evidence only.",
+        "source": "SEC EDGAR filing passage",
+        "url": "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/fixture.htm",
+    }
     bridge = {
         "adjustments": [
             {
@@ -167,7 +173,8 @@ def test_batched_normalization_rejects_late_invalid_source_atomically(normalizat
     assert not desk.calculations
 
 
-def test_batched_normalization_responses_wire_schema_and_tool_call(normalization):
+@pytest.mark.parametrize("finite", [False, True])
+def test_batched_normalization_responses_wire_schema_and_tool_call(normalization, finite):
     import httpx
     from langchain_openai import ChatOpenAI
 
@@ -178,6 +185,15 @@ def test_batched_normalization_responses_wire_schema_and_tool_call(normalization
         bridge,
         [_adjustment_variant(bridge, "capital_expenditure", "-30", label="investment sensitivity")],
     )
+    if finite:
+        arguments["finite_cash_adjustments"] = [
+            {
+                "year": 1,
+                "amount_usd": "-88",
+                "rationale": "Incremental finite payment",
+                "evidence_ids": ["assumptions"],
+            }
+        ]
     requests = []
 
     def respond(request):
@@ -188,6 +204,10 @@ def test_batched_normalization_responses_wire_schema_and_tool_call(normalization
         alternative = schema["properties"]["normalization_alternatives"]
         assert "anyOf" in alternative
         assert any("oneOf" in branch.get("items", {}) for branch in alternative["anyOf"])
+        finite_schema = schema["properties"]["finite_cash_adjustments"]
+        assert any(
+            "year" in branch.get("items", {}).get("properties", {}) for branch in finite_schema["anyOf"]
+        )
         return httpx.Response(
             200,
             json={
@@ -961,3 +981,178 @@ def test_missing_compensation_policy_is_correctable_without_creating_calculation
     source["content"]["fact_taxonomies"]["AllocatedShareBasedCompensationExpense"] = "custom"
     with pytest.raises(ValueError, match="original us-gaap"):
         tool.invoke(args)
+
+
+def test_finite_cash_is_discounted_once_and_replays_with_diagnostics(normalization):
+    from trader.financials import valuation_diagnostics
+
+    desk, source, bridge = normalization
+    tool = next(item for item in desk.tools() if item.name == "value_scenarios")
+    args = {**_batch_args(source, bridge), "years": 2, "terminal_multiples": ["2", "2", "2"]}
+    legacy = tool.invoke(args)
+    assert tool.invoke({**args, "finite_cash_adjustments": []}) == legacy
+    rows = [
+        {
+            "year": 1,
+            "amount_usd": "-880",
+            "rationale": "Incremental first-year payment, not baseline or terminal",
+            "evidence_ids": ["assumptions"],
+        },
+        {
+            "year": 2,
+            "amount_usd": "968",
+            "rationale": "Separate second-year release",
+            "evidence_ids": ["assumptions"],
+        },
+    ]
+    result = tool.invoke({**args, "finite_cash_adjustments": rows})
+    # -880/80/1.1 + 968/80/1.1**2 = zero; negative year-one cash is valid.
+    assert result["base_value"] == legacy["base_value"]
+    assert result["calculation_id"] != legacy["calculation_id"]
+    assert tool.invoke(result["inputs"]) == result
+    diagnostics = valuation_diagnostics(result["inputs"], "10")
+    assert diagnostics == valuation_diagnostics(legacy["inputs"], "10")
+    adverse = tool.invoke({**args, "finite_cash_adjustments": rows[:1]})
+    assert dec(adverse["base_value"]) == dec(legacy["base_value"]) - 10
+    changed = valuation_diagnostics(adverse["inputs"], "10")["rows"][0]
+    original = diagnostics["rows"][0]
+    assert dec(changed["annual_cash_flows_pv"]) == dec(original["annual_cash_flows_pv"]) - 10
+    assert dec(changed["required_terminal_multiple"]) > dec(original["required_terminal_multiple"])
+    assert dec(changed["terminal_value_fraction"]) > dec(original["terminal_value_fraction"])
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["future", "missing", "empty", "nan", "year", "duplicate", "bridge", "bound", "foreign", "derived"],
+)
+def test_finite_cash_validation_is_atomic(normalization, fault):
+    desk, source, bridge = normalization
+    tool = next(item for item in desk.tools() if item.name == "value_scenarios")
+    args = _batch_args(source, bridge, [_adjustment_variant(bridge, "capital_expenditure", "-30")])
+    row = {
+        "year": 1,
+        "amount_usd": "-10",
+        "rationale": "Separate incremental cash",
+        "evidence_ids": ["assumptions"],
+    }
+    args["finite_cash_adjustments"] = [row]
+    if fault == "future":
+        desk.sources["assumptions"]["available_at"] = "2099-01-01T00:00:00Z"
+    elif fault == "missing":
+        row["evidence_ids"] = ["unknown"]
+    elif fault == "empty":
+        desk.sources["assumptions"]["content"] = ""
+    elif fault == "nan":
+        row["amount_usd"] = "NaN"
+    elif fault == "year":
+        row["year"] = 2
+    elif fault == "duplicate":
+        args["finite_cash_adjustments"].append(copy.deepcopy(row))
+    elif fault == "bridge":
+        args.pop("normalization_bridge")
+    elif fault == "foreign":
+        desk.sources["assumptions"]["url"] = (
+            "https://www.sec.gov/Archives/edgar/data/2/000000000226000001/fixture.htm"
+        )
+    elif fault == "derived":
+        desk.sources["assumptions"]["original_source"] = False
+    else:
+        args["finite_cash_adjustments"] *= 21
+    with pytest.raises(ValueError):
+        tool.invoke(args)
+    assert not desk.calculations
+
+
+def test_finite_cash_batch_retains_standalone_inputs_and_rejects_bad_sibling(normalization):
+    desk, source, bridge = normalization
+    tool = next(item for item in desk.tools() if item.name == "value_scenarios")
+    variant = _adjustment_variant(bridge, "capital_expenditure", "-30")
+    args = _batch_args(source, bridge, [variant])
+    args["finite_cash_adjustments"] = [
+        {
+            "year": 1,
+            "amount_usd": "-88",
+            "rationale": "Finite cash separate from normalized capex",
+            "evidence_ids": ["assumptions"],
+        }
+    ]
+    result = tool.invoke(args)
+    for saved in list(desk.calculations.values()):
+        assert saved["inputs"]["finite_cash_adjustments"] == args["finite_cash_adjustments"]
+        assert tool.invoke(saved["inputs"]) == saved
+    before = copy.deepcopy(desk.calculations)
+    args["normalization_alternatives"].append(
+        _adjustment_variant(bridge, "cash_taxes", "20", evidence="missing")
+    )
+    with pytest.raises(ValueError):
+        tool.invoke(args)
+    assert desk.calculations == before
+    tampered = copy.deepcopy(result["inputs"])
+    tampered["finite_cash_adjustments"][0]["amount_usd"] = "-89"
+    assert tool.invoke(tampered)["calculation_id"] != result["calculation_id"]
+
+
+def test_valuation_must_cite_distinct_finite_cash_evidence(normalization):
+    desk, source, bridge = normalization
+    finite_source = copy.deepcopy(desk.sources["assumptions"])
+    finite_source["id"] = "finite-payment-original"
+    desk.sources[finite_source["id"]] = finite_source
+    args = _batch_args(source, bridge)
+    args["finite_cash_adjustments"] = [
+        {
+            "year": 1,
+            "amount_usd": "-88",
+            "rationale": "Incremental finite payment",
+            "evidence_ids": [finite_source["id"]],
+        }
+    ]
+    result = next(t for t in desk.tools() if t.name == "value_scenarios").invoke(args)
+    report = {
+        **{key: result[key] for key in ("calculation_id", "bear_value", "base_value", "bull_value")},
+        "method": "Conditional finite cash model; source provenance is not economic approval",
+        "assumptions": ["Unresolved minority entitlement remains a material gap"],
+        "sensitivity": "Finite cash payment excluded from terminal cash",
+        "margin_of_safety": "Unproven",
+        "evidence_ids": [source["id"], "assumptions"],
+    }
+    with pytest.raises(ValueError, match="finite cash adjustment evidence"):
+        desk.validate(Valuation, report)
+    report["evidence_ids"].append(finite_source["id"])
+    assert desk.validate(Valuation, report)["normalization_review"] is None
+    assert desk.validate(Valuation, report)["base_value"] == result["base_value"]
+
+
+def test_finite_cash_evaluation_requires_provenance_and_report_citations(normalization):
+    desk, source, bridge = normalization
+    finite_source = copy.deepcopy(desk.sources["assumptions"])
+    finite_source["id"] = "finite-payment-original"
+    desk.sources[finite_source["id"]] = finite_source
+    args = _batch_args(source, bridge)
+    args["finite_cash_adjustments"] = [
+        {
+            "year": 1,
+            "amount_usd": "-88",
+            "rationale": "Separate finite cash payment",
+            "evidence_ids": [finite_source["id"]],
+        }
+    ]
+    calc = next(t for t in desk.tools() if t.name == "value_scenarios").invoke(args)
+    case = json.loads(Path("evaluations/baseline-v1.json").read_text())["cases"][0]
+    candidate = json.loads(Path("tests/fixtures/evaluation/recording.json").read_text())["cases"][case["id"]]
+    case["inputs"]["sources"] = list(desk.sources.values())
+    case["expected"].update(required_evidence_ids=[source["id"]], cash_flow_per_share="5.000000")
+    candidate["sources"] = []
+    for report in [candidate["decision"], *candidate["reports"].values()]:
+        report["evidence_ids"] = [source["id"], "assumptions", finite_source["id"]]
+    valuation = candidate["reports"]["valuation"]
+    valuation.update({key: calc[key] for key in ("calculation_id", "bear_value", "base_value", "bull_value")})
+    candidate["calculations"] = {calc["calculation_id"]: calc}
+    assert score(case, candidate)["acceptance"] == "pending_human_review"
+    valuation["evidence_ids"].remove(finite_source["id"])
+    assert "unverified_finite_cash_evidence" in score(case, candidate)["failures"]
+    valuation["evidence_ids"].append(finite_source["id"])
+    calc["inputs"]["finite_cash_adjustments"][0]["year"] = 2
+    assert "unverified_financial_provenance" in score(case, candidate)["failures"]
+    calc["inputs"]["finite_cash_adjustments"][0]["year"] = 1
+    case["inputs"]["sources"][-1]["original_source"] = False
+    assert "unverified_financial_provenance" in score(case, candidate)["failures"]

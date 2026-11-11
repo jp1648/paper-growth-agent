@@ -14,6 +14,68 @@ class CompensationPolicyRequired(ValueError):
     """The analyst must explicitly supply a future-service compensation policy."""
 
 
+class FiniteCashAdjustment(Model):
+    """Incremental cash in one forecast year, excluded from terminal cash flow."""
+
+    year: int = Field(strict=True, ge=1, le=10)
+    amount_usd: str
+    rationale: str = Field(min_length=1)
+    evidence_ids: list[str] = Field(min_length=1)
+
+
+def validate_finite_cash_adjustments(rows, years, sources, cutoff, issuer_cik):
+    if not isinstance(issuer_cik, (str, int)) or not str(issuer_cik).isdigit():
+        raise ValueError("Finite cash adjustments require source-bound company identity")
+    result = []
+    for raw in rows:
+        row = FiniteCashAdjustment.model_validate(raw).model_dump(mode="json")
+        if row["year"] > years or not row["rationale"].strip():
+            raise ValueError("Finite cash adjustment requires an in-horizon year and rationale")
+        if row in result:
+            raise ValueError("Duplicate finite cash adjustment")
+        dec(row["amount_usd"])
+        for ref in row["evidence_ids"]:
+            original = sources.get(ref)
+            if not ref.strip() or not original:
+                raise ValueError("Finite cash adjustment requires retained original evidence")
+            url = urlsplit(original.get("url", ""))
+            match = re.fullmatch(
+                r"/Archives/edgar/data/([0-9]+)/[0-9]{18}/[A-Za-z0-9_.-]+\.(?:htm|html|txt)", url.path
+            )
+            if (
+                original.get("source") != "SEC EDGAR filing passage"
+                or original.get("original_source") is False
+                or original.get("available") is False
+                or url.scheme != "https"
+                or url.hostname != "www.sec.gov"
+                or url.port not in {None, 443}
+                or url.username is not None
+                or url.password is not None
+                or not match
+                or int(match[1]) != int(issuer_cik)
+            ):
+                raise ValueError("Finite cash adjustment requires original SEC evidence for this company")
+            if any(original.get(k) and dt(original[k]) > cutoff for k in ("available_at", "published_at")):
+                raise ValueError("Finite cash adjustment cites future evidence")
+            if not isinstance(original.get("content"), str) or not original["content"].strip():
+                raise ValueError("Finite cash adjustment cites empty evidence")
+        result.append(row)
+    return result
+
+
+def valuation_components(inputs, growth):
+    cash, discount = dec(inputs["cash_flow_per_share"]), dec(inputs["discount_rate"])
+    g, years = dec(growth), inputs["years"]
+    annual = sum((cash * (1 + g) ** y / (1 + discount) ** y for y in range(1, years + 1)), dec(0))
+    rows = inputs.get("finite_cash_adjustments", [])
+    if rows:
+        shares = dec(inputs["normalization_bridge"]["valuation_shares"])
+        annual += sum(
+            (dec(row["amount_usd"]) / shares / (1 + discount) ** row["year"] for row in rows), dec(0)
+        )
+    return annual, cash * (1 + g) ** years / (1 + discount) ** years
+
+
 class CashFlowAdjustment(Model):
     category: Literal[
         "cash_taxes",
@@ -417,22 +479,18 @@ def normalization_supported(valuation):
 
 def valuation_diagnostics(inputs, target_price):
     """Sensitivity of already validated scenario inputs; no normalized-value claim."""
-    cash, discount = dec(inputs["cash_flow_per_share"]), dec(inputs["discount_rate"])
     target = dec(target_price)
     if target <= 0:
         raise ValueError("Target price must be positive")
-    years = inputs["years"]
     rows = []
     for growth, multiple in zip(inputs["growth_rates"], inputs["terminal_multiples"], strict=True):
-        g = dec(growth)
-        annual = sum((cash * (1 + g) ** y / (1 + discount) ** y for y in range(1, years + 1)), dec(0))
-        terminal_unit = cash * (1 + g) ** years / (1 + discount) ** years
+        annual, terminal_unit = valuation_components(inputs, growth)
         terminal = terminal_unit * dec(multiple)
         rows.append(
             {
                 "growth_rate": growth,
                 "annual_cash_flows_pv": str(annual),
-                "terminal_value_fraction": str(terminal / (annual + terminal)),
+                "terminal_value_fraction": str(terminal / (annual + terminal)) if annual + terminal else None,
                 "required_terminal_multiple": str((target - annual) / terminal_unit),
                 "values_by_terminal_multiple": {
                     m: str((annual + terminal_unit * dec(m)).quantize(dec(".01")))

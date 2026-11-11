@@ -5186,3 +5186,39 @@ Primary award sources:
 and [2023 award agreement](https://www.sec.gov/Archives/edgar/data/80424/000008042423000103/fy2324q1jas10-qexhibit10x4.htm).
 The private investigation retains exact recorded-cost arithmetic and source review.
 Research acceptance, unseen evaluation and paper-trading activation remain open.
+
+
+### November 11: implemented cash timing, correction admission and $10 ceilings
+
+The user's subsequent implementation instruction supersedes the test-only cap
+plan above: repository defaults, example configuration, local configuration and
+scheduled-study admission now permit $10 per run and $10 per day. A cap is not a
+funding receipt or permission to resume trading. Existing allocations, daily
+charges, the $15 operational credit buffer, pause and acceptance gates still apply.
+Runtime activation is recorded separately after exact-image/config verification.
+
+The valuation tool now accepts up to 20 signed, source-backed cash increments in
+specified forecast years with an explicit normalized share denominator. They are
+discounted once, never carried into terminal cash, and shared across a batch's
+normalization alternatives. Saved inputs, calculation IDs, standalone replay,
+diagnostics and evaluation scoring account for the increments. Empty/omitted
+increments retain legacy results. Invalid batches save no calculations. Sources
+must be retained original SEC passages for the issuer, with cutoff checks;
+valuation reports must cite the incremental-cash evidence. Source existence does
+not establish economic interpretation, tax treatment or freedom from double count.
+Minority entitlement and maximum award claims still require supported analysis.
+
+Correction requests expose the 2,000-character reason limit and return a specific
+length error. Before invalidating reports, admission checks tools, model slots and
+estimated capacity for at least one call to each rebuilt specialist and the final
+lead. It uses recorded peak request bytes per role, falling back to the configured
+maximum when absent, with the existing full-byte/output reservation formula. This
+minimum-tail check is not a completion guarantee: all later calls still face the
+unchanged hard cost/context/tool/time guards. Original reports remain audited and
+fresh critique remains mandatory. No model-call rate assumptions or evidence
+requirements were relaxed.
+
+Validation: the full offline suite passed 1,585 tests with eight external checks
+skipped. Targeted independent reviews covered correction admission, valuation
+arithmetic/replay and cap boundaries. All 17 safety mutations were caught; lint,
+format checks and a redacted diff secret scan passed. No paid research was rerun.

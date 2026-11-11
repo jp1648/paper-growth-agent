@@ -15,6 +15,7 @@ from .financials import (
     capital_expenditure_selection,
     normalization_supported,
     normalized_cash_flow,
+    validate_finite_cash_adjustments,
 )
 from .models import Decision
 from .research_team import Catalysts, Critique, Research, Valuation
@@ -101,6 +102,17 @@ def scenario_values(inputs):
         factor = (1 + growth) / (1 + rate)
         annuity = years if factor == 1 else factor * (1 - factor**years) / (1 - factor)
         value = cash * (annuity + multiple * factor**years)
+        if inputs.get("finite_cash_adjustments"):
+            shares = Decimal(inputs["normalization_bridge"]["valuation_shares"])
+            if not shares.is_finite() or shares <= 0:
+                raise ValueError("Invalid finite cash share denominator")
+            value += sum(
+                (
+                    Decimal(row["amount_usd"]) / shares / (1 + rate) ** row["year"]
+                    for row in inputs["finite_cash_adjustments"]
+                ),
+                Decimal(0),
+            )
         results.append(str(value.quantize(Decimal("0.01"))))
     if list(map(Decimal, results)) != sorted(map(Decimal, results)):
         raise ValueError("Scenario values must be ordered bear/base/bull")
@@ -201,6 +213,21 @@ def score(case, candidate, review=None):
                     )
                     if not set(bridge["evidence_ids"]).issubset(valuation["evidence_ids"]):
                         failures.append("unverified_normalization_evidence")
+                finite_rows = inputs.get("finite_cash_adjustments", [])
+                if finite_rows:
+                    if bridge is None or len(finite_rows) > 20:
+                        raise ValueError("Finite cash adjustments require a bounded normalized bridge")
+                    validate_finite_cash_adjustments(
+                        finite_rows,
+                        inputs["years"],
+                        verified_sources,
+                        timestamp(case["cutoff"]),
+                        originals[source_id]["content"].get("cik"),
+                    )
+                    if not {ref for row in finite_rows for ref in row["evidence_ids"]}.issubset(
+                        valuation["evidence_ids"]
+                    ):
+                        failures.append("unverified_finite_cash_evidence")
                 if (
                     calc.get("financial_provenance") != provenance
                     or calc.get("normalization_bridge") != bridge

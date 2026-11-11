@@ -52,6 +52,7 @@ def test_durable_reservation_cannot_adopt_legacy_or_unknown_spend(env, monkeypat
 def test_durable_resume_rechecks_other_liabilities_and_original_day(env, monkeypatch):
     monkeypatch.setattr("trader.paper_dispatch.funding_gate", lambda *a, **kw: None)
     service, _, _ = env
+    service.cfg.research_max_cost_usd = dec(5)
     monkeypatch.setattr("trader.spending.now", lambda: AT)
     DailyReservation.for_durable_run(service.store, service.cfg, "durable")
     service.store.put(
@@ -92,6 +93,7 @@ def test_durable_funding_checked_inside_reservation_transaction(env, monkeypatch
 
 def test_daily_reservations_survive_restart_and_unknown_usage(env, monkeypatch):
     service, _, _ = env
+    service.cfg.research_max_cost_usd = dec(5)
     cfg = service.cfg
     cfg.research_daily_cost_usd = dec(6)
     pending = DailyReservation(service.store, cfg, "crashed")
@@ -250,6 +252,7 @@ def test_process_timeout_terminates_child(env, monkeypatch):
 @pytest.mark.parametrize("finish_unknown", [False, True])
 def test_uncapped_unknown_cost_survives_day_rollover_and_restart(env, monkeypatch, finish_unknown):
     service, _, _ = env
+    service.cfg.research_max_cost_usd = dec(5)
     reservation = DailyReservation(service.store, service.cfg, "uncapped", unrestricted_research=True)
     if finish_unknown:
         reservation.finish(dec("1.25"), unknown=True)

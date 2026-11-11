@@ -30,7 +30,7 @@ from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import ToolException, tool
 from langchain_openai import ChatOpenAI
 from langsmith import tracing_context
-from pydantic import Field, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter
 
 from .alpaca import safe_error
 from .claims import ClaimsCoverage, claim_gaps, validate_claim_coverage
@@ -40,6 +40,7 @@ from .financials import (
     CashFlowAdjustment,
     CompensationPolicy,
     CompensationPolicyRequired,
+    FiniteCashAdjustment,
     MissingAnnualFact,
     NormalizationBridge,
     annual_cash_flow,
@@ -47,6 +48,8 @@ from .financials import (
     cash_flow_diagnostics,
     normalization_supported,
     normalized_cash_flow,
+    validate_finite_cash_adjustments,
+    valuation_components,
     valuation_diagnostics,
 )
 from .models import Decision, Model, dec, dt, dumps, now
@@ -211,7 +214,8 @@ ROLES = {
             "Use inspect_cash_flow for annual accounting diagnostics when needed, or pass the proposed normalization_bridge directly to value_scenarios; omitted or null cash_flow_per_share derives the exact source/bridge scalar. An explicit scalar must still match. Missing inputs are gaps; derived arithmetic does not establish economic support. If calls run out, name the exact unfinished source reads and arithmetic for the single correction. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Quantify material normalization alternatives with calculation tools as well as growth/multiple sensitivities. When supported alternatives share the same scenarios, batch up to three labeled normalization_alternatives with the main bridge: one full adjustment replacement, a paired tax/working-capital replacement, or a future-service compensation policy replacement. Each needs its own amount, rationale and original evidence; omit cash_flow_per_share for a batch. Vary one supported treatment at a time; do not combine overlapping tax and working-capital recoveries or capitalize a one-time debt maturity as a perpetual annual drain. Preserve the chosen main calculation_id and identify alternatives separately. "
-            "Explain sensitivity and expectations embedded in today's price. If this simplified "
+            "Explain sensitivity and expectations embedded in today's price. "
+            "Use finite_cash_adjustments for sourced incremental cash payments/releases in specific forecast years; explain what is already in the baseline, taxes and timing uncertainty. These amounts never enter terminal cash; do not turn finite restructuring charges or debt maturities into perpetual deductions. Net minority equity movements or earnings alone do not establish cash distributions or terminal ownership. Award counts and plan grant reserves do not establish maximum PSU delivery; inspect applicable terms and dividend equivalents or preserve the gap. Do not invent missing entitlements or label an illustrative bound verified. If the "
             "cash-flow model is inappropriate or inputs are insufficient, return null for calculation_id "
             "and all three values and explain the limitation in method. Never manufacture value."
         ),
@@ -1227,8 +1231,16 @@ class ResearchDesk:
             normalization_bridge: NormalizationBridge | None = None,
             capital_expenditure_source: CapitalExpenditureSource | None = None,
             normalization_alternatives: list[NormalizationAlternative] | None = None,
+            finite_cash_adjustments: list[FiniteCashAdjustment] | None = None,
         ) -> dict:
-            """Decimal DCF: ordered bear/base/bull cases with fractions as rates. Omit cash_flow_per_share for source/bridge arithmetic. With a main bridge, optionally batch up to three labeled, sourced normalization replacements; each receives its own saved calculation. Explicit cash_flow_per_share is main-only. Alternative capex requires cited original-tag selection consistent with the bridge."""
+            """Decimal DCF: ordered bear/base/bull cases with fractions as rates. Omit cash_flow_per_share for source/bridge arithmetic. With a main bridge, optionally batch up to three sourced normalization replacements. Finite cash adjustments are signed incremental USD amounts in forecast years 1..years, shared across scenarios and alternatives, discounted once and excluded from terminal cash. Require a bridge; explain baseline overlap and timing/tax uncertainty. At most 20 entries. Each calculation retains standalone replay inputs. Conditional arithmetic never resolves unsupported claims."""
+            finite_rows = []
+            if finite_cash_adjustments and (
+                normalization_bridge is None or len(finite_cash_adjustments) > 20
+            ):
+                raise ValueError(
+                    "Finite cash adjustments require a normalization bridge and at most 20 entries"
+                )
             if normalization_alternatives:
                 if len(normalization_alternatives) > 3:
                     raise ValueError("At most three normalization alternatives are allowed")
@@ -1261,6 +1273,14 @@ class ResearchDesk:
                     "note": "No calculation created. Report the material evidence gap and unsupported valuation; never infer the missing input.",
                 }
             bridge_result = None
+            if finite_cash_adjustments:
+                finite_rows = validate_finite_cash_adjustments(
+                    finite_cash_adjustments,
+                    years,
+                    financial_sources,
+                    cutoff,
+                    source["content"].get("cik"),
+                )
             if normalization_bridge is not None:
                 with self.lock:
                     bridge_sources = copy.deepcopy(self.sources)
@@ -1313,11 +1333,18 @@ class ResearchDesk:
                     raise ValueError("Invalid valuation assumptions")
                 computed = []
                 for g, multiple in zip(growth, multiples):
-                    total = sum(
-                        (scalar * (1 + g) ** y / (1 + discount) ** y for y in range(1, years + 1)),
-                        dec(0),
-                    )
-                    total += scalar * (1 + g) ** years * multiple / (1 + discount) ** years
+                    inputs = {
+                        "cash_flow_per_share": str(scalar),
+                        "discount_rate": str(discount),
+                        "years": years,
+                    }
+                    if finite_rows:
+                        inputs.update(
+                            finite_cash_adjustments=finite_rows,
+                            normalization_bridge=bridge_result["assumptions"],
+                        )
+                    annual, terminal_unit = valuation_components(inputs, g)
+                    total = annual + terminal_unit * multiple
                     computed.append(str(total.quantize(dec(".01"))))
                 if list(map(dec, computed)) != sorted(map(dec, computed)):
                     raise ValueError("Scenarios must be ordered bear <= base <= bull")
@@ -1344,6 +1371,8 @@ class ResearchDesk:
             if bridge_result is not None:
                 result["normalization_bridge"] = bridge_result
                 result["inputs"]["normalization_bridge"] = bridge_result["assumptions"]
+            if finite_rows:
+                result["inputs"]["finite_cash_adjustments"] = finite_rows
             identifier = "calculation-" + hashlib.sha256(dumps(result).encode()).hexdigest()[:20]
             result["calculation_id"] = identifier
             alternatives = []
@@ -1638,6 +1667,13 @@ class ResearchDesk:
                 )
             ):
                 raise ValueError("Valuation must cite all normalization bridge evidence")
+            finite_refs = {
+                ref
+                for row in (calculation or {}).get("inputs", {}).get("finite_cash_adjustments", [])
+                for ref in row["evidence_ids"]
+            }
+            if not finite_refs.issubset(result["evidence_ids"]):
+                raise ValueError("Valuation must cite all finite cash adjustment evidence")
             if not calculation or any(
                 result[k] != calculation[k] for k in ("bear_value", "base_value", "bull_value")
             ):
@@ -1850,17 +1886,24 @@ class ResearchDesk:
                 self.running.discard(role)
 
     def correction_tool(self):
-        @tool
+        class CorrectionRequest(BaseModel):
+            role: str
+            report_sha256: str
+            reason: str = Field(json_schema_extra={"maxLength": 2000})
+
+        @tool(args_schema=CorrectionRequest)
         def request_correction(role: str, report_sha256: str, reason: str) -> dict:
             """Request the investigation's one correction cycle after all reports. Name business, catalysts or valuation, its current report hash, and the specific material defect. Rebuild invalidated reports in fixed prerequisite order, including a fresh critique. No budget is reset."""
             with self.lock:
+                if not reason.strip() or len(reason) > 2000:
+                    raise ToolException(
+                        "Correction reason must contain 1–2000 characters of specific material defects."
+                    )
                 if (
                     self.correction is not None
                     or self.running
                     or set(self.reports) != set(ROLES)
                     or role not in {"business", "catalysts", "valuation"}
-                    or not reason.strip()
-                    or len(reason) > 2000
                     or report_sha256 != hashlib.sha256(dumps(self.reports[role]).encode()).hexdigest()
                 ):
                     raise ToolException(
@@ -1879,6 +1922,30 @@ class ResearchDesk:
                         raise ToolException(
                             "Correction unavailable: insufficient remaining calls to rebuild required reports."
                         )
+                    if not self.budget.unrestricted_research:
+                        tail_roles = [*invalidated, "research_lead"]
+                        if self.cfg.research_max_model_calls - self.budget.models < len(tail_roles):
+                            raise ToolException(
+                                "Correction unavailable: insufficient remaining model calls for corrected reports, fresh critique and final decision."
+                            )
+                        minimum_tail = dec(0)
+                        for name in tail_roles:
+                            sizes = [
+                                event["total_bytes"]
+                                for kind, event in self.budget.events
+                                if kind == "research_context" and event["role"] == name
+                            ]
+                            size = max(sizes) if sizes else self.cfg.research_max_input_bytes
+                            route = self.cfg.research_model(name)
+                            minimum_tail += (
+                                dec(size + 2048) * route.input_cost_per_million
+                                + dec(self.cfg.research_max_output_tokens) * route.output_cost_per_million
+                            ) / dec(1000000)
+                        # Minimum-tail preflight only; extra calls/context growth still face every hard guard.
+                        if self.budget.reserved + minimum_tail > self.budget.limit:
+                            raise ToolException(
+                                "Correction unavailable: insufficient remaining estimated cost for the minimum corrected-report, fresh-critique and final-decision tail."
+                            )
                     extra = max(0, remaining - sum(minimum.values()))
                     share, remainder = divmod(extra, len(invalidated))
                     allocations = {

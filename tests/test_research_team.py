@@ -2444,7 +2444,7 @@ def test_correction_invalidates_dependents_preserves_originals_and_rejects_repla
     from trader.models import dumps
     from trader.research_team import ROLES
 
-    cfg = Settings()
+    cfg = Settings(input_cost_per_million=2, output_cost_per_million=10)
     provider = Evidence()
     desk = ResearchDesk(
         cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
@@ -2513,7 +2513,7 @@ def test_correction_reallocates_only_remaining_shared_tools(spent, expected, mon
     from trader.models import dumps
     from trader.research_team import ROLES, Guard
 
-    cfg = Settings(research_max_tool_calls=64)
+    cfg = Settings(research_max_tool_calls=64, input_cost_per_million=2, output_cost_per_million=10)
     budget = Budget(cfg)
     budget.tools = spent
     budget.role_tool_calls = {"valuation": 14, "adversarial": 10}
@@ -2809,7 +2809,7 @@ def test_initial_guards_with_optional_transfer_retain_complete_repair_capacity(
     from trader.models import dumps
     from trader.research_team import CORRECTION_TOOLS, ROLES, Guard
 
-    cfg = Settings(research_max_tool_calls=64)
+    cfg = Settings(research_max_tool_calls=64, input_cost_per_million=2, output_cost_per_million=10)
     budget = Budget(cfg)
     provider = Evidence()
     desk = ResearchDesk(
@@ -3055,3 +3055,115 @@ def test_cash_flow_transcription_mismatch_requires_new_exact_request():
     with pytest.raises(ValueError, match="Unknown financial evidence"):
         tool.invoke({**args, "financial_source_id": "invented", "cash_flow_per_share": None})
     assert len(desk.calculations) == 1 and desk.sources == originals
+
+
+@pytest.mark.parametrize("reason", ["x" * 2000, "x" * 2001, " " * 3], ids=["boundary", "too-long", "blank"])
+def test_correction_reason_schema_boundary_and_diagnostic(reason, monkeypatch):
+    import copy
+    import hashlib
+
+    from trader.models import dumps
+    from trader.research_team import ROLES
+
+    cfg = Settings(input_cost_per_million=2, output_cost_per_million=10)
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    desk.reports = {name: {"role": name} for name in ROLES}
+    before = copy.deepcopy(desk.reports)
+    monkeypatch.setattr(desk, "dispatch_roles", lambda *args: None)
+    tool = desk.correction_tool()
+    assert tool.get_input_schema().model_json_schema()["properties"]["reason"]["maxLength"] == 2000
+    args = {
+        "role": "valuation",
+        "report_sha256": hashlib.sha256(dumps(before["valuation"]).encode()).hexdigest(),
+        "reason": reason,
+    }
+    if len(reason) == 2000:
+        assert "invalidated" in tool.invoke(args)
+    else:
+        result = tool.invoke(args)
+        assert "reason must contain 1–2000" in result and "stale" not in result
+        assert desk.reports == before and desk.correction is None
+        assert desk.budget.correction_tool_limits == {}
+    assert "stale report hash" in tool.invoke({**args, "reason": "Repair claim", "report_sha256": "stale"})
+
+
+@pytest.mark.parametrize("missing", ["cost", "models", "tools"])
+def test_correction_minimum_tail_rejects_without_invalidating_reports(missing, monkeypatch):
+    import copy
+    import hashlib
+
+    from trader.models import dec, dumps
+    from trader.research_team import ROLES
+
+    cfg = Settings(research_max_cost_usd=1, input_cost_per_million=5, output_cost_per_million=10)
+    budget = Budget(cfg)
+    budget.events = [
+        ("research_context", {"role": role, "total_bytes": 10000})
+        for role in ("valuation", "adversarial", "research_lead")
+    ]
+    budget.reserved = dec("0.8") if missing == "cost" else dec(0)
+    budget.models = cfg.research_max_model_calls - 2 if missing == "models" else 0
+    budget.tools = cfg.research_max_tool_calls if missing == "tools" else 0
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    desk.reports = {name: {"role": name} for name in ROLES}
+    desk.report_times = {name: now().isoformat() for name in ROLES}
+    before = copy.deepcopy(
+        (
+            desk.reports,
+            desk.report_times,
+            {"models": budget.models, "tools": budget.tools, "reserved": budget.reserved},
+        )
+    )
+    monkeypatch.setattr(desk, "dispatch_roles", lambda *args: pytest.fail("Rejected correction dispatched"))
+    result = desk.correction_tool().invoke(
+        {
+            "role": "valuation",
+            "report_sha256": hashlib.sha256(dumps(desk.reports["valuation"]).encode()).hexdigest(),
+            "reason": "Repair claim",
+        }
+    )
+    assert "insufficient remaining" in result
+    assert desk.reports == before[0] and desk.report_times == before[1]
+    assert desk.correction is None and budget.correction_tool_limits == {}
+    assert budget.models == before[2]["models"] and budget.tools == before[2]["tools"]
+    assert budget.reserved == before[2]["reserved"] and not budget.failed
+
+
+def test_correction_minimum_tail_uses_peak_context_and_falls_back_closed(monkeypatch):
+    import hashlib
+
+    from trader.models import dec, dumps
+    from trader.research_team import ROLES
+
+    cfg = Settings(research_max_cost_usd=1, input_cost_per_million=5, output_cost_per_million=10)
+    budget = Budget(cfg)
+    budget.reserved = dec("0.6")
+    budget.events = [
+        ("research_context", {"role": role, "total_bytes": size})
+        for role in ("valuation", "adversarial", "research_lead")
+        for size in (100, 10000)
+    ]
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), budget, None
+    )
+    desk.reports = {name: {"role": name} for name in ROLES}
+    args = {
+        "role": "valuation",
+        "report_sha256": hashlib.sha256(dumps(desk.reports["valuation"]).encode()).hexdigest(),
+        "reason": "Repair claim",
+    }
+    monkeypatch.setattr(desk, "dispatch_roles", lambda *args: None)
+    # Recorded 10k peaks need .27072 total; missing lead context uses full180k and cannot fit.
+    saved = budget.events.pop()
+    budget.events = [event for event in budget.events if event[1]["role"] != "research_lead"]
+    assert "minimum corrected-report" in desk.correction_tool().invoke(args)
+    assert desk.correction is None and set(desk.reports) == set(ROLES)
+    budget.events.append(saved)
+    assert desk.correction_tool().invoke(args)["invalidated"] == ["valuation", "adversarial"]
