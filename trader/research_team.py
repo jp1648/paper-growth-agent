@@ -1716,6 +1716,17 @@ class ResearchDesk:
         calculations = copy.deepcopy(self.calculations)
         for identifier, calculation in calculations.items():
             bridge = calculation.get("normalization_bridge")
+            inputs = calculation.get("inputs")
+            if (
+                isinstance(bridge, dict)
+                and isinstance(inputs, dict)
+                and isinstance(bridge.get("assumptions"), dict)
+                and inputs.get("normalization_bridge") == bridge["assumptions"]
+            ):
+                inputs["normalization_bridge"] = {
+                    "same_as": "normalization_bridge.assumptions",
+                    "note": f"Final-context projection only; read_source({identifier}) returns the full saved calculation.",
+                }
             if (
                 isinstance(bridge, dict)
                 and "financial_provenance" in calculation

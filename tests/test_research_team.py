@@ -1707,6 +1707,60 @@ def test_final_context_projects_only_identical_calculation_provenance():
     assert len(dumps(context["calculations"])) < len(dumps(original))
 
 
+def test_final_context_projects_only_identical_bridge_assumptions():
+    import copy
+
+    cfg = Settings()
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    assumptions = {
+        "adjustments": [{"category": "cash_taxes", "evidence_ids": ["fixture-sec"]}] * 80,
+        "share_evidence_ids": ["fixture-sec"],
+    }
+    desk.calculations = {
+        "calculation-equal": {
+            "calculation_id": "calculation-equal",
+            "inputs": {"normalization_bridge": copy.deepcopy(assumptions)},
+            "normalization_bridge": {"assumptions": copy.deepcopy(assumptions)},
+        },
+        "calculation-unequal": {
+            "calculation_id": "calculation-unequal",
+            "inputs": {"normalization_bridge": {"adjustments": []}},
+            "normalization_bridge": {"assumptions": copy.deepcopy(assumptions)},
+        },
+    }
+    desk.reports["valuation"] = {
+        "calculation_id": "calculation-equal",
+        "evidence_ids": ["fixture-sec"],
+    }
+    original = copy.deepcopy(desk.calculations)
+    context = desk.final_context()
+    equal = context["calculations"]["calculation-equal"]
+    assert equal["inputs"]["normalization_bridge"]["same_as"] == "normalization_bridge.assumptions"
+    assert "read_source(calculation-equal)" in equal["inputs"]["normalization_bridge"]["note"]
+    restored = copy.deepcopy(equal)
+    restored["inputs"]["normalization_bridge"] = copy.deepcopy(
+        restored["normalization_bridge"]["assumptions"]
+    )
+    assert restored == original["calculation-equal"]
+    assert context["calculations"]["calculation-unequal"] == original["calculation-unequal"]
+    assert {source["id"] for source in context["evidence"]} == {"fixture-sec"}
+    reader = next(tool for tool in desk.tools() if tool.name == "read_source")
+    pages = []
+    offset = 0
+    while True:
+        page = reader.invoke({"source_id": "calculation-equal", "offset": offset})
+        pages.append(page["content"])
+        if page["next_offset"] is None:
+            break
+        offset = page["next_offset"]
+    assert json.loads("".join(pages)) == original["calculation-equal"]
+    assert desk.calculations == original
+    assert desk.final_context()["calculations"] == context["calculations"]
+
+
 def test_filing_search_is_bounded_navigation_then_citable_read():
     cfg = Settings()
     provider = Evidence()
