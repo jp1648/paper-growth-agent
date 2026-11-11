@@ -338,6 +338,7 @@ def test_operator_runtime_full_stages_with_real_funding_gate(
     from trader.research_workflow import STAGES
 
     service, _, _ = env
+    service.cfg.research_max_cost_usd = dec(10)
     service.cfg.input_cost_per_million = service.cfg.output_cost_per_million = dec(1)
     model = TeamModel(
         decision={
