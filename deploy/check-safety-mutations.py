@@ -20,7 +20,7 @@ MUTATIONS = {
     ),
     "financial_basis": (
         "trader/research_team.py",
-        "if dec(cash_flow_per_share) != dec(required_cash):",
+        "if cash_flow_per_share is not None and dec(cash_flow_per_share) != dec(required_cash):",
         "if False:",
     ),
     "reservation": ("trader/service.py", "        return amount\n", "        return ZERO\n"),
