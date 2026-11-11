@@ -121,6 +121,13 @@ class ResearchStages:
                 old = self._receipt(store, stage)
                 if old is not None:
                     return old
+                if store.db.execute(
+                    "SELECT 1 FROM documents WHERE scope='global' AND kind='research_spend' "
+                    "AND json_extract(body,'$.run_key')=? AND json_extract(body,'$.experiment_id')=? "
+                    "AND json_extract(body,'$.outcome')='aborted_accounted' LIMIT 1",
+                    (self.context["run_key"], store.scope),
+                ).fetchone():
+                    raise StageConfigurationError("Accounting-closed research cannot resume")
                 self._require_predecessor(store, stage)
                 if stage == "commit" and self._settled_commit_exists(store, journal):
                     return self._save_receipt(store, stage, {"status": "complete"})
@@ -508,6 +515,8 @@ class ResearchStages:
         if len(records) != 1:
             raise StageConfigurationError("Committed research has no unique spending record")
         record = records[0]
+        if record.get("outcome") == "aborted_accounted":
+            raise StageConfigurationError("Accounting-closed research cannot publish a commit receipt")
         if not record.get("durable") or record.get("config_sha256") != fingerprint(self.cfg):
             raise StageConfigurationError("Committed research spending identity changed")
         if record.get("status") == "unknown" or record.get("unknown_total"):

@@ -221,11 +221,7 @@ def close_expired_run(cfg, store_path, root, reference):
     store = Store(store_path)
     try:
         manifest = load_manifest(root, reference, cfg, store.scope)
-        if (
-            store.get(f"research_stage_receipt:{reference['run_key']}:commit", "research_stage_receipt")
-            or store.get(reference["run_key"], "research_result")
-            or store.get(reference["run_key"], "research_audit")
-        ):
+        if store.get(f"research_stage_receipt:{reference['run_key']}:commit", "research_stage_receipt"):
             raise AccountingEvidenceError("Completed research cannot use aborted-run accounting")
         path = run_directory(root, reference["run_key"]) / "operations.sqlite"
         if not path.is_file() or path.is_symlink():
@@ -236,18 +232,6 @@ def close_expired_run(cfg, store_path, root, reference):
             if receipt is not None:
                 return _apply_receipt(store, cfg, reference, manifest["binding"], receipt)
             evidence = journal.accounting_evidence()
-            try:
-                phase, kind, role, identity = json.loads(evidence["key"])
-            except (ValueError, TypeError) as exc:
-                raise AccountingEvidenceError("Pending operation is not a model call") from exc
-            if (
-                kind != "model"
-                or phase not in {"initial", "correction"}
-                or role not in {*ROLES, "research_lead"}
-                or not isinstance(identity, str)
-                or not identity
-            ):
-                raise AccountingEvidenceError("Pending operation is not a model call")
             rows = store.db.execute(
                 "SELECT key,body FROM documents WHERE scope='global' AND kind='research_spend' "
                 "AND json_extract(body,'$.run_key')=? AND json_extract(body,'$.experiment_id')=?",
@@ -268,11 +252,62 @@ def close_expired_run(cfg, store_path, root, reference):
             ):
                 raise AccountingEvidenceError("Durable reservation is not expired and unchanged")
             prestate = evidence["prestate"]
-            if not isinstance(prestate, dict) or not isinstance(prestate.get("budget"), dict):
+            budget = (
+                prestate.get("budget", prestate.get("acquisition_budget"))
+                if isinstance(prestate, dict)
+                else None
+            )
+            if isinstance(budget, dict):
+                prior_cost, prior_known = _prior_cost(budget, cfg, record)
+            elif prestate is None and evidence["key"] is None:
+                # No checkpoint means no Budget was constructed. Only an empty
+                # operation/dispatch/exchange journal proves zero usage.
+                prior_cost, prior_known = dec(0), evidence["no_activity"]
+            else:
                 raise AccountingEvidenceError("Pending operation lacks immutable Budget prestate")
-            prior_cost, prior_known = _prior_cost(prestate["budget"], cfg, record)
-            usage, active = _current_usage(evidence, cfg, role)
-            known = prior_known and usage is not None
+            result = store.get(reference["run_key"], "research_result")
+            audit = store.get(reference["run_key"], "research_audit")
+            usage = active = None
+            publication = None
+            if result is not None or audit is not None:
+                if not isinstance(prestate, dict):
+                    raise AccountingEvidenceError("Partial final publication lacks frozen commit state")
+                hashes = prestate.get("desk", {}).get("continuation", {}).get("commit_hashes")
+                if (
+                    evidence["key"] is not None
+                    or not isinstance(result, dict)
+                    or not isinstance(audit, dict)
+                    or result.get("decision", {}).get("symbol") != manifest["context"]["symbol"]
+                    or audit.get("symbol") != manifest["context"]["symbol"]
+                    or hashes != {"result": fingerprint(result), "audit": fingerprint(audit)}
+                    or not prior_known
+                    or dec(audit.get("estimated_usd")) != prior_cost
+                ):
+                    raise AccountingEvidenceError("Partial final publication differs from frozen commit")
+                publication = "partial_final_verified"
+                known = True
+            elif evidence["key"] is None:
+                known = prior_known
+            else:
+                try:
+                    parts = json.loads(evidence["key"])
+                except (ValueError, TypeError) as exc:
+                    raise AccountingEvidenceError("Pending operation identity is malformed") from exc
+                if (
+                    isinstance(parts, list)
+                    and len(parts) == 4
+                    and parts[0] in {"initial", "correction"}
+                    and parts[1] == "model"
+                    and parts[2] in {*ROLES, "research_lead"}
+                    and isinstance(parts[3], str)
+                    and parts[3]
+                ):
+                    usage, active = _current_usage(evidence, cfg, parts[2])
+                    known = prior_known and usage is not None
+                else:
+                    # SEC/news/X or another incomplete tool may have been sent.
+                    # Its outcome is not proven from the frozen model budget.
+                    known = False
             known_cost = prior_cost + (usage["cost"] if usage else dec(0))
             allowance = dec(record["durable_allowance"])
             receipt = {
@@ -299,6 +334,7 @@ def close_expired_run(cfg, store_path, root, reference):
                 "status": "settled" if known else "unknown",
                 "unknown_total": not known,
                 "outcome": "aborted_accounted",
+                "publication": publication,
                 "closed_at": now(),
             }
             receipt = journal.record_accounting_receipt(receipt)

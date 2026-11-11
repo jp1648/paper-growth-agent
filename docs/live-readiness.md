@@ -4853,3 +4853,51 @@ paid retry. The change is not deployed. PG9 used 47 initial and 17 correction ca
 the combined record includes a critic-run valuation diagnostic, but still lacks
 the required quantified alternatives. The next task is reducing repeated source
 navigation without weakening independent critique or inventing economic support.
+
+### November 11: Temporal recovery deployment, trading still paused
+
+Resumable research is now layered over the existing Deep Agents/LangGraph stages.
+The private Temporal coordinator uses dedicated Cloud SQL databases; the worker
+and dispatcher use the verified `bc923bb7a7c3` image. Startup, orderly shutdown,
+server restart, stage receipt replay and abrupt fixture-container death were
+tested on the executor. After SIGKILL, a fresh container completed the same
+seven-stage fixture run without repeating acquisition or completed business work,
+with one spending record and no execution artifacts. Detailed evidence and
+limitations are recorded in [resumable-research.md](resumable-research.md).
+
+The offline suite passed 1,532 tests with eight skips before deployment. Post-cutover
+checks preserved the original experiment and pause, all 62 spending records, both
+research results and zero order intents. No paid research or trade was started.
+The worker is enabled, but there is no active study or pending research submission.
+Unknown provider outcomes still require reconciliation; Temporal does not make a
+provider call inherently idempotent or renew an expired spending allowance.
+
+This does not repair PG9's investment-quality gaps or establish a $6-fit corrected
+path. The exact original-response/audit verifier was rerun successfully after
+deployment. The deployed identical-bridge projection still estimates $6.1182525
+for the retained failed path, above $6. Next work remains the bounded offline
+correction working-set design, followed by independent economic review. The
+remaining $3.108025 testing allocation cannot reserve another $6 run; the separate
+$15 buffer is preserved. Held-AAPL acceptance, unseen evaluation and current
+opening evidence remain incomplete. No additional paid retry is authorized.
+
+The user's current Codex stop point is 35% total weekly usage (superseding the
+historical 25% entry above); the latest observed meter is 34%. API budgets are
+unchanged.
+
+The final Temporal integration review additionally found two expiry-accounting
+gaps: an original reservation can remain stuck after a between-stage/non-model
+interruption, or after result/audit writes but before spending settlement. These
+remain engineering blockers to declaring recovery complete. Fixes must close the
+original accounting record without rerunning research, discarding unknown source
+liabilities, or exposing an unverified completion receipt. Fixture crash recovery
+does not substitute for production funding/dispatcher acceptance.
+
+### November 11: resumed with 50% Codex usage ceiling
+
+The user authorized work through 50% total weekly Codex usage; API dollar limits
+remain unchanged. The resumed meter read 35%. The expiry-accounting fixes passed
+the full offline suite (1,546 passed, eight skipped). Independent review found an
+additional pre-reservation legacy fallback gap; durable request/workflow/submission
+markers now block it, with three added regressions. These final changes are local
+and require deployment verification. No paid research or orders were started.

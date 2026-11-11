@@ -333,6 +333,7 @@ class TemporalResearchClient:
             spend.get("status") != "settled"
             or spend.get("unknown_total")
             or not spend.get("durable")
+            or spend.get("outcome") == "aborted_accounted"
             or spend.get("config_sha256") != manifest["binding"]["config_sha256"]
             or dec(spend["usd"]) != dec(audit["estimated_usd"])
         ):

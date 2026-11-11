@@ -2,7 +2,8 @@
 
 Temporal coordinates durable research stages around the existing Deep Agents /
 LangGraph research team. It does not submit broker orders or activate trading.
-This implementation has not been deployed or accepted end to end yet.
+Services are deployed with trading paused. Fixture recovery checks passed, but
+paid end-to-end production research acceptance is not established.
 
 ## Boundaries
 
@@ -79,9 +80,9 @@ Supervised acceptance also starts or polls this path when Temporal is configured
 it releases account locks while research continues and does not rewrite the pause.
 Its worker uses the frozen configured limits, without legacy per-call overrides.
 The default server address is
-loopback; remote connections require TLS. Production server authentication,
-persistent storage, backups and deployment are still outstanding. Do not expose
-a development server or use it as production infrastructure.
+loopback; remote connections require TLS. The deployed server is accessible only on host loopback and uses dedicated Cloud SQL
+storage. Do not expose its unauthenticated frontend; remote access requires a separate
+authentication and TLS design. Multi-host recovery and restore acceptance remain separate checks.
 
 `inspect` reads an existing private operation journal under its exclusive lease,
 without contacting Temporal or a provider. It returns completed-operation count,
@@ -124,10 +125,14 @@ qualify for this recovery path.
   passed; the exported locked runtime dependencies had no known vulnerabilities
   reported by pip-audit 2.10.1. These are local results, not deployed acceptance.
 
-Still required: final independent review of crash and authority boundaries, safe
-ambiguous-operation resolution beyond verified non-dispatch, persistent
-production deployment and deployed recovery acceptance. No paid research or
-broker orders have been run to validate this implementation.
+Independent review identified expiry-accounting gaps between operations, during
+non-model requests and after partial final publication. The local fixes close the
+original reservation using saved usage, or retain the full unknown allowance.
+An empty journal alone can prove zero usage before the first checkpoint. Closed
+runs cannot gain a commit receipt or enter the legacy research path; durable
+submission markers also block legacy fallback before reservation. Focused regressions
+pass; these final fixes are not yet deployed.
+No paid research or broker orders have been run to validate this implementation.
 
 After a research deadline expires, use
 `uv run python -m trader.research_runtime close-accounting --run-key RUN --manifest-hash HASH`
@@ -144,7 +149,8 @@ Deployment image inspected locally: `temporalio/server:1.32.2` at
 `sha256:7bf69188a6232fea14869b9cef3d94aa82a1601d99517f7e86c71f22da4e0670`.
 It requires an explicit server config file; the image contains no legacy
 `/etc/temporal/config` directory. Environment variables alone did not produce a
-usable server configuration. No production service has been started.
+usable server configuration. This initial image inspection preceded the permanent
+deployment recorded below.
 
 `deploy/temporal-server.yaml` renders against that pinned image with required
 database credentials, four history shards, two connections per SQL pool and

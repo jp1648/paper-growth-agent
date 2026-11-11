@@ -1,7 +1,51 @@
 from types import SimpleNamespace
 
+import pytest
+
+from trader.research import build_graph
 from trader.research_client import ResearchPending
 from trader.runner import Runner
+
+
+@pytest.mark.parametrize("outcome", ["reserved", "aborted_accounted", "complete"])
+@pytest.mark.parametrize("cached", [False, True])
+def test_legacy_graph_cannot_reuse_durable_run(env, outcome, cached):
+    service, _, _ = env
+    key = "durable-only"
+    service.store.put(
+        key,
+        {
+            "run_key": key,
+            "experiment_id": service.store.scope,
+            "durable": True,
+            "outcome": outcome,
+        },
+        "research_spend",
+        scope="global",
+    )
+    if cached:
+        service.store.put(key, {"decision": {"symbol": "ACME"}}, "research_result")
+    team = SimpleNamespace(run=lambda *a, **kw: pytest.fail("model run"))
+    graph = build_graph(service, team)
+    with pytest.raises(ValueError, match="verified Temporal workflow"):
+        graph.invoke({"symbol": "ACME", "run_key": key, "research_only": True})
+    assert service.store.get(key, "research_committed") is None
+    assert service.store.get("ACME", "thesis") is None
+    assert service.store.get(key, "order_intent") is None
+
+
+@pytest.mark.parametrize("kind", ["research_request", "research_workflow", "research_workflow_submission"])
+def test_legacy_graph_cannot_run_before_durable_reservation(env, kind):
+    service, _, _ = env
+    service.reconcile()
+    key = "durable-before-reservation"
+    service.store.put(key, {"run_key": key}, kind)
+    team = SimpleNamespace(run=lambda *a, **kw: pytest.fail("model run"))
+    with pytest.raises(ValueError, match="verified Temporal workflow"):
+        build_graph(service, team).invoke({"symbol": "ACME", "run_key": key, "research_only": True})
+    assert service.store.get(key, "research_committed") is None
+    assert service.store.get("ACME", "thesis") is None
+    assert service.store.get(key, "order_intent") is None
 
 
 def test_runner_preserves_and_drains_exact_pending_invocation(env, monkeypatch):

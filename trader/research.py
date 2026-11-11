@@ -157,6 +157,19 @@ def build_graph(service, team, *, research_client=None):
         }
 
     def research(s):
+        if research_client is None and (
+            any(
+                store.get(s["run_key"], kind) is not None
+                for kind in ("research_request", "research_workflow", "research_workflow_submission")
+            )
+            or store.db.execute(
+                "SELECT 1 FROM documents WHERE scope='global' AND kind='research_spend' "
+                "AND json_extract(body,'$.run_key')=? AND json_extract(body,'$.experiment_id')=? "
+                "AND json_extract(body,'$.durable')=1 LIMIT 1",
+                (s["run_key"], store.scope),
+            ).fetchone()
+        ):
+            raise ValueError("Durable research requires its verified Temporal workflow")
         if research_client is not None:
             reference = research_client.reference_for(s)
             if reference is not None:

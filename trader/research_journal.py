@@ -334,8 +334,26 @@ class Journal:
             pending = db.execute(
                 "SELECT key,request_hash,state_type,state FROM operations WHERE status='pending'"
             ).fetchall()
+            if not pending:
+                no_activity = all(
+                    db.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 0
+                    for table in (
+                        "operations",
+                        "provider_dispatches",
+                        "provider_exchanges",
+                        "non_dispatch_resolutions",
+                    )
+                )
+                return {
+                    "key": None,
+                    "request_hash": None,
+                    "prestate": self.load_state(),
+                    "exchanges": [],
+                    "prior_attempts_proven_non_dispatch": True,
+                    "no_activity": no_activity,
+                }
             if len(pending) != 1:
-                raise JournalError("Accounting close requires exactly one pending operation")
+                raise JournalError("Accounting close requires at most one pending operation")
             key, request_hash, state_type, state_payload = pending[0]
             dispatches = db.execute(
                 "SELECT attempt,request_hash,client_request_id,payload_type,payload,payload_hash "
