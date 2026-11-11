@@ -4941,3 +4941,47 @@ usage ceiling does not authorize more API spending. Renew funding evidence and
 obtain an explicit allocation increase before that experiment. Keep the $15 buffer,
 original history and trading pause. The unseen evaluation, held-position review
 and current opening safety evidence still follow successful development acceptance.
+
+### November 11: one additional bounded validation authorized
+
+The user explicitly approved adding $3 from existing API credits for one run
+capped at $6, with no automatic retry. A refreshed provider credit-grants view
+showed $159.69 available, expiring November 29. Funding conservatively retains
+only $29.74 of available credit (the lower previous balance after all subsequent
+local charges), keeps the $15 buffer, and replaces the old allocation with exactly
+its unspent $3.108025 plus the authorized $3. The original allocation and all 62
+spending records remain preserved; the replacement is not a replenishment of
+past spending. Its installed remaining allowance is $6.108025.
+
+Candidate `a4a1831` passed both GitHub check runs and is deployed as image
+`sha256:5a3af4a6f58d3f3e6c631e5e10c969299b0e8c8524a97ff9185046dc798a65f0`.
+All 49 installed source/dependency hashes match. Four services are active with
+zero restarts. The original experiment, configuration, trading pause, spending,
+research results and execution history were unchanged across deployment.
+The funding installer passed a transaction-rollback dry run and rejects optimized
+Python before reading its inputs. The next PG case remains an observed development
+regression, not a fresh unseen holdout; no research acceptance follows from deployment.
+
+PG10 (`annual-testing-pg-full-regression-20261111-10`) completed its single
+attempt on November 11 at 19:55:41 UTC, but failed research acceptance. Recorded
+model cost settled at $5.0162100, with zero unknown-cost calls or outstanding
+reservations. It used 44 model calls and 60 tools in 261.83 seconds. The batch
+valuation tool worked against the real model path and saved a main calculation
+plus one reinvestment alternative. It did not close the economic gaps.
+
+The lead requested correction of the earliest incomplete business prerequisite:
+minority claims/distributions, unread financing and geographic disclosures, award
+terms and plan-limit discrepancies, and links between business performance,
+valuation and holding horizon. Dependent valuation and critique required rebuilding.
+During valuation correction the next-call reserve would have reached $6.0559300,
+so the unchanged $6 guard stopped it. Context was 195,896/240,000 bytes and model
+calls 44/60; those ceilings were not the stopping cause. Only business/catalyst
+reports remained accepted in the failed recording; no final decision was produced.
+
+The one-run allocation automatically changed to `completed_one_time_authorization`.
+Its unspent accounting remainder is $1.0918150, not authorization for another run.
+All 62 preexisting spending rows are unchanged, the new row is settled, and exact
+execution-history comparisons show no new or modified intents, orders, activities,
+acceptances or adjustments. Trading stays paused with no active study. No retry
+was performed. This observed development regression does not satisfy unseen,
+held-position, paper-opening or live-money acceptance requirements.
