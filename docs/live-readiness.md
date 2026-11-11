@@ -4997,3 +4997,35 @@ and award terms. The next offline task is earlier, decision-material source
 inspection and bounded conditional treatments, not another blind paid retry or a
 5.6-cent cap increase: revised valuation, renewed critique and the final lead
 response were all still outstanding.
+
+### November 11: offline sequencing instructions revised after PG10
+
+The next candidate changes role assignments rather than adding stages or tools.
+Business research prioritizes operating/geographic and financing/ownership
+prerequisites and hands dated terms and original passage IDs to valuation.
+Valuation inspects those questions before choosing cash-flow/share assumptions,
+reuses retained arithmetic, and either resolves a question, supports a conditional
+bound, or preserves its gap. The critic names the disputed treatment, original
+source/missing disclosure and required comparison for a material repair.
+
+The lead no longer treats every unread business page as grounds for a broad
+upstream rebuild. It targets the earliest report whose decision-material findings
+actually require changing and budgets for dependent reports, fresh critique and
+final synthesis. Corrections retain supported work while allowing rereads of
+contested originals. Unavailable terms cannot be invented or treated as zero;
+material gaps and all existing acceptance gates remain. Both synchronous and
+Temporal stage execution already use these same role instructions. The fixed
+stage order, invalidation rules, counters, evidence schemas and dollar limits
+were not changed.
+
+Offline substitution into all 45 recorded PG10 model requests preserved tool
+schemas and original tool messages; the largest projected request was 215,350
+bytes, below 240,000. Repeating the old path would add 15,652 input bytes in total:
+this measurement does not predict behavioral improvement or cost savings. The
+candidate has not been deployed or tested with paid model calls. PG10's original
+failed result, one-run authorization closeout and trading pause remain unchanged.
+
+Validation: the full offline suite passed (1,560 tests, 8 skipped). Independent
+review found no weakened gates; its final clarity suggestion to explicitly retain
+catalyst findings as valuation inputs was applied. The focused research suite was
+rerun after that wording change. No new paid research or broker action occurred.
