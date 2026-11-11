@@ -4901,3 +4901,8 @@ the full offline suite (1,546 passed, eight skipped). Independent review found a
 additional pre-reservation legacy fallback gap; durable request/workflow/submission
 markers now block it, with three added regressions. These final changes are local
 and require deployment verification. No paid research or orders were started.
+
+The final recovery fixes are now deployed as `b1d0510` (image digest recorded in
+resumable-research.md). Independent review closed the expiry and legacy-fallback
+findings. Cloud fixture recovery passed; all original state and the trading pause
+were verified unchanged after restart. Production research acceptance remains open.

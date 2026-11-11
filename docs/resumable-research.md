@@ -131,7 +131,7 @@ original reservation using saved usage, or retain the full unknown allowance.
 An empty journal alone can prove zero usage before the first checkpoint. Closed
 runs cannot gain a commit receipt or enter the legacy research path; durable
 submission markers also block legacy fallback before reservation. Focused regressions
-pass; these final fixes are not yet deployed.
+pass; these final fixes were deployed as `b1d0510` after independent review.
 No paid research or broker orders have been run to validate this implementation.
 
 After a research deadline expires, use
@@ -316,3 +316,14 @@ Backups of config, old image setting and a consistent ledger snapshot are under
 verified identical experiment data, pause content, all 62 spending records, both
 research results, and zero order intents. No paid research or orders were started.
 Evidence: `state/temporal-verification/paused-cutover.json`.
+
+November 11 recovery-fix release `b1d0510`: Cloud Build succeeded; all 49 installed
+source/dependency file hashes match the committed build. Image digest
+`sha256:db4262f6e192729c99edc70bae71393ae92603891d1340c96fa508381787e498`
+is now used by the worker and dispatcher. The seven-stage cloud fixture passed
+again using simulated providers and isolated storage. Original experiment, pause,
+configuration, 62 spending records, two research results and zero order intents
+were preserved across deployment. All four services are running with zero restarts.
+No production workflows were active at cutover; no paid model calls or broker
+orders were made. The independent reviewer closed the four reported recovery
+findings. This does not establish investment-quality acceptance.
