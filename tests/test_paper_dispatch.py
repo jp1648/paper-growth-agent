@@ -87,13 +87,13 @@ def test_scheduled_run_consumed_once_and_journaled(runtime):
     )
 
 
-@pytest.mark.parametrize("run_cap,day_cap", [("10", "10"), ("10.01", "10"), ("10", "10.01")])
-def test_approved_ten_dollar_study_ceilings(runtime, run_cap, day_cap):
+@pytest.mark.parametrize("run_cap,day_cap", [("20", "20"), ("20.01", "20"), ("20", "20.01")])
+def test_approved_twenty_dollar_study_ceilings(runtime, run_cap, day_cap):
     runner, study, _, calls, _ = runtime
     runner.cfg.research_max_cost_usd = dec(run_cap)
     runner.cfg.research_daily_cost_usd = dec(day_cap)
     study["config_sha256"] = fingerprint(runner.cfg.model_dump(mode="json"))
-    if run_cap == day_cap == "10":
+    if run_cap == day_cap == "20":
         assert "mechanically completed" in run(runtime)["status"]
         assert len(calls) == 1
     else:

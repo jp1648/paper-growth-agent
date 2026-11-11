@@ -5282,3 +5282,15 @@ review caught and removed the unnecessary testing-budget bypass. Offline tests
 verified 14 admission denials, exclusive replay prevention, matching one-run
 authority retirement on success/failure, and rejection of a second ordinary claim
 after the first reserves $10. Fresh funding and final launch bindings remain unset.
+
+
+### November 11: user-approved $20 bounds
+
+The user explicitly raised the run/day bounds to $20 to continue validation.
+Defaults, example/local configuration and study admission now use $20, with
+$20.01 rejected before a scheduled claim. The next prepared observed PG12 run
+remains capped at $10: prior gross $9.9529325 plus its full reservation fits the
+new $20 daily ceiling. This does not authorize a $20 additional run today.
+Funding, pause, source, economic-acceptance and broker gates remain unchanged.
+Targeted dispatch/accounting checks passed (99 tests); deployment and new funding
+installation require their separate exact-image/preflight evidence.

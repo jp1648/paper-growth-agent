@@ -186,7 +186,7 @@ def dispatch(runner, study, clock, calendar_day):
     opportunities = schedule["opportunities"]
     if len(opportunities) != 36 or len({s["id"] for s in opportunities}) != 36:
         raise ValueError("Require all 36 distinct approved slots")
-    if cfg.research_max_cost_usd > 10 or cfg.research_daily_cost_usd > 10:
+    if cfg.research_max_cost_usd > 20 or cfg.research_daily_cost_usd > 20:
         raise ValueError("Study exceeds approved run/day ceilings")
     pending_slots = [
         record
