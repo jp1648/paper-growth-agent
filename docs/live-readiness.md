@@ -5127,3 +5127,62 @@ can represent finite-year costs without incorrectly perpetuating them into termi
 value. Establish a complete revised-valuation/critique/final-decision cost envelope
 before another paid authorization. Do not respond with another blind retry or a
 small cap increase.
+
+
+### November 11: offline PG11 fix investigation and next-test ceiling
+
+Independent Sol reviews separated a financial-model limitation from a capacity
+limit; neither is resolved by raising the other. The primary agent checked the
+recorded correction calls and reproduced the projected reserve arithmetic. No
+additional provider calls, funding installation, deployment or broker action were
+performed during this investigation.
+
+The smallest proposed changes, before another paid experiment, are:
+
+1. Expose the existing 2,000-character correction-reason limit in the tool schema
+   and return a specific length error. PG11's 2,150-character request received a
+   misleading stale-report error; the subsequent 1,827-character request succeeded.
+   The intervening lead call cost an estimated $0.513075. Test the exact boundary
+   and retain stale-hash and single-correction protections.
+2. Extend the existing valuation calculation with source-backed, signed cash
+   adjustments for specific forecast years. Discount those increments only in
+   their stated years; do not implicitly carry a temporary restructuring payment
+   into terminal value. Keep the original scalar-growth result when omitted.
+   Update valuation diagnostics, canonical saved inputs/replay and atomic batched
+   alternatives together. Test timing, sign, denominator, citation validation,
+   terminal exclusion and unchanged legacy results. This is a proposed change,
+   not an implemented or accepted financial model.
+3. Reconcile minority cash/ownership treatment and award populations from sources.
+   Net equity movements do not establish recurring minority distributions. The
+   incorporated 2024 program summary caps aggregate performance payout at 200%,
+   including the TSR modifier; the 2023 agreement also specifies 200% and dividend
+   equivalents. Both precede the evaluation cutoff. They do not establish the
+   maximum total outstanding share claim without reconciling award populations,
+   terms and dividend-equivalent units. Missing evidence must remain a gap.
+4. Check capacity for the entire revised valuation, fresh critique and final lead
+   decision before beginning a correction. Preserve report identity, downstream
+   invalidation, evidence requirements and conservative per-call reservations;
+   do not replace the byte-based reservation ceiling with an average token ratio.
+
+The next controlled development validation ceiling is **$10**, replacing the
+previous $6 experiment ceiling in the plan. Ordinary runtime and unattended study
+limits remain **$6 per run/day**. No active configuration or funding receipt was
+changed: the next experiment must explicitly bind the $10 maximum in its reviewed
+run package, after offline fixes and fresh funding/buffer verification. This
+threshold decision does not start or fund a run or extend today's daily exception.
+
+After removing the observed formatting retry, modeled completion paths require
+$7.60–$8.78 of capacity under the existing conservative reservation guard. These
+paths assume two or three valuation calls, two or three critique calls, one final
+lead call and observed/projected context sizes. Thus $8 is marginal and $10 offers
+headroom; these are projections, not promised completion costs or provider bills.
+A $0.05 increase would only admit the immediately blocked call. PG11 also had only
+eight tool calls remaining, so a higher dollar ceiling alone cannot prove that the
+whole correction fits. Retain other limits and verify the repaired path offline
+before deciding whether any further limit change is warranted.
+
+Primary award sources:
+[2024 program summary](https://www.sec.gov/Archives/edgar/data/80424/000008042424000113/fy2425q1jas10-qexhibit10x2.htm)
+and [2023 award agreement](https://www.sec.gov/Archives/edgar/data/80424/000008042423000103/fy2324q1jas10-qexhibit10x4.htm).
+The private investigation retains exact recorded-cost arithmetic and source review.
+Research acceptance, unseen evaluation and paper-trading activation remain open.
