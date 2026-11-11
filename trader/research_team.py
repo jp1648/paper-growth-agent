@@ -9,6 +9,7 @@ import threading
 import time
 from datetime import date, timedelta
 from decimal import localcontext
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -29,13 +30,15 @@ from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import ToolException, tool
 from langchain_openai import ChatOpenAI
 from langsmith import tracing_context
-from pydantic import Field
+from pydantic import Field, TypeAdapter
 
 from .alpaca import safe_error
 from .claims import ClaimsCoverage, claim_gaps, validate_claim_coverage
 from .evidence import SEC_MAX_RESPONSE_BYTES, EvidenceTooLarge
 from .financials import (
     CapitalExpenditureSource,
+    CashFlowAdjustment,
+    CompensationPolicy,
     CompensationPolicyRequired,
     MissingAnnualFact,
     NormalizationBridge,
@@ -56,6 +59,32 @@ class CashFlowComponent(Model):
     label: str = Field(min_length=1, max_length=120)
     amount_usd: str = Field(pattern=r"^-?(?:0|[1-9][0-9]{0,14})(?:\.[0-9]{1,2})?$")
     evidence_id: str = Field(min_length=1, max_length=200)
+
+
+class AdjustmentAlternative(Model):
+    kind: Literal["adjustment"]
+    label: str = Field(min_length=1, max_length=120)
+    replacement: CashFlowAdjustment
+
+
+class TaxWorkingCapitalAlternative(Model):
+    kind: Literal["tax_working_capital"]
+    label: str = Field(min_length=1, max_length=120)
+    cash_taxes: CashFlowAdjustment
+    working_capital: CashFlowAdjustment
+
+
+class CompensationAlternative(Model):
+    kind: Literal["compensation_policy"]
+    label: str = Field(min_length=1, max_length=120)
+    replacement: CompensationPolicy
+
+
+NormalizationAlternative = Annotated[
+    AdjustmentAlternative | TaxWorkingCapitalAlternative | CompensationAlternative,
+    Field(discriminator="kind"),
+]
+_ALTERNATIVE_ADAPTER = TypeAdapter(NormalizationAlternative)
 
 
 class Research(Model):
@@ -181,7 +210,7 @@ ROLES = {
             "All bridge evidence must appear in the valuation report. The historical proxy does not establish normalized earnings. Zero deltas require a specific scenario rationale, never a default to satisfy the schema. Explicitly provide normalization_review.claims_coverage with exactly common_shares, preferred_or_convertible, legacy_awards, noncontrolling_interests. Each needs status (supported_conditional_treatment, supported_not_applicable, unread, not_disclosed_in_inspected_sources, unsupported_treatment), evidence_ids, canonical as_of_date or null, and treatment_or_gap explaining quantitative treatment/double counting or exact missing work. Supported closure requires inspected original disclosure, never search absence; common-share treatment requires a supported point date, not an EPS average period. These are runtime diagnostics, not economic approval. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Preserve unresolved_material_gaps for genuinely unsupported material historical inputs or assumptions; calculating a conditional sensitivity does not resolve such gaps or authorize BUY/ADD. A missing or unresolved normalization review blocks BUY/ADD. Return the calculation_id and exact bear/base/bull values when computed. "
             "Use inspect_cash_flow for annual accounting diagnostics when needed, or pass the proposed normalization_bridge directly to value_scenarios; omitted or null cash_flow_per_share derives the exact source/bridge scalar. An explicit scalar must still match. Missing inputs are gaps; derived arithmetic does not establish economic support. If calls run out, name the exact unfinished source reads and arithmetic for the single correction. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
-            "Quantify material normalization alternatives with calculation tools as well as growth/multiple sensitivities. Vary one supported compensation, combined tax/operating-movement or reinvestment assumption at a time; do not combine overlapping tax and working-capital recoveries or capitalize a one-time debt maturity as a perpetual annual drain. Preserve the chosen main calculation_id and identify alternatives separately. "
+            "Quantify material normalization alternatives with calculation tools as well as growth/multiple sensitivities. When supported alternatives share the same scenarios, batch up to three labeled normalization_alternatives with the main bridge: one full adjustment replacement, a paired tax/working-capital replacement, or a future-service compensation policy replacement. Each needs its own amount, rationale and original evidence; omit cash_flow_per_share for a batch. Vary one supported treatment at a time; do not combine overlapping tax and working-capital recoveries or capitalize a one-time debt maturity as a perpetual annual drain. Preserve the chosen main calculation_id and identify alternatives separately. "
             "Explain sensitivity and expectations embedded in today's price. If this simplified "
             "cash-flow model is inappropriate or inputs are insufficient, return null for calculation_id "
             "and all three values and explain the limitation in method. Never manufacture value."
@@ -1197,8 +1226,17 @@ class ResearchDesk:
             cash_flow_per_share: str | None = None,
             normalization_bridge: NormalizationBridge | None = None,
             capital_expenditure_source: CapitalExpenditureSource | None = None,
+            normalization_alternatives: list[NormalizationAlternative] | None = None,
         ) -> dict:
-            """Decimal DCF: annual per-share cash flows plus terminal cash-flow multiple. Three ordered bear/base/bull cases; rates are fractions. Omit cash_flow_per_share to derive exact source/bridge arithmetic, not economic support; explicit values must match. Alternative capex requires cited original-tag selection consistent with the bridge."""
+            """Decimal DCF: ordered bear/base/bull cases with fractions as rates. Omit cash_flow_per_share for source/bridge arithmetic. With a main bridge, optionally batch up to three labeled, sourced normalization replacements; each receives its own saved calculation. Explicit cash_flow_per_share is main-only. Alternative capex requires cited original-tag selection consistent with the bridge."""
+            if normalization_alternatives:
+                if len(normalization_alternatives) > 3:
+                    raise ValueError("At most three normalization alternatives are allowed")
+                if normalization_bridge is None or cash_flow_per_share is not None:
+                    raise ValueError(
+                        "Batched normalization alternatives require a main bridge and omitted or null cash_flow_per_share"
+                    )
+            cutoff = self.evaluation_at or now()
             with self.lock:
                 source = copy.deepcopy(self.sources.get(financial_source_id))
                 financial_sources = copy.deepcopy(self.sources)
@@ -1212,7 +1250,7 @@ class ResearchDesk:
                 provenance = annual_cash_flow(
                     source,
                     financial_period_end,
-                    self.evaluation_at or now(),
+                    cutoff,
                     capital_expenditure_source=selection,
                     sources=financial_sources,
                 )
@@ -1230,7 +1268,7 @@ class ResearchDesk:
                     bridge_result = normalized_cash_flow(
                         source,
                         financial_period_end,
-                        self.evaluation_at or now(),
+                        cutoff,
                         normalization_bridge,
                         bridge_sources,
                     )
@@ -1269,13 +1307,23 @@ class ResearchDesk:
                 or any(not 0 <= m <= 100 for m in multiples)
             ):
                 raise ValueError("Invalid valuation assumptions")
-            values = []
-            for g, multiple in zip(growth, multiples):
-                total = sum((cash * (1 + g) ** y / (1 + discount) ** y for y in range(1, years + 1)), dec(0))
-                total += cash * (1 + g) ** years * multiple / (1 + discount) ** years
-                values.append(str(total.quantize(dec(".01"))))
-            if list(map(dec, values)) != sorted(map(dec, values)):
-                raise ValueError("Scenarios must be ordered bear <= base <= bull")
+
+            def scenario_values(scalar):
+                if not 0 < scalar <= 100000:
+                    raise ValueError("Invalid valuation assumptions")
+                computed = []
+                for g, multiple in zip(growth, multiples):
+                    total = sum(
+                        (scalar * (1 + g) ** y / (1 + discount) ** y for y in range(1, years + 1)),
+                        dec(0),
+                    )
+                    total += scalar * (1 + g) ** years * multiple / (1 + discount) ** years
+                    computed.append(str(total.quantize(dec(".01"))))
+                if list(map(dec, computed)) != sorted(map(dec, computed)):
+                    raise ValueError("Scenarios must be ordered bear <= base <= bull")
+                return computed
+
+            values = scenario_values(cash)
             result = {
                 "financial_provenance": provenance,
                 "bear_value": values[0],
@@ -1298,9 +1346,115 @@ class ResearchDesk:
                 result["inputs"]["normalization_bridge"] = bridge_result["assumptions"]
             identifier = "calculation-" + hashlib.sha256(dumps(result).encode()).hexdigest()[:20]
             result["calculation_id"] = identifier
+            alternatives = []
+            pending = {identifier: result}
+            if normalization_alternatives:
+                main_assumptions = bridge_result["assumptions"]
+                main_rows = {row["category"]: row for row in main_assumptions["adjustments"]}
+                seen_bridges = {dumps(main_assumptions)}
+                seen_numeric = set()
+                seen_labels = set()
+                for raw_alternative in normalization_alternatives:
+                    alternative = _ALTERNATIVE_ADAPTER.validate_python(raw_alternative)
+                    label = alternative.label.strip()
+                    if not label or label.casefold() in seen_labels:
+                        raise ValueError("Normalization alternative labels must be distinct and nonblank")
+                    seen_labels.add(label.casefold())
+                    adjusted = copy.deepcopy(main_assumptions)
+                    rows = {row["category"]: row for row in adjusted["adjustments"]}
+                    if alternative.kind == "adjustment":
+                        replacement = alternative.replacement.model_dump(mode="json")
+                        category = replacement["category"]
+                        if category not in rows or dec(replacement["annual_delta_usd"]) == dec(
+                            rows[category]["annual_delta_usd"]
+                        ):
+                            raise ValueError(
+                                "Alternative must replace an existing adjustment with a changed amount"
+                            )
+                        rows[category].update(replacement)
+                        changes = {"replacement": replacement}
+                    elif alternative.kind == "tax_working_capital":
+                        tax = alternative.cash_taxes.model_dump(mode="json")
+                        working = alternative.working_capital.model_dump(mode="json")
+                        if tax["category"] != "cash_taxes" or working["category"] != "working_capital":
+                            raise ValueError("Tax/working-capital alternative requires both named categories")
+                        if all(
+                            dec(row["annual_delta_usd"]) == dec(rows[row["category"]]["annual_delta_usd"])
+                            for row in (tax, working)
+                        ):
+                            raise ValueError("Tax/working-capital alternative must change an amount")
+                        rows["cash_taxes"].update(tax)
+                        rows["working_capital"].update(working)
+                        changes = {"cash_taxes": tax, "working_capital": working}
+                    else:
+                        replacement = alternative.replacement.model_dump(mode="json")
+                        original_cost = bridge_result.get(
+                            "future_compensation_cash_usd", bridge_result["sbc_expense_equivalent_usd"]
+                        )
+                        if dec(replacement["annual_cash_usd"]) == dec(original_cost):
+                            raise ValueError("Compensation alternative must change the future-service amount")
+                        adjusted["compensation_policy"] = replacement
+                        changes = {"replacement": replacement}
+                    numeric_signature = tuple(
+                        sorted(
+                            (category, dec(row["annual_delta_usd"]))
+                            for category, row in rows.items()
+                            if dec(row["annual_delta_usd"]) != dec(main_rows[category]["annual_delta_usd"])
+                        )
+                    )
+                    if alternative.kind == "compensation_policy":
+                        numeric_signature += (
+                            ("future_service_compensation", dec(replacement["annual_cash_usd"])),
+                        )
+                    if numeric_signature in seen_numeric:
+                        raise ValueError("Duplicate quantitative normalization alternative")
+                    seen_numeric.add(numeric_signature)
+                    variant_bridge = normalized_cash_flow(
+                        source,
+                        financial_period_end,
+                        cutoff,
+                        adjusted,
+                        bridge_sources,
+                    )
+                    canonical = variant_bridge["assumptions"]
+                    signature = dumps(canonical)
+                    if signature in seen_bridges:
+                        raise ValueError("Duplicate normalization alternative")
+                    seen_bridges.add(signature)
+                    variant_cash = variant_bridge["cash_flow_per_share"]
+                    variant_values = scenario_values(dec(variant_cash))
+                    variant_result = copy.deepcopy(result)
+                    variant_result.pop("calculation_id")
+                    variant_result.update(
+                        bear_value=variant_values[0],
+                        base_value=variant_values[1],
+                        bull_value=variant_values[2],
+                        normalization_bridge=variant_bridge,
+                    )
+                    variant_result["inputs"]["cash_flow_per_share"] = variant_cash
+                    variant_result["inputs"]["normalization_bridge"] = canonical
+                    variant_id = (
+                        "calculation-" + hashlib.sha256(dumps(variant_result).encode()).hexdigest()[:20]
+                    )
+                    variant_result["calculation_id"] = variant_id
+                    if variant_id in pending:
+                        raise ValueError("Duplicate normalization alternative")
+                    pending[variant_id] = variant_result
+                    alternatives.append(
+                        {
+                            "label": label,
+                            "kind": alternative.kind,
+                            "changes": changes,
+                            "cash_flow_per_share": variant_cash,
+                            "bear_value": variant_values[0],
+                            "base_value": variant_values[1],
+                            "bull_value": variant_values[2],
+                            "calculation_id": variant_id,
+                        }
+                    )
             with self.lock:
-                self.calculations[identifier] = result
-            return result
+                self.calculations.update(pending)
+            return {**result, "alternatives": alternatives} if alternatives else result
 
         @tool
         def inspect_cash_flow(

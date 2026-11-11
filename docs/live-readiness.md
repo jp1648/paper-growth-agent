@@ -4867,7 +4867,9 @@ limitations are recorded in [resumable-research.md](resumable-research.md).
 
 The offline suite passed 1,532 tests with eight skips before deployment. Post-cutover
 checks preserved the original experiment and pause, all 62 spending records, both
-research results and zero order intents. No paid research or trade was started.
+research results. The later execution-history comparison confirmed two historical
+intents and one order unchanged, together with activities and acceptance records.
+No new paid research or trade was started.
 The worker is enabled, but there is no active study or pending research submission.
 Unknown provider outcomes still require reconciliation; Temporal does not make a
 provider call inherently idempotent or renew an expired spending allowance.
@@ -4906,3 +4908,36 @@ The final recovery fixes are now deployed as `b1d0510` (image digest recorded in
 resumable-research.md). Independent review closed the expiry and legacy-fallback
 findings. Cloud fixture recovery passed; all original state and the trading pause
 were verified unchanged after restart. Production research acceptance remains open.
+
+### November 11: bounded normalization alternatives prepared
+
+The next offline candidate lets `value_scenarios` evaluate up to three
+analyst-specified normalization alternatives alongside the main calculation.
+Each alternative retains its own original evidence, source-checked cash-flow
+bridge, calculation ID and standalone replay inputs. A bad alternative rejects
+the whole batch before any calculation is saved. Main-only behavior is unchanged.
+Independent review found no arithmetic, evidence-check or atomicity defect.
+The full offline suite passed 1,559 tests with eight skips before the additional
+mocked Responses wire test. That test also passed: the real SDK serializes the
+new tool schema, parses a simulated function call and invokes the tool correctly.
+This checks client integration, not actual provider schema acceptance.
+This candidate is not yet deployed or economically
+accepted; production remains on the verified recovery-fix image with trading paused.
+
+The recorded PG9 tool definition grows by 1,862 bytes per valuation request.
+The synthetic three-alternative fixture also adds 12,245 bytes to the final lead
+request, despite compact tool output. The retained PG9 calculation used as a size
+proxy would add 26,250 bytes for three alternatives. Neither proxy establishes
+future model behavior or a complete run below $6. Batching addresses arithmetic
+capacity, not the missing economic rationale or acceptance requirements.
+
+A subsequent paid experiment must use a new stable run ID, retain the $6 run cap,
+reserve its entire allowance before calls, and stop after one attempt. Review the
+main and alternative bridges, exact original citations, operating-driver growth
+assumptions, independent critique and final decision before calling it accepted.
+No completion may be inferred from successful API calls or WATCH alone.
+The approved testing allocation has only $3.108025 remaining: increasing Codex's
+usage ceiling does not authorize more API spending. Renew funding evidence and
+obtain an explicit allocation increase before that experiment. Keep the $15 buffer,
+original history and trading pause. The unseen evaluation, held-position review
+and current opening safety evidence still follow successful development acceptance.

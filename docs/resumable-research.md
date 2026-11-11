@@ -314,7 +314,9 @@ job, or unfinished durable submission.
 Backups of config, old image setting and a consistent ledger snapshot are under
 `/mnt/trader-state/temporal/cutover-bc923bb7a7c3` (private). Post-start comparisons
 verified identical experiment data, pause content, all 62 spending records, both
-research results, and zero order intents. No paid research or orders were started.
+research results. A later comparison using the actual execution record kinds
+confirmed the two historical intents, one order, three activities, eight acceptance
+records and one adjustment were unchanged. No new paid research or orders were started.
 Evidence: `state/temporal-verification/paused-cutover.json`.
 
 November 11 recovery-fix release `b1d0510`: Cloud Build succeeded; all 49 installed
@@ -322,8 +324,9 @@ source/dependency file hashes match the committed build. Image digest
 `sha256:db4262f6e192729c99edc70bae71393ae92603891d1340c96fa508381787e498`
 is now used by the worker and dispatcher. The seven-stage cloud fixture passed
 again using simulated providers and isolated storage. Original experiment, pause,
-configuration, 62 spending records, two research results and zero order intents
-were preserved across deployment. All four services are running with zero restarts.
+configuration, 62 spending records, two research results, two historical intents,
+one order, three activities, eight acceptance records and one adjustment were
+preserved across deployment. All four services are running with zero restarts.
 No production workflows were active at cutover; no paid model calls or broker
 orders were made. The independent reviewer closed the four reported recovery
 findings. This does not establish investment-quality acceptance.

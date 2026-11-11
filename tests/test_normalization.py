@@ -68,6 +68,217 @@ def test_bridge_source_immutability_and_independent_arithmetic(normalization):
     assert (source, bridge) == original
 
 
+def _batch_args(source, bridge, alternatives=None):
+    args = {
+        "financial_source_id": source["id"],
+        "financial_period_end": "2025-12-31",
+        "growth_rates": ["0", "0", "0"],
+        "discount_rate": ".1",
+        "terminal_multiples": ["0", "0", "0"],
+        "years": 1,
+        "normalization_bridge": bridge,
+    }
+    if alternatives is not None:
+        args["normalization_alternatives"] = alternatives
+    return args
+
+
+def _adjustment_variant(bridge, category, amount, *, label="adverse", evidence="assumptions"):
+    row = copy.deepcopy(next(row for row in bridge["adjustments"] if row["category"] == category))
+    row.update(
+        annual_delta_usd=amount, rationale="Distinct conditional annual treatment", evidence_ids=[evidence]
+    )
+    return {"kind": "adjustment", "label": label, "replacement": row}
+
+
+def test_batched_normalization_alternatives_are_standalone_and_replayable(normalization):
+    desk, source, bridge = normalization
+    tool = next(item for item in desk.tools() if item.name == "value_scenarios")
+    original = copy.deepcopy((source, bridge, desk.sources))
+    main = tool.invoke(_batch_args(source, bridge))
+    pair = {
+        "kind": "tax_working_capital",
+        "label": "combined tax and operating movement",
+        "cash_taxes": _adjustment_variant(bridge, "cash_taxes", "15")["replacement"],
+        "working_capital": _adjustment_variant(bridge, "working_capital", "-7")["replacement"],
+    }
+    policy = {
+        "kind": "compensation_policy",
+        "label": "future service cost",
+        "replacement": {
+            "annual_cash_usd": "60",
+            "rationale": "Conditional future service cash cost",
+            "legacy_award_treatment": "Existing awards remain in dated shares; no second charge",
+            "evidence_ids": ["assumptions"],
+        },
+    }
+    variants = [
+        _adjustment_variant(bridge, "capital_expenditure", "-30", label="more investment"),
+        pair,
+        policy,
+    ]
+    response = tool.invoke(_batch_args(source, bridge, variants))
+    assert {key: value for key, value in response.items() if key != "alternatives"} == main
+    assert len(response["alternatives"]) == 3
+    assert len(desk.calculations) == 4
+    assert (
+        len(
+            {item["cash_flow_per_share"] for item in response["alternatives"]}
+            | {main["inputs"]["cash_flow_per_share"]}
+        )
+        == 4
+    )
+    assert all("normalization_bridge" not in item for item in response["alternatives"])
+    assert all(
+        set(item)
+        == {
+            "label",
+            "kind",
+            "changes",
+            "cash_flow_per_share",
+            "bear_value",
+            "base_value",
+            "bull_value",
+            "calculation_id",
+        }
+        for item in response["alternatives"]
+    )
+    assert (source, bridge, desk.sources) == original
+    read_source = next(item for item in desk.tools() if item.name == "read_source")
+    for identifier, saved in list(desk.calculations.items()):
+        assert saved["calculation_id"] == identifier
+        assert saved["inputs"]["cash_flow_per_share"] == saved["normalization_bridge"]["cash_flow_per_share"]
+        # This is the same standalone provenance replay used by finalize().
+        assert tool.invoke(saved["inputs"]) == saved
+        assert json.loads(read_source.invoke({"source_id": identifier})["content"]) == saved
+    assert len(desk.calculations) == 4
+    assert set(desk.final_context()["calculations"]) == set(desk.calculations)
+
+
+def test_batched_normalization_rejects_late_invalid_source_atomically(normalization):
+    desk, source, bridge = normalization
+    tool = next(item for item in desk.tools() if item.name == "value_scenarios")
+    variants = [
+        _adjustment_variant(bridge, "capital_expenditure", "-30", label="supported"),
+        _adjustment_variant(bridge, "cash_taxes", "20", label="unsupported", evidence="unknown-source"),
+    ]
+    with pytest.raises(ValueError, match="retained original evidence"):
+        tool.invoke(_batch_args(source, bridge, variants))
+    assert not desk.calculations
+
+
+def test_batched_normalization_responses_wire_schema_and_tool_call(normalization):
+    import httpx
+    from langchain_openai import ChatOpenAI
+
+    desk, source, bridge = normalization
+    tool = next(item for item in desk.tools() if item.name == "value_scenarios")
+    arguments = _batch_args(
+        source,
+        bridge,
+        [_adjustment_variant(bridge, "capital_expenditure", "-30", label="investment sensitivity")],
+    )
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        assert str(request.url) == "https://api.openai.com/v1/responses"
+        payload = json.loads(request.content)
+        schema = next(item["parameters"] for item in payload["tools"] if item["name"] == "value_scenarios")
+        alternative = schema["properties"]["normalization_alternatives"]
+        assert "anyOf" in alternative
+        assert any("oneOf" in branch.get("items", {}) for branch in alternative["anyOf"])
+        return httpx.Response(
+            200,
+            json={
+                "id": "resp_batch_fixture",
+                "object": "response",
+                "created_at": 1,
+                "model": "gpt-6.1-sol",
+                "status": "completed",
+                "error": None,
+                "incomplete_details": None,
+                "output": [
+                    {
+                        "id": "fc_batch_fixture",
+                        "type": "function_call",
+                        "status": "completed",
+                        "name": "value_scenarios",
+                        "call_id": "call_batch_fixture",
+                        "arguments": json.dumps(arguments),
+                    }
+                ],
+                "usage": {
+                    "input_tokens": 20,
+                    "output_tokens": 30,
+                    "total_tokens": 50,
+                    "input_tokens_details": {"cached_tokens": 0},
+                    "output_tokens_details": {"reasoning_tokens": 0},
+                },
+            },
+        )
+
+    model = ChatOpenAI(
+        model="gpt-6.1-sol",
+        api_key="fixture-only",
+        base_url="https://api.openai.com/v1",
+        use_responses_api=True,
+        store=False,
+        max_retries=0,
+        http_client=httpx.Client(transport=httpx.MockTransport(respond)),
+    )
+    message = model.bind_tools([tool]).invoke("Call the valuation tool for the supplied synthetic case")
+    assert len(requests) == 1
+    assert len(message.tool_calls) == 1
+    assert message.tool_calls[0]["name"] == "value_scenarios"
+    assert message.tool_calls[0]["args"] == arguments
+    result = tool.invoke(message.tool_calls[0]["args"])
+    assert len(result["alternatives"]) == 1
+    assert len(desk.calculations) == 2
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "duplicate_label",
+        "identical",
+        "duplicate_numeric_rationale",
+        "numeric_noop",
+        "bad_pair",
+        "too_many",
+        "explicit_scalar",
+        "missing_bridge",
+    ],
+)
+def test_batched_normalization_rejects_invalid_variants_atomically(normalization, fault):
+    desk, source, bridge = normalization
+    tool = next(item for item in desk.tools() if item.name == "value_scenarios")
+    first = _adjustment_variant(bridge, "capital_expenditure", "-30", label="first")
+    second = _adjustment_variant(bridge, "capital_expenditure", "-40", label="second")
+    args = _batch_args(source, bridge, [first, second])
+    if fault == "duplicate_label":
+        second["label"] = "FIRST"
+    elif fault == "identical":
+        second["replacement"] = copy.deepcopy(first["replacement"])
+    elif fault == "duplicate_numeric_rationale":
+        second["replacement"]["annual_delta_usd"] = "-30.0"
+        second["replacement"]["rationale"] = "Different words, same economic amount"
+    elif fault == "numeric_noop":
+        second["replacement"]["annual_delta_usd"] = "-20"
+    elif fault == "bad_pair":
+        second.update(kind="tax_working_capital", cash_taxes=second.pop("replacement"))
+        second["working_capital"] = _adjustment_variant(bridge, "working_capital", "-7")["replacement"]
+    elif fault == "too_many":
+        args["normalization_alternatives"] = [first, second, second, second]
+    elif fault == "explicit_scalar":
+        args["cash_flow_per_share"] = "5.562500"
+    else:
+        args.pop("normalization_bridge")
+    with pytest.raises((ValueError, TypeError)):
+        tool.invoke(args)
+    assert not desk.calculations
+
+
 def test_future_service_policy_replaces_historical_sbc_and_retains_provenance(normalization):
     desk, source, bridge = normalization
     legacy = normalized_cash_flow(source, "2025-12-31", CUTOFF, bridge, desk.sources)
