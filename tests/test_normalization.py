@@ -217,6 +217,11 @@ def test_tools_and_frozen_replay_recompute_bridge_and_require_all_citations(
     calc = tools["value_scenarios"].invoke(args)
     assert calc["base_value"] == present_value  # Cash per share / 1.1, rounded to cents.
     assert calc["normalization_bridge"] == inspected
+    omitted = tools["value_scenarios"].invoke(
+        {key: value for key, value in args.items() if key != "cash_flow_per_share"}
+    )
+    assert omitted == tools["value_scenarios"].invoke(dict(args, cash_flow_per_share=None)) == calc
+    assert len(desk.calculations) == 1
     rejected = tools["value_scenarios"].invoke(dict(args, cash_flow_per_share="5"))
     assert rejected["available"] is False and rejected["error"] == "cash_flow_input_mismatch"
     assert rejected["required_cash_flow_per_share"] == per_share
@@ -720,7 +725,6 @@ def test_missing_compensation_policy_is_correctable_without_creating_calculation
     }
     if tool_name == "value_scenarios":
         args.update(
-            cash_flow_per_share="5.312500",
             growth_rates=["0", ".05", ".10"],
             discount_rate=".10",
             terminal_multiples=["10", "15", "20"],

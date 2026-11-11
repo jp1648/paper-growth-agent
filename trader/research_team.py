@@ -147,7 +147,7 @@ ROLES = {
             "customer concentration and accounting quality. Read filings; seek contrary evidence. "
             "Analyze available product/segment and geographic revenue changes and margins quantitatively, including their contribution to growth. Explain how mix and concentration affect the thesis. "
             "Coverage first: inspect original passages for operating segments/geography, concentration, competition, revenue recognition/accounting, regulation, and financing/share claims before repeating or deepening a covered topic. Distinguish specific disclosed commitments from broader obligations and date every share base. Use search_document to locate distinct operating, concentration and regulatory sections before spending calls on overlapping passages. Do not label available but unread evidence unavailable; inspect operating discussion and notes before listing gaps. Distinguish receivables concentration from revenue concentration and retention. "
-            "Use exact returned passage offsets, not rounded or guessed offsets. Heading/table-of-contents matches do not complete coverage: advance search_document past those matches to the substantive disclosure. Report available concentration percentages with their denominator and date; generic concentration language cannot replace disclosed figures. "
+            "Use exact returned passage offsets, not rounded or guessed offsets. Heading/table-of-contents matches do not complete coverage: advance search_document past those matches to the substantive disclosure. Report available concentration percentages with their denominator and date; generic concentration language cannot replace disclosed figures. Pass dated financing and share-claim source IDs to valuation for the common-owner bridge. "
             "Separate truly absent sources, unread/budget-limited evidence, and unresolved economic interpretation. Cite exact passages for each material factual claim."
         ),
     ),
@@ -156,13 +156,13 @@ ROLES = {
         (
             "Investigate what changed and why now. Inspect recent news and earnings "
             "exhibits. Read available X discussion sources with read_source for sentiment, narratives and research leads. Separate observed discussion, unverified claims and corroborated facts; cite post links and timestamps in your report. Never infer sentiment shifts without comparable earlier samples or trade on popularity alone. Give dated catalysts, triggers and missing coverage. Set requires_deeper_review "
-            "when changes could affect the saved business thesis or valuation, or when uncertain."
+            "when changes could affect the saved business thesis or valuation, or when uncertain. Focus source calls on event timing, primary guidance and sentiment; pass financing or award leads to business and valuation rather than reconciling their economics here."
         ),
     ),
     "valuation": (
         Valuation,
         (
-            "Use business and catalyst findings. Locate MD&A liquidity/cash-flow explanations, tax notes, the equity-compensation plan table and its footnotes, and award/financing notes before closing coverage. Reconcile plan-table scope with individual award notes; an incorporated disclosure not retrieved remains an explicit coverage gap. Before calling material Other/residual operating cash movements unexplained, inspect management cash-flow discussion using descriptive variants, not only the exact statement-row label. Use search_document and returned offsets rather than overlapping or guessed pages. Reserve three tool calls for inspect_cash_flow, value_scenarios and inspect_valuation; spend remaining calls on material gaps. Call value_scenarios with explicitly "
+            "Use business and catalyst findings. Locate MD&A liquidity/cash-flow explanations, tax notes, the equity-compensation plan table and its footnotes, and award/financing notes before closing coverage. Reconcile plan-table scope with individual award notes; an incorporated disclosure not retrieved remains an explicit coverage gap. Before calling material Other/residual operating cash movements unexplained, inspect management cash-flow discussion using descriptive variants, not only the exact statement-row label. Use search_document and returned offsets rather than overlapping or guessed pages. Reconcile source-backed signed comparison-year operating movements and classify tax, residual, compensation and noncommon claims before spending calls on full scenarios; do not model a historical proxy merely to reserve scenario calls. Call value_scenarios with explicitly "
             "justified cash-flow assumptions. Supply financial_source_id and financial_period_end from original "
             "structured facts: matched annual USD operating cash flow, USD capex and diluted weighted-average shares "
             "from one coherent filing accession/date/form. Do not mix amended and older facts. "
@@ -178,7 +178,7 @@ ROLES = {
             "(3) Model an economically justified conditional bridge and scenarios with the calculation tools. Unknown future policy alone is not grounds to omit calculations. If historical attribution remains uncertain, assess whether a source-supported combined treatment or bounded sensitivity avoids double counting; do not silently set an unknown item to zero. If even bounded modeling would mislead, identify the exact missing historical input and explain why the uncertainty cannot be bounded, rather than merely listing unanswered forecasts. "
             "A preferred recovery adjustment needs a forecast of operating funding needs anchored in the filing, not simply a fraction of historical outflow. When that preference cannot be justified, label the alternative cases without claiming a preferred normalized estimate. Explain each cash-flow growth scenario through disclosed business mix, margins and reinvestment; explain terminal multiples through post-horizon growth, maturity and competitive risk. Merely calling numbers analyst choices or a bracket is not an economic rationale. Use multiply_values for derived products such as award quantities times grant-date values, and cite the original inputs separately. "
             "All bridge evidence must appear in the valuation report. The historical proxy does not establish normalized earnings. Zero deltas require a specific scenario rationale, never a default to satisfy the schema. Explicitly provide normalization_review.claims_coverage with exactly common_shares, preferred_or_convertible, legacy_awards, noncontrolling_interests. Each needs status (supported_conditional_treatment, supported_not_applicable, unread, not_disclosed_in_inspected_sources, unsupported_treatment), evidence_ids, canonical as_of_date or null, and treatment_or_gap explaining quantitative treatment/double counting or exact missing work. Supported closure requires inspected original disclosure, never search absence; common-share treatment requires a supported point date, not an EPS average period. These are runtime diagnostics, not economic approval. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Preserve unresolved_material_gaps for genuinely unsupported material historical inputs or assumptions; calculating a conditional sensitivity does not resolve such gaps or authorize BUY/ADD. A missing or unresolved normalization review blocks BUY/ADD. Return the calculation_id and exact bear/base/bull values when computed. "
-            "Use inspect_cash_flow for annual accounting diagnostics or pass the proposed normalization_bridge to obtain its exact per-share result before calling value_scenarios with that same bridge. Missing inputs are gaps; arithmetic does not establish economic support. "
+            "Use inspect_cash_flow for annual accounting diagnostics when needed, or pass the proposed normalization_bridge directly to value_scenarios; omitted or null cash_flow_per_share derives the exact source/bridge scalar. An explicit scalar must still match. Missing inputs are gaps; derived arithmetic does not establish economic support. If calls run out, name the exact unfinished source reads and arithmetic for the single correction. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Quantify material normalization alternatives with calculation tools as well as growth/multiple sensitivities. Vary one supported compensation, combined tax/operating-movement or reinvestment assumption at a time; do not combine overlapping tax and working-capital recoveries or capitalize a one-time debt maturity as a perpetual annual drain. Preserve the chosen main calculation_id and identify alternatives separately. "
             "Explain sensitivity and expectations embedded in today's price. If this simplified "
@@ -955,17 +955,17 @@ class ResearchDesk:
 
         @tool
         def value_scenarios(
-            cash_flow_per_share: str,
             financial_source_id: str,
             financial_period_end: str,
             growth_rates: list[str],
             discount_rate: str,
             terminal_multiples: list[str],
             years: int,
+            cash_flow_per_share: str | None = None,
             normalization_bridge: NormalizationBridge | None = None,
             capital_expenditure_source: CapitalExpenditureSource | None = None,
         ) -> dict:
-            """Decimal DCF: annual per-share cash flows plus terminal cash-flow multiple. Three ordered bear/base/bull cases; rates are fractions. Justify inputs using cited evidence. Alternative capex requires explicit original-tag selection with cited rationale; keep any bridge selection consistent."""
+            """Decimal DCF: annual per-share cash flows plus terminal cash-flow multiple. Three ordered bear/base/bull cases; rates are fractions. Omit cash_flow_per_share to derive exact source/bridge arithmetic, not economic support; explicit values must match. Alternative capex requires cited original-tag selection consistent with the bridge."""
             with self.lock:
                 source = copy.deepcopy(self.sources.get(financial_source_id))
                 financial_sources = copy.deepcopy(self.sources)
@@ -1015,7 +1015,7 @@ class ResearchDesk:
                         "note": "No normalized calculation created; source SBC is required, not assumed zero.",
                     }
             required_cash = (bridge_result or provenance)["cash_flow_per_share"]
-            if dec(cash_flow_per_share) != dec(required_cash):
+            if cash_flow_per_share is not None and dec(cash_flow_per_share) != dec(required_cash):
                 return {
                     "available": False,
                     "error": "cash_flow_input_mismatch",
@@ -1023,6 +1023,7 @@ class ResearchDesk:
                     "required_cash_flow_per_share": required_cash,
                     "note": "No calculation created and no input substituted. Use the exact source-derived proxy or explicit bridge value in a new request; this arithmetic requirement does not establish economic normalization.",
                 }
+            cash_flow_per_share = required_cash if cash_flow_per_share is None else cash_flow_per_share
             cash, discount = dec(cash_flow_per_share), dec(discount_rate)
             growth, multiples = list(map(dec, growth_rates)), list(map(dec, terminal_multiples))
             if (
@@ -1307,7 +1308,7 @@ class ResearchDesk:
                     if self.budget.unrestricted_research
                     else f" You currently have at most {max(0, self.budget.correction_tool_limits.get(role, self.budget.initial_specialist_allowance) - self.budget.role_tool_calls.get(role, 0))} tool calls remaining. Corrections may receive an audited allocation from the remaining shared pool; counters and global limits never reset."
                 )
-                + " Batch independent source searches, reads or arithmetic requests in one model turn when their inputs are already known; each operation still counts against the shared tool budget. Never guess a source ID or offset to batch a dependent lookup. Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Reserve a call for value_scenarios if valuing. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
+                + " Batch independent source searches, reads or arithmetic requests in one model turn when their inputs are already known; each operation still counts against the shared tool budget. Never guess a source ID or offset to batch a dependent lookup. Keep your entire structured report under 600 words, with concise fields and at most four items per narrative list; evidence_ids must include every source needed to support the report, without that list limit. Preserve key numbers, evidence IDs, uncertainties and invalidation criteria; do not repeat prose across fields. Prioritize the latest filing and material evidence; do not exhaustively read all sources. Then return the structured report, explicitly marking gaps; never fill gaps with invented facts."
                 if role != "research_lead"
                 else ""
             ),

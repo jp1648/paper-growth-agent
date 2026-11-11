@@ -2632,7 +2632,11 @@ def test_cash_flow_transcription_mismatch_requires_new_exact_request():
     corrected = invoke(args | {"cash_flow_per_share": rejected["required_cash_flow_per_share"]})
     assert corrected["inputs"]["cash_flow_per_share"] == "5.000000"
     assert corrected["base_value"] == "4.55" and len(desk.calculations) == 1
-    assert desk.budget.tools == guard.tool_calls == 2
+    omitted = invoke({key: value for key, value in args.items() if key != "cash_flow_per_share"})
+    null = invoke(args | {"cash_flow_per_share": None})
+    assert omitted == null == corrected
+    assert corrected["calculation_id"] in desk.calculations
+    assert desk.budget.tools == guard.tool_calls == 4
     with pytest.raises(ValueError, match="Unknown financial evidence"):
-        tool.invoke(args | {"financial_source_id": "invented"})
+        tool.invoke({**args, "financial_source_id": "invented", "cash_flow_per_share": None})
     assert len(desk.calculations) == 1 and desk.sources == originals

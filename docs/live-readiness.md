@@ -4758,3 +4758,42 @@ feasibility evidence, not guarantees of future model behavior or economic qualit
 Final offline verification: 1413 tests passed, seven external checks skipped;
 lint, formatting and diff checks passed. Deployment and new real-run acceptance
 remain pending.
+
+### November 10: eighth observed PG regression
+
+The `f623880` candidate was deployed with 38 installed source hashes verified and
+pause, configuration, original experiment, funding and all 60 spending records
+preserved. PG8 ran once under a strict $6 testing cap. All four specialists and
+final synthesis completed in 356.9 seconds for $4.8223000 estimated model cost,
+with 48 model calls, 64 tool calls and no unknown charges. The outcome remains
+WATCH with zero shares; no order or active paper study was created.
+
+Independent review reproduced the valuation arithmetic and matched all 11 retained
+passages to the frozen original, but rejected economic completion. Finite tax
+payments and comparative operating-cash movements were cited without quantified
+alternatives; minority earnings remained an unsupported recurring cash/terminal
+claim, compensation assumptions lacked numerical alternatives, and scenario growth
+was not bridged to operating cash drivers. Mechanical completion does not satisfy
+the unchanged sufficient-evidence acceptance criterion.
+
+Trace review identifies work ordering and capacity as the next offline task:
+valuation used eight retrieval operations and three calculation operations before
+correction, then four reads and another three calculation operations. The required
+comparative arithmetic and isolated alternatives remained undone. Reports were
+below the 600-word instruction; that was not the observed binding limit. Repeated
+reads in fresh correction contexts can be legitimate verification and must not be
+made free or treated as unnecessary by assumption. Conserve the remaining
+$7.7270025 allocation while planning normalization-first work within existing
+limits. Gross November 10 settled model estimates are $48.1281000, not a final
+provider invoice. Held-position acceptance, unseen evaluation and final opening
+evidence remain incomplete; automatic trading remains paused.
+
+The next offline change orders signed historical reconciliation and claim treatment
+before full scenarios, narrows catalyst work to events/guidance/sentiment, and lets
+the valuation tool derive the exact validated per-share scalar when omitted or
+null. An explicitly conflicting scalar still creates no calculation. Original
+source/bridge validation, canonical calculation inputs and hashes, call metering,
+limits and acceptance criteria remain unchanged. The full suite passes 1413 tests
+with seven external checks skipped. This is not deployed or economically accepted.
+The retained-path operation ledger remains above 64 calls even under optimistic
+ordering, so no further paid launch is approved by this offline evidence alone.
