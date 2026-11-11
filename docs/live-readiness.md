@@ -5222,3 +5222,21 @@ Validation: the full offline suite passed 1,585 tests with eight external checks
 skipped. Targeted independent reviews covered correction admission, valuation
 arithmetic/replay and cap boundaries. All 16 safety mutations were caught; lint,
 format checks and a redacted diff secret scan passed. No paid research was rerun.
+
+
+Release verification: exact-commit GitHub push and PR checks for `9d0f4ae` both
+completed successfully. Its immutable image is
+`sha256:41773d52f3ea68d574c301a8d89a2e4d4d51fa378a1f8c8c11213ebdec5b7c65`;
+all 49 installed source/dependency hashes matched the committed build context.
+The paused production executor and research worker now run this image. Both
+mounted configurations were verified at $10/run and $10/day, with all other TOML
+values unchanged. All four runtime services are active. Preflight confirmed no
+running production research, active study, unexpected research container/process
+or held journal lease. Exact ledger document/journal, funding, spending, order,
+experiment and pause hashes were preserved across the cutover. Rollback backups
+contain only configuration/image references; the ledger is never restored backward.
+
+No funding allocation was renewed, paid research rerun, paper study activated or
+order submitted. The completed PG11 allocation remains completed. These are
+implemented and deployed engineering fixes; successful investment research,
+independent economic acceptance and trial-opening gates remain separate work.
