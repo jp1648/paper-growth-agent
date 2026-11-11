@@ -18,6 +18,9 @@ class EvidenceTooLarge(ValueError):
     """The complete response cannot be retrieved within the evidence byte bound."""
 
 
+SEC_MAX_RESPONSE_BYTES = 10_000_000
+
+
 class FilingText(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -90,7 +93,7 @@ class EvidenceProvider:
                 chunks, size = [], 0
                 for chunk in response.iter_bytes():
                     size += len(chunk)
-                    if size > 8_000_000:
+                    if size > SEC_MAX_RESPONSE_BYTES:
                         raise EvidenceTooLarge("SEC document exceeds retrieval limit")
                     chunks.append(chunk)
                 return httpx.Response(200, content=b"".join(chunks))

@@ -4702,3 +4702,46 @@ and final invoice reconciliation remain incomplete. Independently reviewed raw
 paper activity supports reconstructed booked closing cash $99655.66 and one AAPL
 share, subject to late-posting revisions. Later broker prices are not closing
 marks; canonical SIP marking and the November 11 loss baseline remain pending.
+
+### November 10: seventh observed PG regression and opening evidence
+
+The combined `ab01fbd` fixes were deployed with the original pause, configuration,
+history and spending records preserved. PG7 then completed all four specialists,
+one correction cycle and a final WATCH with zero shares. Its $4.3928475 estimated
+model cost settled without unknown usage; 46 model calls and 64 tool calls took
+347.8 seconds. Mechanical checks passed, but independent economic review failed
+the unchanged sufficient-evidence case. Available finite-tax and operating-cash
+disclosures were not integrated into quantified normalization alternatives;
+minority earnings remained an unsupported cash/terminal proxy. Correct temporary
+abstention is not completed investment research. Original results remain retained.
+
+The trace identifies a navigation and handoff problem: a repeated section query
+returned an early cross-reference, while a corrected business report's substantive
+original passage reached downstream analysts only as a short preview. Offline
+repairs are being validated before another paid run. Gross November 10 settled
+model estimates are $43.3058000; remaining allocation is $12.5493025. No new order
+or active paper study was created, and the original trading pause remains intact.
+
+Independent opening-stage reviews now support the five frozen primary-source
+templates and the append-only pending-claims register. Current original filings
+were separately collected for all five names; this does not establish accepted
+research or future retrieval availability. Microsoft's current annual exceeds the
+deployed 8 MB retrieval bound, requiring a separately tested bounded downloader
+change. Corporate-action evidence supplies Apple's November 12 ex-date and
+November 16 payment date for its $0.27 dividend. It is not a November 10 anchor
+receivable; future qualifying quantity and net settlement remain pending.
+Canonical closing marks, the fresh November 11 loss baseline, accepted current
+held-position research and final opening approval remain separate requirements.
+
+The offline candidate now exposes bounded, exact-offset navigation for repeated
+filing headings and passes one original 6000-character serialized evidence page
+from a corrected prerequisite to downstream analysts. Eligibility uses newly
+cited passages, including cached originals, with newest-registered priority and
+explicit omitted IDs/continuations. Original evidence and all budgets remain
+unchanged. SEC retrieval has a finite 10 MB bound, tested at the boundary and
+against the retained 8.59 MB Microsoft filing. The full suite passes 1412 tests,
+with seven external checks skipped. Independent PG7 request replay fits the same
+240000-byte limit and projects a conservative $5.9371025 peak reservation under
+$6, without assuming fewer calls. That narrow margin does not prove a future run
+will fit. Held-AAPL's saved path still requires $6.3838975; no successful held
+review or deployed validation of this new candidate is claimed.

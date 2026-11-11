@@ -32,7 +32,7 @@ from pydantic import Field
 
 from .alpaca import safe_error
 from .claims import ClaimsCoverage, claim_gaps, validate_claim_coverage
-from .evidence import EvidenceTooLarge
+from .evidence import SEC_MAX_RESPONSE_BYTES, EvidenceTooLarge
 from .financials import (
     CapitalExpenditureSource,
     CompensationPolicyRequired,
@@ -707,6 +707,46 @@ class ResearchDesk:
                 }
         return previews
 
+    @staticmethod
+    def original_source_page(source_id, source, offset=0):
+        text = dumps(source["content"])
+        return {
+            "id": source_id,
+            "offset": offset,
+            "content": text[offset : offset + 6000],
+            "truncated": offset + 6000 < len(text),
+            "next_offset": offset + 6000 if offset + 6000 < len(text) else None,
+            "total_chars": len(text),
+        }
+
+    def correction_source_handoff(self, prerequisites):
+        corrected = prerequisites & set(self.correction["invalidated"])
+        cited = set().union(
+            *(
+                set(self.reports[role].get("evidence_ids", []))
+                - set(self.correction["reports"][role].get("evidence_ids", []))
+                for role in corrected
+            )
+        )
+        eligible = [
+            source_id
+            for source_id, source in reversed(list(self.sources.items()))
+            if source_id in cited and source.get("source") == "SEC EDGAR filing passage"
+        ]
+        included = eligible[:1]
+        return {
+            "eligible_ids": eligible,
+            "eligible_count": len(eligible),
+            "included_ids": included,
+            "included_count": len(included),
+            "omitted_ids": eligible[1:],
+            "omitted_count": len(eligible) - len(included),
+            "pages": [
+                self.original_source_page(source_id, self.sources[source_id]) for source_id in included
+            ],
+            "note": "Newly cited original passages from corrected prerequisites, newest registered first; only the first read_source page is included. Read later pages or omitted IDs with read_source. This handoff does not independently validate the claims.",
+        }
+
     def document_text(self, document_id):
         metadata = self.documents.get(document_id)
         if metadata is None:
@@ -729,7 +769,7 @@ class ResearchDesk:
                     "document_id": document_id,
                     "url": metadata["url"],
                     "available": False,
-                    "reason": "SEC document exceeds the 8000000-byte retrieval bound; no text was retained. Try the primary filing or a separately listed exhibit. This unavailable document supplies no evidence for any claim.",
+                    "reason": f"SEC document exceeds the {SEC_MAX_RESPONSE_BYTES}-byte retrieval bound; no text was retained. Try the primary filing or a separately listed exhibit. This unavailable document supplies no evidence for any claim.",
                 }
                 self.unavailable_documents[document_id] = gap
                 with self.budget.lock:
@@ -789,15 +829,7 @@ class ResearchDesk:
                         "requested_id": source_id,
                         "note": "No evidence or calculation has this ID. Use exact IDs from supplied sources, reports or calculations; this response supports no claim and cannot be cited.",
                     }
-                text = dumps(self.sources[source_id]["content"])
-                return {
-                    "id": source_id,
-                    "offset": offset,
-                    "content": text[offset : offset + 6000],
-                    "truncated": offset + 6000 < len(text),
-                    "next_offset": offset + 6000 if offset + 6000 < len(text) else None,
-                    "total_chars": len(text),
-                }
+                return self.original_source_page(source_id, self.sources[source_id], offset)
 
         @tool
         def filing_documents(symbol: str, accession: str) -> list[dict]:
@@ -825,6 +857,17 @@ class ResearchDesk:
                     result.append({"document_id": identifier, **doc})
                 return result
 
+        def document_matches(text, query, start_offset=0):
+            matches = []
+            next_start_offset = None
+            for match in re.compile(re.escape(query), re.IGNORECASE).finditer(text, start_offset):
+                start = match.start()
+                matches.append({"offset": start, "preview": text[max(0, start - 80) : start + 160]})
+                if len(matches) == 3:
+                    next_start_offset = match.end()
+                    break
+            return {"matches": matches, "next_start_offset": next_start_offset}
+
         @tool
         def search_document(document_id: str, queries: list[str], start_offset: int = 0) -> dict:
             """Search one to three nonempty literal queries, each at most 300 characters; start_offset must be nonnegative. Returns up to three matches per query. Split larger requests into batches. Use next_start_offset for later matches. Navigation only; read_document supplies citable evidence."""
@@ -842,17 +885,10 @@ class ResearchDesk:
                     return text
                 results = []
                 for query in queries:
-                    matches = []
-                    for match in re.compile(re.escape(query), re.IGNORECASE).finditer(text, start_offset):
-                        start = match.start()
-                        matches.append({"offset": start, "preview": text[max(0, start - 80) : start + 160]})
-                        if len(matches) == 3:
-                            break
                     results.append(
                         {
                             "query": query,
-                            "matches": matches,
-                            "next_start_offset": match.end() if len(matches) == 3 else None,
+                            **document_matches(text, query, start_offset),
                         }
                     )
                 return {
@@ -866,7 +902,7 @@ class ResearchDesk:
 
         @tool
         def read_document(document_id: str, query: str = "", offset: int = 0) -> dict:
-            """Read a 12000-character SEC passage; query locates text, offset paginates. Cite returned ID."""
+            """Read a 12000-character SEC passage. Empty query uses absolute offset; with a query, offset pages from 500 characters before its first match. Cite returned ID; navigation previews are not evidence."""
             if offset < 0 or len(query) > 300:
                 raise ValueError("Invalid passage query or offset")
             with self.lock:
@@ -874,9 +910,14 @@ class ResearchDesk:
                 if not isinstance(text, str):
                     return text
                 metadata = self.documents[document_id]
-                start = text.casefold().find(query.casefold()) if query else 0
-                if start < 0:
-                    return {"found": False, "note": "Query absent; not proof the underlying risk is absent"}
+                navigation = document_matches(text, query) if query else None
+                if query and not navigation["matches"]:
+                    return {
+                        "found": False,
+                        "navigation": navigation,
+                        "note": "Query absent; not proof the underlying risk is absent",
+                    }
+                start = navigation["matches"][0]["offset"] if query else 0
                 start = max(0, start - 500) + offset
                 passage = text[start : start + 12000]
                 if not passage.strip():
@@ -904,7 +945,13 @@ class ResearchDesk:
                     "truncated": start + len(passage) < len(text),
                 }
                 self.sources[identifier] = source
-                return copy.deepcopy(source)
+                result = copy.deepcopy(source)
+                if navigation is not None:
+                    result["navigation"] = {
+                        **navigation,
+                        "note": "Navigation previews are not citable evidence. Matches are absolute document offsets; read a selected offset with an empty query. Use next_start_offset with search_document for later matches.",
+                    }
+                return result
 
         @tool
         def value_scenarios(
@@ -1335,6 +1382,7 @@ class ResearchDesk:
                     "original_critique": self.correction["reports"]["adversarial"],
                     "claims_coverage": self.claims_coverage(self.correction["reports"].get("valuation")),
                     "correction_valuation_provenance": self.correction_valuation_provenance(),
+                    "source_handoff": self.correction_source_handoff(prerequisites),
                     "instruction": "Address the cited defect using original evidence and calculation tools. Retain unsupported gaps; do not change a conclusion just to gain approval.",
                 }
             dependencies = {

@@ -493,6 +493,7 @@ def test_budget_deadline_calls_and_cost():
 
 
 def test_sec_documents_safe_urls_bounded_content_and_no_redirects(tmp_path):
+    from trader.evidence import SEC_MAX_RESPONSE_BYTES
     from trader.store import Store
 
     seen = []
@@ -532,7 +533,9 @@ def test_sec_documents_safe_urls_bounded_content_and_no_redirects(tmp_path):
     with pytest.raises(httpx.HTTPStatusError):
         provider.document(docs[0])
     provider.client = httpx.Client(
-        transport=httpx.MockTransport(lambda r: httpx.Response(200, content=b"x" * 8_000_001))
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(200, content=b"x" * (SEC_MAX_RESPONSE_BYTES + 1))
+        )
     )
     with pytest.raises(ValueError, match="retrieval limit"):
         provider.document(docs[0])
@@ -1681,6 +1684,129 @@ def test_filing_search_is_bounded_navigation_then_citable_read():
     passage = tools["read_document"].invoke({"document_id": document["document_id"], "offset": offset})
     assert passage["offset"] == offset and passage["content"] == text[offset : offset + 12000]
     assert passage["id"] in desk.sources and len(reads) == 1
+
+
+def test_queried_read_navigates_later_occurrences_with_original_offsets():
+    cfg = Settings()
+    provider = Evidence()
+    text = (
+        "ß"
+        + "x" * 600
+        + "Cash Flow cross-reference. "
+        + "a" * 13000
+        + "CASH FLOW substantive disclosure. "
+        + "b" * 13000
+        + "cash flow second table. "
+        + "c" * 13000
+        + "Cash Flow late note."
+    )
+    provider.document = lambda metadata: text
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    tools = {t.name: t for t in desk.tools()}
+    document = tools["filing_documents"].invoke({"symbol": "ACME", "accession": "0000000001-26-000001"})[0]
+    original_sources = dict(desk.sources)
+    first = tools["read_document"].invoke({"document_id": document["document_id"], "query": "CASH FLOW"})
+    offsets = [m["offset"] for m in first["navigation"]["matches"]]
+    assert offsets == [text.index(term) for term in ("Cash Flow", "CASH FLOW", "cash flow")]
+    assert first["offset"] == offsets[0] - 500
+    assert first["content"] == text[first["offset"] : first["offset"] + 12000]
+    assert "navigation" not in desk.sources[first["id"]]
+    assert "not citable" in first["navigation"]["note"]
+    assert len(json.dumps(first["navigation"])) < 1200
+    later = tools["search_document"].invoke(
+        {
+            "document_id": document["document_id"],
+            "queries": ["cash flow"],
+            "start_offset": first["navigation"]["next_start_offset"],
+        }
+    )["results"][0]
+    assert [m["offset"] for m in later["matches"]] == [text.index("Cash Flow late note.")]
+    assert later["next_start_offset"] is None
+    selected = tools["read_document"].invoke({"document_id": document["document_id"], "offset": offsets[1]})
+    assert selected["offset"] == offsets[1] and selected["content"] == text[offsets[1] : offsets[1] + 12000]
+    assert "navigation" not in selected
+    paged = tools["read_document"].invoke(
+        {"document_id": document["document_id"], "query": "Cash Flow", "offset": 12000}
+    )
+    assert paged["offset"] == first["offset"] + 12000
+    assert desk.texts[document["document_id"]] == text
+    assert set(original_sources).issubset(desk.sources)
+
+
+def test_corrected_source_handoff_is_new_cited_bounded_and_page_exact():
+    import copy
+
+    from trader.models import dumps
+
+    cfg = Settings()
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    desk.sources["passage-old"] = {
+        "id": "passage-old",
+        "source": "SEC EDGAR filing passage",
+        "content": "old",
+    }
+    for identifier, content in (
+        ("passage-first", "first"),
+        ("passage-second", "second"),
+        ("passage-third", "ß" + "a" * 6500),
+        ("passage-uncited", "not cited"),
+    ):
+        desk.sources[identifier] = {
+            "id": identifier,
+            "source": "SEC EDGAR filing passage",
+            "content": content,
+        }
+    desk.sources["news-cited"] = {"id": "news-cited", "source": "news", "content": "not SEC"}
+    desk.correction = {
+        "invalidated": ["business", "valuation", "adversarial"],
+        "reports": {"business": {"evidence_ids": ["passage-old"]}},
+    }
+    desk.reports = {
+        "business": {
+            "evidence_ids": ["passage-old", "passage-first", "passage-second", "passage-third", "news-cited"]
+        },
+        "catalysts": {"evidence_ids": ["passage-uncited"]},
+    }
+    originals = copy.deepcopy(desk.sources)
+    handoff = desk.correction_source_handoff({"business", "catalysts"})
+    assert handoff["eligible_ids"] == ["passage-third", "passage-second", "passage-first"]
+    assert handoff["included_ids"] == ["passage-third"]
+    assert handoff["omitted_ids"] == ["passage-second", "passage-first"]
+    assert (handoff["eligible_count"], handoff["included_count"], handoff["omitted_count"]) == (3, 1, 2)
+    assert all(len(page["content"]) <= 6000 for page in handoff["pages"])
+    reader = next(t for t in desk.tools() if t.name == "read_source")
+    first = handoff["pages"][0]
+    continuation = reader.invoke({"source_id": first["id"], "offset": first["next_offset"]})
+    assert json.loads(first["content"] + continuation["content"]) == originals[first["id"]]["content"]
+    assert len(handoff["pages"]) == 1
+    assert "passage-second" in handoff["omitted_ids"]
+    assert desk.correction_source_handoff(set())["eligible_count"] == 0
+    assert desk.sources == originals
+    assert len(dumps(handoff)) < 7000
+
+
+def test_corrected_source_handoff_includes_preexisting_new_citation():
+    cfg = Settings()
+    desk = ResearchDesk(
+        cfg, Evidence(), {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    desk.sources["passage-cached"] = {
+        "id": "passage-cached",
+        "source": "SEC EDGAR filing passage",
+        "content": "Existing source",
+    }
+    desk.correction = {
+        "invalidated": ["business", "valuation", "adversarial"],
+        "reports": {"business": {"evidence_ids": ["fixture-sec"]}},
+    }
+    desk.reports["business"] = {"evidence_ids": ["fixture-sec", "passage-cached"]}
+    handoff = desk.correction_source_handoff({"business"})
+    assert handoff["eligible_ids"] == handoff["included_ids"] == ["passage-cached"]
+    assert handoff["pages"][0] == desk.original_source_page("passage-cached", desk.sources["passage-cached"])
 
 
 @pytest.mark.parametrize("queries", [[], ["a"] * 4, ["a"] * 7, [" "], ["a" * 301]])

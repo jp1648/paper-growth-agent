@@ -314,6 +314,28 @@ def test_sec_rejects_untrusted_origin_before_network(url):
         provider.request(url)
 
 
+@pytest.mark.parametrize("extra_byte", [False, True])
+def test_sec_streamed_response_byte_bound(extra_byte):
+    from trader.evidence import SEC_MAX_RESPONSE_BYTES, EvidenceProvider, EvidenceTooLarge
+
+    class Chunks(httpx.SyncByteStream):
+        def __iter__(self):
+            yield b"a" * 6_000_000
+            yield b"b" * (SEC_MAX_RESPONSE_BYTES - 6_000_000)
+            if extra_byte:
+                yield b"c"
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, stream=Chunks())))
+    provider = EvidenceProvider(Settings(sec_user_agent="Test contact@example.org"), None, None, client)
+    if extra_byte:
+        with pytest.raises(EvidenceTooLarge):
+            provider.request("https://www.sec.gov/Archives/filing.htm")
+    else:
+        assert (
+            len(provider.request("https://www.sec.gov/Archives/filing.htm").content) == SEC_MAX_RESPONSE_BYTES
+        )
+
+
 @pytest.mark.parametrize(
     "stamp,expected", [("2026-10-21T15:00:00Z", D("123")), ("2025-11-02T15:00:00Z", None)]
 )
