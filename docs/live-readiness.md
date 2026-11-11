@@ -5240,3 +5240,45 @@ No funding allocation was renewed, paid research rerun, paper study activated or
 order submitted. The completed PG11 allocation remains completed. These are
 implemented and deployed engineering fixes; successful investment research,
 independent economic acceptance and trial-opening gates remain separate work.
+
+
+### November 11: remaining acceptance work resumed
+
+A fresh read-only runtime audit verified the deployed `9d0f4ae` image and $10
+run/day limits, preserved pause, no active paper study or extension, 64 settled
+spending records and no duplicate run keys. Gross November 11 research consumption
+is $9.9529325 including testing; its $0.0470675 remainder cannot fund another full
+run. The ordinary-accounting view excludes settled testing and must not be used
+to manufacture additional testing authority. The completed PG11 allocation remains
+retired; its unused remainder is not renewed permission.
+
+Fresh paper-broker GETs at 23:20 UTC matched cash and the one-share AAPL position
+exactly, with no open orders. The recomputed daily-loss baseline was valid and
+unbreached. The broker was closed. This observation is not a new saved acceptance,
+held-position thesis or permission to trade, and opening-time checks must be fresh.
+Provider credit evidence was refreshed separately; no billing change, allocation
+installation or paid model call occurred.
+
+The next observed development case is prepared privately as
+`annual-testing-pg-full-regression-20261112-12`, retaining the exact prior PG suite
+and new deployed candidate. The package remains nonlaunchable without fresh
+funding, runtime bindings and independent preflight. The earliest full-cap window
+under the current daily limit is November 12, 00:00 New York. Funding evidence must
+be refreshed within 30 minutes of installation; today's observation cannot be
+reused as fresh evidence at that time. No automatic wakeup or retry was installed.
+
+Following development economic acceptance, independently select and freeze a
+truly unseen full-evidence and missing-evidence cohort; prior PG/MSFT cases cannot
+be relabeled unseen. Complete current held-AAPL research and then bind the final
+opening approval to a future broker-calendar schedule, at least 60 sessions and
+12 weeks, with an audited experiment extension beyond the original January 21
+end. Elapsed opening drafts cannot be backdated. All three requested acceptance
+objectives remain open; prepared packages and read-only checks are not passed
+research or trial activation.
+
+The PG12 draft now uses ordinary transactional reservations (`testing=False`),
+while its gross-day preflight still counts historical testing consumption. Root
+review caught and removed the unnecessary testing-budget bypass. Offline tests
+verified 14 admission denials, exclusive replay prevention, matching one-run
+authority retirement on success/failure, and rejection of a second ordinary claim
+after the first reserves $10. Fresh funding and final launch bindings remain unset.
