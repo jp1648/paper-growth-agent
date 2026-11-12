@@ -5314,3 +5314,19 @@ current, candidate and rollback images were retained. No accounting history
 was deleted. The next observed PG12 regression remains individually capped at
 $10 so today's existing $9.9529325 plus its reservation cannot exceed $20.
 Deployment is not research acceptance or paper-trial activation.
+
+
+PG12 (`annual-testing-pg-full-regression-20261111-12`) then ran once with a
+$10 cap. It settled $4.0563900 with zero unknown-cost calls; Nov11 gross total
+is $14.0093225. All 64 previous spending rows remain byte-identical. Its
+one-run funding authorization retired in finally; trading pause and existing
+orders/activities were unchanged. It completed correction valuation, fresh
+critique and a WATCH decision, but failed mechanical acceptance with
+`required_valuation_missing`: no required bear/base/bull valuation in the final
+result. This was not a dollar-budget exception. It remains an observed
+regression, not an accepted unseen case. No further paid retry occurred.
+
+Work stopped at the user's separate 50% Codex usage threshold after terminal
+settlement verification. Next work is review of the saved final output and
+valuation handoff before considering another paid attempt; broader research
+acceptance and paper-trial activation remain incomplete.
