@@ -25,6 +25,9 @@ test("private dashboard, research filtering, traces and responsive layout", asyn
   await expect(
     page.getByText(/Missing billing data does not mean zero cost/),
   ).toBeVisible();
+  await expect(
+    page.getByText(/Cost-adjusted P.L is unavailable in this snapshot/),
+  ).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.screenshot({
     path: "../state/dashboard-desktop.png",
@@ -68,6 +71,27 @@ test("accepted investigation is readable and trace filters work", async ({
   await page.getByRole("button", { name: "Enter observatory" }).click();
   await expect(page.getByRole("button", { name: /Refresh/ })).toBeVisible();
   const original = await (await page.request.get("/api/data")).json();
+  original.snapshot.portfolio.economic_result = {
+    broker_pnl_usd: "-2",
+    recorded_operating_cost_usd_estimate: "4.25",
+    pnl_after_recorded_costs_usd_estimate: "-6.25",
+    unknown_cost_requests: 2,
+    unresolved_research_runs: 1,
+    research_run_ledger: {
+      provider_reconciled_usd: "1.5",
+      estimated_usd: "3.25",
+      unresolved_recorded_usd: "5",
+      settled_runs: 2,
+      unresolved_runs: 1,
+      unbounded_unknown_runs: 0,
+    },
+    complete: false,
+    scope: "Current experiment journal only.",
+    limitations: [
+      "Broker fees are already in broker P/L.",
+      "Infrastructure costs are not fully recorded.",
+    ],
+  };
   original.snapshot.x_credits = {
     status: "available",
     checked_at: "2026-11-06T04:00:00Z",
@@ -93,6 +117,7 @@ test("accepted investigation is readable and trace filters work", async ({
         evidence_ids: ["source-1"],
       },
       reports: {
+        valuation: { normalization_review: {} as Record<string, unknown> },
         business: { conclusion: "Complete findings preserved." },
         adversarial: {
           unresolved_material_gaps: true,
@@ -123,6 +148,25 @@ test("accepted investigation is readable and trace filters work", async ({
     }),
   );
   await page.getByRole("button", { name: /Refresh/ }).click();
+  const economic = page.getByRole("region", { name: "Economic result" });
+  const runCosts = page.getByRole("region", { name: "Research run ledger" });
+  await expect(
+    runCosts.getByText(/Provider-reconciled: \$1.5000/),
+  ).toBeVisible();
+  await expect(runCosts.getByText(/Estimated: \$3.2500/)).toBeVisible();
+  await expect(
+    runCosts.getByText(/do not add the two views together/),
+  ).toBeVisible();
+  await expect(economic.getByText("-$6.2500", { exact: true })).toBeVisible();
+  await expect(
+    economic.getByText(/2 unpriced requests · 1 unresolved research runs/),
+  ).toBeVisible();
+  await expect(
+    economic.getByText(/not an all-in investment return/),
+  ).toBeVisible();
+  await expect(
+    economic.getByText(/Infrastructure costs are not fully recorded/),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "X API credits" }),
   ).toBeVisible();
@@ -149,6 +193,42 @@ test("accepted investigation is readable and trace filters work", async ({
     page.getByRole("heading", { name: "WATCH — no trade proposed" }),
   ).toBeVisible();
   await expect(page.getByText("Material evidence gaps remain")).toBeVisible();
+  const accounting = page.getByRole("region", {
+    name: "Accounting normalization review",
+  });
+  await expect(
+    accounting.getByText("No accounting normalization review saved."),
+  ).toBeVisible();
+  original.snapshot.runs[0].reports.valuation.normalization_review = {
+    cash_flow_basis:
+      "Historical cash-flow proxy; discount basis requires review.",
+    debt_and_cash: "Debt treatment is unresolved.",
+    dilution_and_sbc: "Dilution needs filing verification.",
+    nonrecurring_items: "No conclusion recorded.",
+    unresolved_material_gaps: true,
+    evidence_ids: ["source-1"],
+  };
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(
+    accounting.getByText("Agent reports unresolved accounting gaps."),
+  ).toBeVisible();
+  await accounting.locator("summary").click();
+  await expect(
+    accounting.getByText("Debt treatment is unresolved."),
+  ).toBeVisible();
+  await expect(
+    accounting.getByText(/not independent verification/),
+  ).toBeVisible();
+  await expect(accounting.getByText("source-1", { exact: true })).toBeVisible();
+  original.snapshot.runs[0].reports.valuation.normalization_review.unresolved_material_gaps = false;
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(
+    accounting.getByText("Agent reports no material accounting gaps."),
+  ).toBeVisible();
+  await expect(
+    accounting.getByText(/not independent verification/),
+  ).toBeVisible();
+
   const report = page.locator("details").filter({
     has: page.locator("summary", {
       hasText: "Business quality & financial health",
@@ -180,4 +260,102 @@ test("accepted investigation is readable and trace filters work", async ({
       page.getByRole("button", { name: filter, exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
   }
+});
+
+test("long trace loads every event and full details require authentication", async ({
+  page,
+  request,
+}) => {
+  test.skip(!password, "Requires isolated fixture dashboard");
+  await page.goto("/login");
+  await page.getByLabel("Workspace password").fill(password!);
+  await page.getByRole("button", { name: "Enter observatory" }).click();
+  await page.getByRole("button", { name: "Traces", exact: true }).click();
+  await page.locator(".run-choice").filter({ hasText: "long-fixture" }).click();
+  await expect(page.locator(".trace-row")).toHaveCount(100);
+  await page
+    .getByRole("button", { name: "Load older events", exact: true })
+    .click();
+  await expect(page.locator(".trace-row")).toHaveCount(200);
+  await page
+    .getByRole("button", { name: "Load older events", exact: true })
+    .click();
+  await expect(page.locator(".trace-row")).toHaveCount(205);
+  await expect(
+    page.getByRole("button", { name: "Load older events", exact: true }),
+  ).toHaveCount(0);
+  await page.locator(".trace-row").first().locator("summary").click();
+  const href = await page
+    .getByRole("link", { name: "Open complete event (new tab)" })
+    .first()
+    .getAttribute("href");
+  expect(href).toBeTruthy();
+  expect((await request.get(href!)).status()).toBe(401);
+  const full = await page.request.get(href!);
+  expect(full.headers()["cache-control"]).toContain("no-store");
+  expect((await full.json()).event.payload.end_marker).toBe("FULL_EVENT_END");
+  expect(
+    (
+      await page.request.get("/api/data?run=long-fixture&cursor=invalid")
+    ).status(),
+  ).toBe(400);
+});
+
+test("execution evidence distinguishes measured, missing and empty coverage", async ({
+  page,
+}) => {
+  test.skip(!password, "Requires isolated fixture dashboard");
+  await page.goto("/login");
+  await page.getByLabel("Workspace password").fill(password!);
+  await page.getByRole("button", { name: "Enter observatory" }).click();
+  await expect(page.getByRole("button", { name: /Refresh/ })).toBeVisible();
+  const data = await (await page.request.get("/api/data")).json();
+  await page.route("**/api/data*", (route) => route.fulfill({ json: data }));
+  const panel = page.getByRole("region", { name: "Paper execution evidence" });
+  await expect(panel.getByText(/unavailable in this snapshot/)).toBeVisible();
+  data.snapshot.portfolio.execution_quality = {
+    fill_count: 2,
+    referenced_fill_count: 2,
+    reference_coverage_complete: true,
+    fill_notional_usd: "996",
+    aggregate_slippage_usd: "-4",
+    aggregate_slippage_bps: "-40",
+    referenced_slippage_usd: "-4",
+    scope: "Current experiment, not a prospective window",
+    limitations: ["Paper fills do not establish live execution quality."],
+  };
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(panel.getByText("-40.00 bps")).toBeVisible();
+  await expect(
+    panel.getByText("2 of 2 fills have quote references."),
+  ).toBeVisible();
+  await panel.getByText("Measurement limits").click();
+  await expect(
+    panel.getByText("Paper fills do not establish live execution quality."),
+  ).toBeVisible();
+  await panel.screenshot({ path: "../state/execution-quality-desktop.png" });
+  Object.assign(data.snapshot.portfolio.execution_quality, {
+    referenced_fill_count: 1,
+    reference_coverage_complete: false,
+    aggregate_slippage_usd: null,
+    aggregate_slippage_bps: null,
+  });
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(panel.getByText("Unknown", { exact: true })).toHaveCount(2);
+  await expect(panel.getByText(/Quote evidence is incomplete/)).toBeVisible();
+  Object.assign(data.snapshot.portfolio.execution_quality, {
+    fill_count: 0,
+    referenced_fill_count: 0,
+    fill_notional_usd: "0",
+    referenced_slippage_usd: null,
+  });
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(panel.getByText(/No fills to measure yet/)).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await panel.screenshot({ path: "../state/execution-quality-mobile.png" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

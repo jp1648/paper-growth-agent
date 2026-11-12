@@ -1,6 +1,7 @@
+import { queryTrace } from "./trace-query.mjs";
 import "server-only";
 import { readXCredits } from "./x-credits.mjs";
-import type { OverviewData, Snapshot, TraceEvent } from "./types";
+import type { OverviewData, Snapshot } from "./types";
 import { Pool } from "pg";
 let creditCheck:
   { expires: number; result: ReturnType<typeof readXCredits> } | undefined;
@@ -14,7 +15,7 @@ function xCredits() {
   return creditCheck.result;
 }
 const globalDB = globalThis as unknown as { dashboardPool?: Pool };
-function pool() {
+export function pool() {
   if (!process.env.DATABASE_URL) throw new Error("Database not configured");
   return (globalDB.dashboardPool ??= new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -47,15 +48,10 @@ export async function overview(): Promise<OverviewData> {
     at: latest.rows[0].at.toISOString(),
   };
 }
-export async function trace(run: string): Promise<TraceEvent[]> {
-  if (!run || run.length > 200) throw new Error("Invalid run");
-  const result = await pool().query<Omit<TraceEvent, "at"> & { at: Date }>(
-    `SELECT at,name,phase,span_id,parent_span_id,
-    left(payload::text,12000) AS detail, length(payload::text)>12000 AS truncated
-    FROM telemetry_events WHERE run_key=$1 ORDER BY at DESC LIMIT 100`,
-    [run],
-  );
-  return result.rows
-    .reverse()
-    .map((row) => ({ ...row, at: row.at.toISOString() }));
+export async function trace(
+  run: string,
+  cursor: string | null,
+  event: string | null,
+) {
+  return queryTrace(pool(), run, cursor, event);
 }

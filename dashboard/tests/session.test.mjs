@@ -18,3 +18,25 @@ test("authentication fails closed and sessions expire", () => {
   assert.equal(validSession(undefined, secret), false);
   assert.equal(validSession("Infinity.x", secret), false);
 });
+
+test("sessions require canonical signed tokens", () => {
+  const issued = 1000;
+  const token = signSession(secret, issued);
+  for (const malformed of [
+    token + ".",
+    token + "..",
+    token + ".extra",
+    " " + token,
+    token + " ",
+  ]) {
+    assert.equal(validSession(malformed, secret, issued + 1), false, malformed);
+  }
+});
+
+test("simultaneous logins have independent session identities", () => {
+  const first = signSession(secret, 1000);
+  const second = signSession(secret, 1000);
+  assert.notEqual(first, second);
+  assert.equal(validSession(first, secret, 1001), true);
+  assert.equal(validSession(second, secret, 1001), true);
+});

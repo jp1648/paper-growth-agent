@@ -1,4 +1,4 @@
-"""Provision a local SELECT-only dashboard login without printing credentials."""
+"""Provision a local telemetry-reader dashboard login with session storage without printing credentials."""
 
 import os
 import secrets
@@ -24,6 +24,7 @@ with psycopg.connect(
     db.execute("GRANT USAGE ON SCHEMA public TO dashboard_reader")
     db.execute("GRANT SELECT ON telemetry_events TO dashboard_reader")
     db.execute("ALTER ROLE dashboard_reader SET default_transaction_read_only = on")
+    db.execute((root / "deploy/dashboard-sessions.sql").read_text())
 with os.fdopen(os.open(env, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as output:
     output.write(
         "DATABASE_URL=postgresql://dashboard_reader:"
@@ -34,4 +35,6 @@ with os.fdopen(os.open(env, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") a
         + "\nDATABASE_SSL=false\n"
     )
 env.chmod(0o600)
-print("Dashboard read-only login and private environment configured. No credentials displayed.")
+print(
+    "Dashboard telemetry reader, session storage and private environment configured. No credentials displayed."
+)

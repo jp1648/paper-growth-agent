@@ -1,0 +1,27 @@
+[Unit]
+Description=Persistent private Temporal research coordinator
+Wants=network-online.target
+After=network-online.target temporal-proxy.service
+Requires=temporal-proxy.service
+RequiresMountsFor=@TEMPORAL_ROOT@
+ConditionPathExists=@TEMPORAL_ROOT@/server.yaml
+
+[Service]
+User=trader-temporal
+Group=trader-temporal
+EnvironmentFile=/etc/trader-temporal.env
+WorkingDirectory=@TEMPORAL_ROOT@
+ExecStart=@TEMPORAL_ROOT@/temporal-server --config . --env server --allow-no-auth start
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=90
+MemoryMax=1G
+TasksMax=256
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

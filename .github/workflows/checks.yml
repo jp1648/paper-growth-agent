@@ -21,13 +21,34 @@ jobs:
           enable-cache: true
           python-version: "3.12"
       - run: uv sync --locked
+      - run: uv export --locked --no-dev --no-emit-project --format requirements-txt --output-file /tmp/trader-runtime-requirements.txt
+      - run: uv tool run pip-audit==2.10.1 -r /tmp/trader-runtime-requirements.txt
       - run: uv run ruff check trader tests deploy
       - run: uv run ruff format --check trader tests deploy
-      - run: uv run pytest -q
+      - run: uv run --with coverage==7.17.2 coverage run --branch --source=trader,deploy -m pytest -q
         env:
           TEST_OBSERVABILITY_DATABASE_URL: postgresql://postgres:isolated-ci-fixture@localhost:5432/postgres
+      - run: uv run --with coverage==7.17.2 coverage report --fail-under=80
+      - run: uv run python deploy/check-safety-mutations.py
   dashboard:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-ci-fixture
+          POSTGRES_DB: trader_dashboard_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_OBSERVABILITY_DATABASE_URL: postgresql://postgres:isolated-ci-fixture@127.0.0.1:5432/trader_dashboard_test
+      DATABASE_URL: postgresql://postgres:isolated-ci-fixture@127.0.0.1:5432/trader_dashboard_test
+      DASHBOARD_PASSWORD: isolated-browser-fixture-password
+      TEST_DASHBOARD_PASSWORD: isolated-browser-fixture-password
+      TEST_DASHBOARD_URL: http://127.0.0.1:3017
+      X_BEARER_TOKEN: ""
     defaults:
       run:
         working-directory: dashboard
@@ -35,10 +56,33 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
+      - run: npm audit --audit-level=moderate
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - run: node e2e/seed.mjs
+      # Packaged Chrome has Ubuntu's AppArmor user-namespace profile.
+      - run: |
+          if ! command -v google-chrome >/dev/null 2>&1; then
+            npx playwright install --with-deps chrome
+          fi
+          google-chrome --version
+      - run: npx playwright test
+        env:
+          TEST_START_SERVER: "1"
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - run: go install github.com/zricethezav/gitleaks/v8@v8.30.1
+      - run: gitleaks git . --redact --log-opts=--all

@@ -6,7 +6,7 @@ const reportNames: Record<string, string> = {
   business: "Business quality & financial health",
   catalysts: "Catalysts & timing",
   valuation: "Valuation & assumptions",
-  adversarial: "Independent challenge & risks",
+  adversarial: "Adversarial agent challenge & risks",
 };
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 const failure = (e: TraceEvent) =>
@@ -32,12 +32,18 @@ export default function Investigation({
   tab,
   events,
   traceError,
+  hasOlder,
+  traceLoading,
+  loadOlder,
   setTab,
 }: {
   run: ResearchRun | undefined;
   tab: string;
   events: TraceEvent[];
   traceError: string;
+  hasOlder: boolean;
+  traceLoading: boolean;
+  loadOlder: () => void;
   setTab: (tab: string) => void;
 }) {
   const [filter, setFilter] = useState("All events");
@@ -60,6 +66,16 @@ export default function Investigation({
     review && typeof review === "object" && !Array.isArray(review) ? review : {}
   ) as Record<string, unknown>;
   const gaps = critique.unresolved_material_gaps === true;
+  const valuation = run.reports.valuation as
+    Record<string, unknown> | undefined;
+  const rawAccounting = valuation?.normalization_review;
+  const accounting = (
+    rawAccounting &&
+    typeof rawAccounting === "object" &&
+    !Array.isArray(rawAccounting)
+      ? rawAccounting
+      : {}
+  ) as Record<string, unknown>;
   const cited = new Set(
     Array.isArray(decision?.evidence_ids) ? decision.evidence_ids : [],
   );
@@ -142,7 +158,7 @@ export default function Investigation({
             <div className="research-warning">
               <strong>Material evidence gaps remain</strong>
               <p>
-                The independent reviewer flagged unresolved issues. Research
+                The adversarial agent flagged unresolved issues. Research
                 acceptance does not mean the investment thesis is proven.
               </p>
             </div>
@@ -199,12 +215,14 @@ export default function Investigation({
             {text(critique.conclusion) ? (
               <p>{text(critique.conclusion)}</p>
             ) : (
-              <p className="muted">No independent conclusion was recorded.</p>
+              <p className="muted">
+                No adversarial-agent conclusion was recorded.
+              </p>
             )}
             <details className="research-disclosure">
               <summary>Review objections and assumptions</summary>
               <Finding
-                title="Independent objections"
+                title="Adversarial agent objections"
                 value={critique.objections}
               />
               <Finding
@@ -217,6 +235,50 @@ export default function Investigation({
               />
             </details>
           </div>
+          <section
+            className="research-section"
+            aria-label="Accounting normalization review"
+          >
+            <h3>Accounting normalization review</h3>
+            <p className="research-warning">
+              {!Object.keys(accounting).length
+                ? "No accounting normalization review saved."
+                : accounting.unresolved_material_gaps === true
+                  ? "Agent reports unresolved accounting gaps."
+                  : accounting.unresolved_material_gaps === false
+                    ? "Agent reports no material accounting gaps."
+                    : "Accounting review status is unavailable."}
+            </p>
+            <p className="muted">
+              Agent-written analysis, not independent verification. A calculated
+              cash-flow proxy does not establish fair value.
+            </p>
+            {Object.keys(accounting).length > 0 && (
+              <details className="research-disclosure">
+                <summary>Inspect accounting treatment and citations</summary>
+                <Finding
+                  title="Cash-flow basis and discount consistency"
+                  value={accounting.cash_flow_basis || "Not recorded"}
+                />
+                <Finding
+                  title="Debt and cash"
+                  value={accounting.debt_and_cash || "Not recorded"}
+                />
+                <Finding
+                  title="Dilution and stock compensation"
+                  value={accounting.dilution_and_sbc || "Not recorded"}
+                />
+                <Finding
+                  title="Nonrecurring items"
+                  value={accounting.nonrecurring_items || "Not recorded"}
+                />
+                <Finding
+                  title="Accounting evidence IDs"
+                  value={accounting.evidence_ids || "Not recorded"}
+                />
+              </details>
+            )}
+          </section>
           <div className="research-section">
             <h3>Specialist reports</h3>
             <p className="muted">
@@ -299,21 +361,29 @@ export default function Investigation({
               ))}
             </div>
             <p>
-              {visible.length} of {events.length} loaded events · latest 100
-              available here
+              {visible.length} of {events.length} loaded events
             </p>
           </div>
           <p className="muted">
             Events are shown chronologically. A start without an end can mean
             interrupted or still running.
           </p>
+          {hasOlder && (
+            <button onClick={loadOlder} disabled={traceLoading}>
+              {traceLoading ? "Loading events…" : "Load older events"}
+            </button>
+          )}
+          {traceLoading && <p role="status">Loading trace events…</p>}
           {traceError && (
             <p role="alert" className="error">
               {traceError}
             </p>
           )}
           {visible.map((e, i) => (
-            <details className="trace-row" key={`${e.span_id}-${e.at}-${i}`}>
+            <details
+              className="trace-row"
+              key={e.event_id ?? `${e.span_id}-${e.at}-${i}`}
+            >
               <summary>
                 <span
                   className={
@@ -335,8 +405,21 @@ export default function Investigation({
               <pre>{payload(e.detail)}</pre>
               {e.truncated && (
                 <p className="notice">
-                  Preview limited to 12,000 characters. Full event remains in
-                  Postgres.
+                  Preview limited to 12,000 characters.{" "}
+                  {e.event_id && (
+                    <a
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      href={
+                        "/api/data?run=" +
+                        encodeURIComponent(run.id) +
+                        "&event=" +
+                        encodeURIComponent(e.event_id)
+                      }
+                    >
+                      Open complete event (new tab)
+                    </a>
+                  )}
                 </p>
               )}
             </details>

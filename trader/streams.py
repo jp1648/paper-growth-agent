@@ -107,6 +107,8 @@ async def listen(settings, store, config_path):
                                     {"id": message.get("id"), "symbols": message.get("symbols")},
                                 )
                                 wake.set()
+                    # A normal socket close also needs backoff; otherwise this loop reconnects continuously.
+                    raise ConnectionError("Stream closed; reconcile before reconnecting")
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001 - failed cancellation/reconnect must remain observable
@@ -162,7 +164,7 @@ async def listen(settings, store, config_path):
         stream(
             "wss://stream.data.alpaca.markets/v1beta1/news",
             {"action": "auth", "key": key, "secret": secret},
-            {"action": "subscribe", "news": list(settings.universe)},
+            {"action": "subscribe", "news": list(settings.research_universe)},
             "news",
         ),
         finite_runs(),

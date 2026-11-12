@@ -45,6 +45,182 @@ export default function Overview({
           </section>
         ))}
       </div>
+      {s.lifecycle && (
+        <section className="panel" aria-label="Study deadlines">
+          <h2>Study deadlines</h2>
+          <p>
+            Original experiment expiry: {time(s.lifecycle.original_ends_at)}
+          </p>
+          {s.lifecycle.valid ? (
+            <>
+              <p>
+                Research and order cutoff:{" "}
+                {time(s.lifecycle.execution_ends_at ?? undefined)}
+              </p>
+              <p>
+                Reconciliation deadline:{" "}
+                {time(s.lifecycle.effective_ends_at ?? undefined)}
+              </p>
+              <p>
+                {s.lifecycle.amended
+                  ? "An audited extension preserves the original experiment history."
+                  : "No extension installed."}{" "}
+                Reconciliation time does not permit new trades or automatic
+                liquidation.
+              </p>
+            </>
+          ) : (
+            <p className="notice">
+              Lifecycle approval is invalid. New execution is blocked;
+              cancellation remains available.
+            </p>
+          )}
+        </section>
+      )}
+      <section className="panel" aria-label="Economic result">
+        <div className="panel-title">
+          <div>
+            <h2>P/L after recorded operating costs</h2>
+            <p>Partial estimate · not an all-in investment return</p>
+          </div>
+        </div>
+        {p.economic_result ? (
+          <>
+            <div className="metrics">
+              {[
+                ["Broker P/L", p.economic_result.broker_pnl_usd],
+                [
+                  "Recorded operating costs",
+                  p.economic_result.recorded_operating_cost_usd_estimate,
+                ],
+                [
+                  "P/L after recorded costs",
+                  p.economic_result.pnl_after_recorded_costs_usd_estimate,
+                ],
+              ].map(([title, value]) => (
+                <div className="metric" key={String(title)}>
+                  <span>{title}</span>
+                  <strong>{money(value, 4)}</strong>
+                </div>
+              ))}
+            </div>
+            <p className="notice">
+              {p.economic_result.unknown_cost_requests} unpriced requests ·{" "}
+              {p.economic_result.unresolved_research_runs} unresolved research
+              runs. These are excluded from recorded costs, not treated as free.
+            </p>
+            <p className="muted">{p.economic_result.scope}</p>
+            {p.economic_result.research_run_ledger && (
+              <section aria-label="Research run ledger">
+                <h3>Research run ledger · includes evaluations</h3>
+                <p>
+                  Provider-reconciled:{" "}
+                  {money(
+                    p.economic_result.research_run_ledger
+                      .provider_reconciled_usd,
+                    4,
+                  )}
+                  {" · "}Estimated:{" "}
+                  {money(
+                    p.economic_result.research_run_ledger.estimated_usd,
+                    4,
+                  )}
+                  {" · "}Unresolved amounts:{" "}
+                  {money(
+                    p.economic_result.research_run_ledger
+                      .unresolved_recorded_usd,
+                    4,
+                  )}
+                </p>
+                <p className="muted">
+                  {p.economic_result.research_run_ledger.settled_runs} settled
+                  runs · {p.economic_result.research_run_ledger.unresolved_runs}{" "}
+                  unresolved runs ·{" "}
+                  {p.economic_result.research_run_ledger.unbounded_unknown_runs}{" "}
+                  unknown uncapped runs. Current experiment only. Estimates and
+                  unresolved amounts are not final bills. This overlaps the
+                  journal costs above; do not add the two views together.
+                  Infrastructure and data costs are excluded from this
+                  model-only ledger.
+                </p>
+              </section>
+            )}
+            <ul className="muted">
+              {p.economic_result.limitations.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="muted">
+            Cost-adjusted P/L is unavailable in this snapshot. Missing costs do
+            not mean zero cost.
+          </p>
+        )}
+      </section>
+      <section className="panel" aria-label="Paper execution evidence">
+        <div className="panel-title">
+          <div>
+            <h2>Paper execution evidence</h2>
+            <p>Fill prices compared with the retained submission quote</p>
+          </div>
+        </div>
+        {p.execution_quality ? (
+          <>
+            <p>
+              {p.execution_quality.referenced_fill_count} of{" "}
+              {p.execution_quality.fill_count} fills have quote references.
+            </p>
+            <div className="metrics">
+              <div className="metric">
+                <span>Filled notional</span>
+                <strong>{money(p.execution_quality.fill_notional_usd)}</strong>
+              </div>
+              <div className="metric">
+                <span>Total quote-relative slippage</span>
+                <strong>
+                  {p.execution_quality.aggregate_slippage_usd == null
+                    ? "Unknown"
+                    : money(p.execution_quality.aggregate_slippage_usd, 4)}
+                </strong>
+              </div>
+              <div className="metric">
+                <span>Weighted slippage</span>
+                <strong>
+                  {p.execution_quality.aggregate_slippage_bps == null
+                    ? "Unknown"
+                    : `${Number(p.execution_quality.aggregate_slippage_bps).toFixed(2)} bps`}
+                </strong>
+              </div>
+            </div>
+            {!p.execution_quality.reference_coverage_complete && (
+              <p className="notice">
+                {p.execution_quality.fill_count === 0
+                  ? "No fills to measure yet. This is not evidence of zero execution cost."
+                  : `Quote evidence is incomplete. Measured subset: ${money(p.execution_quality.referenced_slippage_usd, 4)}; total slippage remains unknown.`}
+              </p>
+            )}
+            <p className="muted">
+              Positive slippage is worse than the reference; negative is
+              improvement. 1 basis point (bps) = 0.01%.
+            </p>
+            <p className="muted">{p.execution_quality.scope}</p>
+            <details>
+              <summary>Measurement limits</summary>
+              <ul className="muted">
+                {p.execution_quality.limitations.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            </details>
+          </>
+        ) : (
+          <p className="muted">
+            Execution evidence is unavailable in this snapshot. Missing data
+            does not mean zero slippage.
+          </p>
+        )}
+      </section>
       <section className="panel x-credits">
         <div className="panel-title">
           <div>

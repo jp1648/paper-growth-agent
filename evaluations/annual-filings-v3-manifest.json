@@ -1,0 +1,45 @@
+{
+  "suite_sha256": "b66a752fb722b0a68539ce5a5af1ee1c96201919c5f097fb257192765c870f7e",
+  "retrieval_date": "2026-11-06",
+  "sources": [
+    {
+      "symbol": "AAPL",
+      "accession": "0000320193-25-000079",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+      "acceptance_at": "2025-10-31T10:01:26.000Z",
+      "period_end": "2025-09-27",
+      "cfo_usd": "111482000000",
+      "capex_usd": "12715000000",
+      "diluted_shares": "15004697000",
+      "historical_proxy_per_share": "6.582405",
+      "raw_sha256": {
+        "facts.json": "f085735b4d08fb116ade18d24247ffabe11df8eb52eae6556b165831f15ef1ad",
+        "submissions.json": "73e35ef6e705188999d1cd868727a0ac7524cd470cca647f60033f6318eff3c4",
+        "annual.html": "8352df81d4220262ab3be2462b194f2717057993f991b3d12d50d5a8131e2439"
+      },
+      "frozen_text_sha256": "173f3322f861ec4f49004dabeca746ce8c0d0141808502fc1260ad1ec05ae2f7",
+      "sbc_usd": "12863000000"
+    },
+    {
+      "symbol": "MSFT",
+      "accession": "0000950170-25-100235",
+      "filing_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm",
+      "acceptance_at": "2025-07-30T20:11:40.000Z",
+      "period_end": "2025-06-30",
+      "cfo_usd": "136162000000",
+      "capex_usd": "64551000000",
+      "diluted_shares": "7465000000",
+      "historical_proxy_per_share": "9.592900",
+      "raw_sha256": {
+        "facts.json": "8c1903c041f5c27e86ed15f37debb1f41882b7904bba129ef9edc76478b1e8ea",
+        "submissions.json": "1a4256a23be814a5193601a2c733d1da647c45da4d73dfe98eee58e32f8f9251",
+        "annual.html": "d34f3a49dc68d5672f5e97a6c0d871a8b3d3e945c3fd398a55e7f7fb7272499c"
+      },
+      "frozen_text_sha256": "1dbcf727f0e9810d14ad7b848f8996fb98adf7f3862399926a917ddb2fbf2f1f",
+      "sbc_usd": "11974000000"
+    }
+  ],
+  "parent_suite_sha256": "384ac5c22418a293b72e0caa1b237045055a424131349211594f2bc41d8f4eff",
+  "scoring_contract": "financial-provenance-v8",
+  "change": "Canonical ShareBasedCompensation enrichment before any Microsoft candidate; incomplete cases unchanged."
+}

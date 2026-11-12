@@ -20,6 +20,37 @@ export default function Observatory({
     [traceError, setTraceError] = useState(""),
     [search, setSearch] = useState(""),
     [loading, setLoading] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
+  const traceController = useRef<AbortController | null>(null);
+  async function loadOlder() {
+    const controller = traceController.current;
+    if (!controller || !nextCursor || traceLoading) return;
+    setTraceLoading(true);
+    setTraceError("");
+    try {
+      const response = await fetch(
+        "/api/data?run=" +
+          encodeURIComponent(selected) +
+          "&cursor=" +
+          encodeURIComponent(nextCursor),
+        { signal: controller.signal },
+      );
+      if (!response.ok)
+        throw Error("Older events unavailable; retry loading them.");
+      const page = await response.json();
+      if (controller.signal.aborted) return;
+      setEvents((current) => [...page.events, ...current]);
+      setNextCursor(page.next_cursor ?? null);
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setTraceError(
+          error instanceof Error ? error.message : "Trace unavailable",
+        );
+    } finally {
+      if (!controller.signal.aborted) setTraceLoading(false);
+    }
+  }
   const pendingRefresh = useRef<AbortController | null>(null);
   const refresh = useCallback(async () => {
     pendingRefresh.current?.abort();
@@ -56,6 +87,9 @@ export default function Observatory({
   useEffect(() => {
     if (!selected || tab !== "Traces") return;
     const controller = new AbortController();
+    traceController.current = controller;
+    setNextCursor(null);
+    setTraceLoading(true);
     setEvents([]);
     setTraceError("");
     fetch("/api/data?run=" + encodeURIComponent(selected), {
@@ -65,12 +99,19 @@ export default function Observatory({
         if (!r.ok) throw Error("Trace unavailable");
         return r.json();
       })
-      .then((d) => setEvents(d.events))
+      .then((d) => {
+        if (controller.signal.aborted) return;
+        setEvents(d.events);
+        setNextCursor(d.next_cursor ?? null);
+      })
       .catch((e) => {
         if (e.name !== "AbortError") setTraceError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTraceLoading(false);
       });
     return () => controller.abort();
-  }, [selected, data.at, tab]);
+  }, [selected, tab]);
   const s = data.snapshot,
     p = s?.portfolio,
     runs = s?.runs || [];
@@ -234,6 +275,9 @@ export default function Observatory({
                     tab={tab}
                     events={events}
                     traceError={traceError}
+                    hasOlder={Boolean(nextCursor)}
+                    traceLoading={traceLoading}
+                    loadOlder={loadOlder}
                     setTab={setTab}
                   />
                 </div>

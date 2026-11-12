@@ -7,7 +7,7 @@ import os
 import sqlite3
 import tempfile
 import threading
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 from .models import TERMINAL, dec, dt, dumps, now
@@ -69,6 +69,98 @@ class Store:
             )
         ]
 
+    def approve_adjustments(self, adjustments):
+        """Preflighted approvals and their audit receipts commit as one unit."""
+        stamp = now().isoformat()
+        with self.db:
+            for item in adjustments:
+                body = dumps(item)
+                self.db.execute(
+                    "INSERT INTO documents VALUES (?,?,?,?)",
+                    (self.scope, "adjustment", item["id"], body),
+                )
+                self.db.execute(
+                    "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+                    (self.scope, stamp, "explicit_adjustment", body),
+                )
+        for item in adjustments:
+            emit("document.adjustment", {"key": item["id"], "value": item}, experiment_id=self.scope)
+            emit("explicit_adjustment", item, experiment_id=self.scope)
+
+    def claim_paper_slot(self, study_id, slot_id, receipt, *, kind="paper_slot", pending=None):
+        """Consume a scheduled slot once; a crash cannot grant a second paid attempt."""
+        if not isinstance(study_id, str) or not study_id or not isinstance(slot_id, str) or not slot_id:
+            raise ValueError("Require study and slot identities")
+        if {"study_id", "slot_id", "status"} & receipt.keys():
+            raise ValueError("Receipt cannot override claim identity or status")
+        if kind not in {"paper_slot", "paper_invocation"}:
+            raise ValueError("Unknown study claim kind")
+        if pending is not None and (
+            kind != "paper_slot"
+            or not isinstance(pending, dict)
+            or pending.get("status") != "starting"
+            or pending.get("slot") != slot_id
+            or pending.get("study_id") != study_id
+            or pending.get("schedule_sha256") != receipt.get("schedule_sha256")
+            or not isinstance(pending.get("state"), dict)
+            or pending["state"].get("run_key") != slot_id
+            or pending["state"].get("symbol") != receipt.get("symbol")
+        ):
+            raise ValueError("Pending invocation must match the original scheduled slot")
+        key = dumps([study_id, slot_id])
+        body = dumps({"study_id": study_id, "slot_id": slot_id, "status": "claimed", **receipt})
+        with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            if self.get(key, kind) is not None:
+                return False
+            self.db.execute("INSERT INTO documents VALUES (?,?,?,?)", (self.scope, kind, key, body))
+            if pending is not None:
+                self.db.execute(
+                    "INSERT INTO documents VALUES (?,?,?,?)",
+                    (self.scope, "paper_slot_pending", slot_id, dumps(pending)),
+                )
+            self.db.execute(
+                "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+                (self.scope, now().isoformat(), kind + "_claimed", body),
+            )
+        emit(kind + "_claimed", json.loads(body), experiment_id=self.scope)
+        return True
+
+    def approve_revision(self, identifier, revision):
+        """Commit the accounting correction and its approval receipt together."""
+        receipt = {"id": identifier, **revision}
+        with self.db:
+            self.db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?)",
+                (self.scope, "broker_revision", identifier, dumps(revision)),
+            )
+            self.db.execute(
+                "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+                (self.scope, now().isoformat(), "broker_revision_approved", dumps(receipt)),
+            )
+        emit("document.broker_revision", {"key": identifier, "value": revision}, experiment_id=self.scope)
+        emit("broker_revision_approved", receipt, experiment_id=self.scope)
+
+    def save_daily_report(self, sample, report):
+        """Publish the measurement, report and audit receipt together."""
+        date = sample["date"]
+        receipt = {"date": date, "equity": report["close_equity"], "benchmarks": report["benchmarks"]}
+        with self.db:
+            self.db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?) ON CONFLICT(scope,kind,key) DO UPDATE SET body=excluded.body",
+                (self.scope, "daily", date, dumps(sample)),
+            )
+            self.db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?)", (self.scope, "daily_report", date, dumps(report))
+            )
+            self.db.execute(
+                "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+                (self.scope, now().isoformat(), "daily_report", dumps(receipt)),
+            )
+        for kind, body in (("daily", sample), ("daily_report", report)):
+            emit("document." + kind, {"key": date, "value": body}, experiment_id=self.scope)
+        emit("daily_report", receipt, experiment_id=self.scope)
+
     def log(self, kind, body):
         with self.db:
             self.db.execute(
@@ -83,22 +175,93 @@ class Store:
             run_key=body.get("run_key") if isinstance(body, dict) else None,
         )
 
-    def backup(self):
-        """Publish a consistent SQLite backup once per UTC day, including WAL transactions."""
+    def activities(self):
+        """Effective broker activities; original records and approved revision chains remain intact."""
+        result = []
+        revisions = self.items("broker_revision")
+        for original in self.items("activity"):
+            current = original
+            # Each approval names its exact predecessor, so unrelated/replayed approvals cannot apply.
+            remaining = [r for r in revisions if "sequence" not in r]
+            while True:
+                matches = [r for r in remaining if r["before"] == current]
+                if not matches:
+                    break
+                if len(matches) != 1:
+                    raise RuntimeError("Conflicting broker activity revisions")
+                current = matches[0]["after"]
+                remaining.remove(matches[0])
+            ordered = sorted(
+                (r for r in revisions if "sequence" in r and r["before"]["id"] == original["id"]),
+                key=lambda r: r["sequence"],
+            )
+            for revision in ordered:
+                if revision["before"] != current:
+                    raise RuntimeError("Broker revision predecessor mismatch")
+                current = revision["after"]
+            result.append(current)
+        return result
+
+    def backup(self, intent_id=None):
+        """Publish a verified daily backup or immutable prepared-intent checkpoint."""
+        intent = self.get(intent_id, "intent") if intent_id else None
+        if intent_id and (not intent or intent.get("status") != "prepared"):
+            raise RuntimeError("Execution checkpoint requires a prepared intent")
         directory = self.path.parent / "backups"
         directory.mkdir(mode=0o700, exist_ok=True)
-        destination = directory / ("ledger-" + now().date().isoformat() + ".sqlite")
-        if destination.exists():
+        name = (
+            "intent-" + hashlib.sha256(f"{self.scope}:{intent_id}".encode()).hexdigest()
+            if intent_id
+            else "ledger-" + now().date().isoformat()
+        )
+        destination = directory / (name + ".sqlite")
+
+        def verify(path):
+            if path.is_symlink() or not path.is_file() or path.stat().st_mode & 0o077:
+                raise RuntimeError("Backup must be a private regular file")
+            with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as saved:
+                if saved.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+                    raise RuntimeError("Backup integrity check failed")
+                row = saved.execute(
+                    "SELECT body FROM documents WHERE scope='global' AND kind='state' AND key='active'"
+                ).fetchone()
+                experiment = json.loads(row[0]) if row else None
+                if experiment != self.experiment:
+                    raise RuntimeError("Backup belongs to a different experiment; preserve and investigate")
+                if intent_id:
+                    row = saved.execute(
+                        "SELECT body FROM documents WHERE scope=? AND kind='intent' AND key=?",
+                        (self.scope, intent_id),
+                    ).fetchone()
+                    if not row or json.loads(row[0]) != intent:
+                        raise RuntimeError("Execution checkpoint does not match prepared intent")
+
+        def sync_directory():
+            fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+
+        if destination.exists() or destination.is_symlink():
+            verify(destination)
+            sync_directory()
             return destination
         fd, name = tempfile.mkstemp(prefix=".backup-", suffix=".sqlite", dir=directory)
         os.close(fd)
         temporary = Path(name)
         try:
-            with sqlite3.connect(temporary) as target:
+            with closing(sqlite3.connect(temporary)) as target:
                 self.db.backup(target)
                 if target.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise RuntimeError("Backup integrity check failed")
+                # Publish one closed database, not a file depending on temporary WAL sidecars.
+                target.execute("PRAGMA journal_mode=DELETE")
+            verify(temporary)
+            with temporary.open("rb") as source:
+                os.fsync(source.fileno())
             os.replace(temporary, destination)
+            sync_directory()
         finally:
             temporary.unlink(missing_ok=True)
         return destination
@@ -116,8 +279,12 @@ class Store:
 
     def order(self, order):
         old = self.get(order["client_order_id"], "order")
+        corrected = old and any(
+            revision.get("order_before") == old and revision.get("order_after") == order
+            for revision in self.items("broker_revision")
+        )
         if old:
-            if dec(order["filled_qty"]) < dec(old["filled_qty"]):
+            if not corrected and dec(order["filled_qty"]) < dec(old["filled_qty"]):
                 return
             if dt(order["updated_at"] or order["created_at"]) < dt(old["updated_at"] or old["created_at"]):
                 return

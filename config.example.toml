@@ -9,9 +9,16 @@ experiment_weeks = 12
 max_position = "0.10"
 max_sector = "0.40"
 max_positions = 10
+max_cumulative_loss_fraction = "0.10" # Loss / original capital, excluding external flows; provisional paper limit.
+max_daily_loss_fraction = "0.02" # Loss / prior broker close equity; provisional paper limit.
+# checkpoint_bucket = "your-private-recovery-bucket" # Require verified GCS replication before POST; GCE identity.
+# executor_fence = true # Cloud mutations require this VM to match executor-owner.json in that bucket.
 turnover_30d = "1.0" # Gross filled + pending notional / current equity over 30 days
 cooldown_hours = 24
 price_tolerance = "0.005"
+max_spread_fraction = "0.005" # Spread / midpoint; engineering limit, not a validated strategy parameter.
+max_quote_participation = "0.10" # At most 10% of displayed executable-side size; not guaranteed liquidity.
+max_order_equity = "0.02" # Maximum notional per order / account equity; no automatic slicing.
 fee_buffer = "1"
 quote_max_age_seconds = 60
 halt_max_age_seconds = 180
@@ -35,23 +42,24 @@ research_max_tool_calls = 48
 research_max_seconds = 600
 research_max_input_bytes = 180000
 research_max_output_tokens = 3000
-research_max_cost_usd = "5" # Estimated ceiling, not a spending target or billing guarantee.
-research_daily_cost_usd = "10" # Shared across runs/restarts; New York date when each run starts.
+research_max_cost_usd = "20" # Estimated ceiling, not a spending target or billing guarantee.
+research_daily_cost_usd = "20" # Shared across runs/restarts; New York date when each run starts.
 sec_user_agent = "" # Your application name and contact email, as required by SEC.
-# Standard short-context USD / million tokens, checked 2026-10-28; verify before running.
-input_cost_per_million = "2"
+# Budget ceilings in USD / million tokens, verified 2026-11-08.
+# Input uses the highest Standard short-context cache-write rate (12h); not actual billed usage.
+input_cost_per_million = "5"
 output_cost_per_million = "10"
 
 [role_models.research_lead]
 model = "gpt-6-astra" # Planning, delegation, and final synthesis.
 reasoning_effort = "high"
-input_cost_per_million = "10"
+input_cost_per_million = "25"
 output_cost_per_million = "50"
 
 [role_models.catalysts]
 model = "gpt-6.1-terra" # Focused news/event review; deeper analysis remains with Sol/Astra.
 reasoning_effort = "low"
-input_cost_per_million = "1"
+input_cost_per_million = "2.5"
 output_cost_per_million = "5"
 
 # Operator-verified stock universe and sectors. Research ranks this list; these are examples,
@@ -65,3 +73,8 @@ cik = "789019"
 [universe.AMZN]
 sector = "Consumer Discretionary"
 cik = "1018724"
+
+# Optional research coverage with no order eligibility; do not overlap [universe].
+# [research_only_universe.PG]
+# sector = "Consumer Staples"
+# cik = "80424"
