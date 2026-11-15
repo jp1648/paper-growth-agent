@@ -70,3 +70,14 @@ whose post-baseline record was deleted outside supported workflows. Do not grant
 external writers or reset/delete spending history; add append-only attestations
 before introducing such writers. Evidence hashes are references to reviewed
 artifacts, not cryptographic proof that an operator's assertion is true.
+
+### November 14 monitoring timeout repair
+
+The missing-heartbeat email cycle came from the monitor scanning a 4.5 GB
+telemetry outbox, exceeding its 90-second service timeout. SQLite's connection
+timeout only limits lock waits. Both monitor SQL queries now have a five-second
+execution deadline; an interrupted query emits the existing unhealthy sentinel
+instead of preventing heartbeat publication. Metadata requests and the health
+subprocess also have bounded timeouts with headroom below the service timeout.
+Alert policies remain enabled and unchanged. This does not clear or discard the
+telemetry backlog, approve research, or unpause trading.
