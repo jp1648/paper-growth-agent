@@ -93,6 +93,8 @@ class Sink:
         self.export_lock = self.path.with_suffix(".export.lock")
         self.export_lock.touch(mode=0o600, exist_ok=True)
         with self.db() as db:
+            # Monitoring reads must not block event commits while a backlog is scanned.
+            db.execute("PRAGMA journal_mode=WAL")
             db.execute("CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, body TEXT NOT NULL)")
         self.stop = threading.Event()
         self.lock = threading.Lock()

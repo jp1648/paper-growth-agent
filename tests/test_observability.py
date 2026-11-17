@@ -729,3 +729,20 @@ def test_byte_limited_success_drains_without_idle_delay(sink, monkeypatch):
     monkeypatch.setattr(sink.stop, "wait", wait)
     with pytest.raises(RuntimeError, match="idle boundary"):
         sink.work()
+
+
+def test_monitoring_snapshot_does_not_block_event_commit(sink):
+    import sqlite3
+
+    with sqlite3.connect(sink.path.resolve().as_uri() + "?mode=ro", uri=True) as monitor:
+        monitor.execute("BEGIN")
+        assert monitor.execute("select count(*) from outbox").fetchone()[0] == 0
+        sink.emit("concurrent", "event", {"preserved": True}, {})
+        assert len(events(sink)) == 1
+        assert monitor.execute("select count(*) from outbox").fetchone()[0] == 0
+        monitor.commit()
+        assert monitor.execute("select count(*) from outbox").fetchone()[0] == 1
+    for suffix in ("", "-wal", "-shm"):
+        path = sink.path.with_name(sink.path.name + suffix)
+        if path.exists():
+            assert path.stat().st_mode & 0o777 == 0o600

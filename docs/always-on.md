@@ -106,3 +106,11 @@ concurrent migration removes only this unused index. Payloads remain intact and
 SQL-queryable; ad-hoc whole-payload searches lose that index acceleration. New
 schemas no longer create it. Recreate a targeted index only for a demonstrated
 query workload rather than indexing every nested trace field.
+
+Recovery verification also caught monitoring reads blocking local producer
+commits: scanning the large outbox can hold a rollback-journal read lock longer
+than the producer timeout. The outbox now uses WAL so that read snapshots and
+producer commits coexist. A regression holds a read-only monitoring transaction
+open while verifying another connection commits an event and private sidecar
+permissions remain intact. Prior persistence failures are not reconstructed by
+this fix; the authoritative trading ledger remains separate.
