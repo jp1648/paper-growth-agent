@@ -81,3 +81,20 @@ instead of preventing heartbeat publication. Metadata requests and the health
 subprocess also have bounded timeouts with headroom below the service timeout.
 Alert policies remain enabled and unchanged. This does not clear or discard the
 telemetry backlog, approve research, or unpause trading.
+
+## November 17 telemetry backlog recovery
+
+The state volume filled after routine `report.portfolio` traces repeatedly
+embedded the full growing operational-error, intent and model-usage histories.
+Observed report rows were about 3.2 MB and a 200-row export batch about 28 MB.
+The state disk was expanded from 20 to 40 GB without deleting ledger or outbox
+data. This adds provisioned storage cost; it is recovery headroom, not retention.
+
+Portfolio traces now retain current report fields and explicit counts/references
+for those three histories. Full reports and original ledger histories are
+unchanged. Existing queued payloads are preserved. Export batches are bounded to
+4 MiB (one larger event is still delivered whole), with the existing 200-row
+ceiling, single-exporter lock and commit-before-delete/idempotent replay. Failures
+log exception class and SQLSTATE without credential-bearing exception text.
+Deployment and backlog drain must be checked independently of passing tests;
+research/trading must not be resumed solely because storage has headroom.

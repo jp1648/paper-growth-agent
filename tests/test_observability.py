@@ -650,3 +650,62 @@ def test_tool_response_trace_failure_stops_run_and_releases_task(sink, monkeypat
         guard.wrap_tool_call(request, lambda r: calls.append(r) or "report")
     assert len(calls) == 1 and budget.failed and not guard.running_tasks
     assert budget.events[-1][1]["succeeded"] is False
+
+
+def test_portfolio_trace_does_not_repeat_history(env, sink, monkeypatch):
+    from trader import reports
+
+    service, _, _ = env
+    original = {
+        "cash": "100",
+        "decisions": [{"evidence": "original"}],
+        "model_usage": [{"tokens": 123}],
+        "operational_events": [{"error": "historical"}] * 1000,
+    }
+    monkeypatch.setattr(reports, "_portfolio_report", lambda _: original)
+    assert reports.portfolio_report(service) is original
+    rows = events(sink)
+    final = next(row for row in rows if row["name"] == "report.portfolio" and row["phase"] == "end")
+    assert final["payload"]["output"] == {"cash": "100"}
+    assert final["payload"]["history_references"]["operational_events"]["count"] == 1000
+    assert original["operational_events"][0] == {"error": "historical"}
+
+
+def test_export_byte_limit_preserves_large_rows_and_commit_order(sink, monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    for index in range(3):
+        sink.emit("large", "event", {"index": index, "body": "x" * (3 * 1024 * 1024)}, {})
+    originals = events(sink)
+    received = []
+    fail_commit = True
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def executemany(self, query, batch):
+            received.append([row["event_id"] for row in batch])
+
+    @contextmanager
+    def connect(*args, **kwargs):
+        yield SimpleNamespace(
+            execute=lambda _: SimpleNamespace(fetchone=lambda: ("telemetry_events",)),
+            cursor=Cursor,
+        )
+        assert len(events(sink)) == 3  # No local deletion before the remote commit.
+        if fail_commit:
+            raise OSError("commit failed")
+
+    monkeypatch.setattr(psycopg, "connect", connect)
+    with pytest.raises(OSError, match="commit failed"):
+        sink.flush()
+    assert events(sink) == originals
+    assert received == [[originals[0]["event_id"]]]
+    fail_commit = False
+    assert sink.flush() == 1
+    assert events(sink) == originals[1:]

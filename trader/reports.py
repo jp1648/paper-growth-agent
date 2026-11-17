@@ -2,14 +2,22 @@ from zoneinfo import ZoneInfo
 
 from .accounting import recent_turnover
 from .models import ZERO, dec, dt, now
-from .observability import traced
+from .observability import span, traced
 from .spending import research_cost_summary, spend_breakdown, spending_status
 
 
-@traced("report.portfolio", inputs=lambda service: {})
 def portfolio_report(service):
-    with service.lock():
-        return _portfolio_report(service)
+    with span("report.portfolio", {}, service.store.scope) as outcome:
+        with service.lock():
+            report = _portfolio_report(service)
+        # Repeated snapshots must not duplicate the experiment's growing audit history.
+        histories = {"decisions", "model_usage", "operational_events"}
+        outcome["output"] = {key: value for key, value in report.items() if key not in histories}
+        outcome["history_references"] = {
+            key: {"count": len(report[key]), "source": "experiment ledger; full portfolio report"}
+            for key in sorted(histories)
+        }
+        return report
 
 
 def _portfolio_report(service):

@@ -140,6 +140,13 @@ class Sink:
             rows = db.execute("SELECT id, body FROM outbox ORDER BY rowid LIMIT 200").fetchall()
             if not rows:
                 return 0
+            # A count-only batch can contain hundreds of megabytes of model/report payloads.
+            size = 0
+            for index, (_, body) in enumerate(rows):
+                size += len(body.encode("utf-8"))
+                if index and size > 4 * 1024 * 1024:
+                    rows = rows[:index]
+                    break
             with psycopg.connect(self.dsn, connect_timeout=2, options="-c statement_timeout=30000") as pg:
                 # Hosted writers only need INSERT/SELECT; schema provisioning belongs to migration.
                 if pg.execute("SELECT to_regclass('public.telemetry_events')").fetchone()[0] is None:
@@ -167,9 +174,13 @@ class Sink:
                 if failed:
                     LOG.warning("Telemetry Postgres export recovered")
                 failed = False
-            except Exception:  # noqa: BLE001 - only research opts into fail-closed persistence
+            except Exception as error:  # noqa: BLE001 - only research opts into fail-closed persistence
                 if not failed:
-                    LOG.warning("Telemetry export unavailable; events retained in local outbox")
+                    LOG.warning(
+                        "Telemetry export unavailable (%s, SQLSTATE %s); events retained in local outbox",
+                        type(error).__name__,
+                        getattr(error, "sqlstate", None),
+                    )
                 failed, count = True, 0
             if self.stop.is_set():
                 return
