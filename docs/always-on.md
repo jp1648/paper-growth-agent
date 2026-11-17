@@ -98,3 +98,11 @@ ceiling, single-exporter lock and commit-before-delete/idempotent replay. Failur
 log exception class and SQLSTATE without credential-bearing exception text.
 Deployment and backlog drain must be checked independently of passing tests;
 research/trading must not be resumed solely because storage has headroom.
+
+The smaller-batch production probe still hit SQLSTATE 57014 on a historical
+multi-megabyte report. The 1.5 GB full-payload GIN index had zero recorded scans
+since November 5; dashboard queries use run/name/trace indexes. The explicit
+concurrent migration removes only this unused index. Payloads remain intact and
+SQL-queryable; ad-hoc whole-payload searches lose that index acceleration. New
+schemas no longer create it. Recreate a targeted index only for a demonstrated
+query workload rather than indexing every nested trace field.

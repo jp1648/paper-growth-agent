@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
 CREATE INDEX IF NOT EXISTS telemetry_trace ON telemetry_events(trace_id, at);
 CREATE INDEX IF NOT EXISTS telemetry_run ON telemetry_events(run_key, at);
 CREATE INDEX IF NOT EXISTS telemetry_name ON telemetry_events(name, at);
-CREATE INDEX IF NOT EXISTS telemetry_payload ON telemetry_events USING gin(payload);
 """
 
 
