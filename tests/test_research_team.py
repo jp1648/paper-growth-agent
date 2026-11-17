@@ -3167,3 +3167,41 @@ def test_correction_minimum_tail_uses_peak_context_and_falls_back_closed(monkeyp
     assert desk.correction is None and set(desk.reports) == set(ROLES)
     budget.events.append(saved)
     assert desk.correction_tool().invoke(args)["invalidated"] == ["valuation", "adversarial"]
+
+
+def test_valuation_receives_live_budget_without_mutating_saved_history():
+    from types import SimpleNamespace
+
+    from langchain_core.messages import HumanMessage
+
+    from trader.research_team import Guard
+
+    budget = Budget(Settings(research_max_tool_calls=64))
+    guard = Guard(budget, "valuation", {"read_source", "value_scenarios", "inspect_valuation"})
+    request = SimpleNamespace(
+        messages=[HumanMessage(content="Inspect original evidence")],
+        tools=[{"name": name} for name in sorted(guard.allowed)],
+        system_message=None,
+        response_format=SimpleNamespace(schema_spec=SimpleNamespace(json_schema={})),
+    )
+    guard.tool_calls = 8
+    messages, tools, payload = guard._model_request(request)
+    assert "3 tool calls remain" in messages[-1].content
+    assert "value_scenarios and inspect_valuation" in messages[-1].content
+    assert "never invent inputs" in messages[-1].content
+    assert len(request.messages) == 1
+    assert payload["messages"][-1]["content"] == messages[-1].content
+    assert len(tools) == 3
+
+    budget.correction_tool_limits["valuation"] = 22
+    guard.tool_calls = 20
+    budget.tools = 63
+    resumed = Guard(budget, "valuation", guard.allowed)
+    messages, _, _ = resumed._model_request(request)
+    assert "1 tool calls remain" in messages[-1].content
+    assert len(messages) == 2
+    guard.tool_calls = 22
+    messages, tools, _ = resumed._model_request(request)
+    assert "0 tool calls remain" in messages[-1].content
+    assert tools == []
+    assert budget.tools == 63 and budget.models == 0

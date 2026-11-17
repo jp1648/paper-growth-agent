@@ -5330,3 +5330,22 @@ Work stopped at the user's separate 50% Codex usage threshold after terminal
 settlement verification. Next work is review of the saved final output and
 valuation handoff before considering another paid attempt; broader research
 acceptance and paper-trial activation remain incomplete.
+
+### November 17: PG12 diagnosis corrected before further paid research
+
+Offline inspection of the original recording shows no scenario calculation was
+created (`calculations` is empty and valuation `calculation_id` is null). This
+was not a final-decision handoff loss. Initial valuation consumed 13 tools
+(10 source operations and three signed cash-flow sums); its correction consumed
+nine more source operations. The full run consumed all 64 tool slots. Ownership
+and normalization gaps remained unresolved, and WATCH accurately disclosed them.
+The frozen acceptance failure remains valid; no saved result has been rewritten.
+
+Specialists now receive a fresh remaining-tool count at each model boundary,
+including after correction/checkpoint recreation. Valuation is explicitly told
+to plan for scenario calculation and inspection, without inventing missing
+inputs or weakening material-gap vetoes. The count is request-only and does not
+accumulate in saved history or reset counters. Targeted research/checkpoint/stage
+and evaluation checks passed (234 tests), plus Ruff. This is an offline-tested
+planning improvement, not proof of economic completion; the next controlled run
+must still establish that. No paid retry was made for this change.

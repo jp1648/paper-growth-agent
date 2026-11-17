@@ -533,6 +533,32 @@ class Guard(AgentMiddleware):
 
     def _model_request(self, request):
         messages = self.bounded_messages(request.messages)
+        if not self.budget.unrestricted_research and self.role != "research_lead":
+            remaining = max(
+                0,
+                min(
+                    self.specialist_allowance - self.tool_calls,
+                    self.budget.cfg.research_max_tool_calls - self.budget.tools,
+                ),
+            )
+            messages = [
+                *messages,
+                HumanMessage(
+                    content=(
+                        f"Runtime budget: {remaining} tool calls remain for this specialist. "
+                        "Each operation in a parallel batch consumes one call. "
+                        + (
+                            "Plan remaining evidence and arithmetic around at least two calls for "
+                            "value_scenarios and inspect_valuation. Use already inspected evidence; "
+                            "avoid repeated retrieval unless needed to verify a specific claim. "
+                            "If material inputs cannot be supported or defensibly bounded, report "
+                            "the exact blocker and unfinished work; never invent inputs to finish."
+                            if self.role == "valuation"
+                            else "Prioritize material unfinished work and return an honest structured report."
+                        )
+                    )
+                ),
+            ]
         tools = [
             t for t in request.tools if (t.get("name") if isinstance(t, dict) else t.name) in self.allowed
         ]
