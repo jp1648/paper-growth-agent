@@ -5421,3 +5421,39 @@ Post-run verification preserved the original experiment, pause, funding receipt,
 order/intent/activity counts and all 65 prior spend records. Exactly one new
 settled spend record was added. No second attempt or trade was made. Independent
 semantic review and the remaining paper-trial gates remain outstanding.
+
+### November 17 independent PG13 semantic review
+
+An independent agent reviewed the frozen evidence, candidate and citations. Root
+checked the review, independently reproduced all four saved valuations to cents,
+and ran the evaluator tests (43 passed). The hash-bound review was replayed into
+a separate private `state/supervised-pg13-20261117/reviewed-results.json`; original
+recording/results remain unchanged. Its semantic verdict passes the **qualified
+WATCH abstention**, not purchase-ready investment research. The legacy scorer's
+`accepted_completed_decisions=1` must be read in that narrow sense; execution
+eligibility remains false. This was an independent agent review, not a human
+review, despite the evaluator's historical human-review terminology.
+
+The reviewer supplied reproducible offline sensitivities for previously omitted
+comparisons. Against recorded base $107.91, replacement recurring tax gives
+$103.58, hypothetical perpetual preferred nonconversion gives $108.68, and zero
+minority deduction gives $108.61. They retain their explicit assumptions and do
+not establish ownership entitlements, probabilistic bounds or current fair value.
+Literal transition-tax retention plus the separate remaining liability would
+double count; the adverse tax case instead assumes replacement recurring taxes.
+
+Measurement rule for this result: accept temporary abstention when cited facts,
+reproducible arithmetic and explicitly conditional reasoning support it. Do not
+infer purchase readiness from that acceptance. A purchase thesis still requires
+cutoff-valid award terms or justified materiality bounds, supported minority
+cash/terminal ownership treatment, and an operating-growth/reinvestment bridge
+with restructuring cash costs or a documented overlap/materiality argument.
+Missing claim-specific terms are not supplied by this frozen filing; they are
+not proven unavailable elsewhere before the cutoff. The reviewer found no
+production-code defect requiring a patch or paid rerun to support this WATCH.
+
+No new model-provider calls, runtime configuration changes, trading activation
+or orders occurred in this review. Unseen cohort validation, current held-AAPL
+research and final funding/scheduling/safety approval remain outstanding. The
+independent report and conditional sensitivity script/results are private under
+`state/supervised-pg13-20261117/`.
