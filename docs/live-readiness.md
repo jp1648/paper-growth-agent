@@ -5382,3 +5382,42 @@ and available Chrome was a Guest window. Resume the one controlled observed
 research test only after funding verification and fresh operational preflight;
 its economic acceptance, independent review, held-AAPL refresh and paper-trial
 activation remain open. Do not reuse prior retired funding receipts or run IDs.
+
+### November 17 supervised buffer waiver and PG13
+
+The operator explicitly waived the credit buffer for one supervised research run.
+This does not change unattended dispatch funding rules or authorize trading.
+The authenticated November 11 observation confirmed a November 10 $100 grant
+expiring November 29. Deducting all ledger charges dated November 10 onward
+($66.7564000), including charges potentially already reflected by the provider,
+left a conservative estimated $33.2436000. This is not a fresh provider balance;
+it relies on the operator's Trader-only account-use declaration and complete
+local charge accounting. All 65 prior charges were settled with no unknown total,
+and November 17 spending was zero before launch.
+
+One ordinary-reservation evaluation, `annual-testing-pg-full-regression-20261117-13`,
+was launched with a $20 run/day cap and zero required buffer for this attempt.
+The installed reviewed image and all 47 Python files were verified before calls.
+The existing 64-tool, 60-model-call, 240000-byte, 5000-output-token and 600-second
+bounds were retained. This tests the specialist tool-planning fix against the
+same observed PG regression; it is not unseen evidence. The original experiment,
+trading pause and retired unattended funding receipt are preserved. Private
+launch, authorization, source and settlement evidence is under
+`state/supervised-pg13-20261117/`. No retry is implied by this authorization.
+
+PG13 completed in 383.63 seconds with estimated model cost **$6.1763250**, settled
+and zero unknown-cost calls. All four specialist reports and the final WATCH
+(zero shares) completed. Four valuations were saved, correcting PG12's missing
+calculation outcome; all frozen mechanical checks passed. Semantic acceptance
+remains `pending_human_review`. The final conditional bear/base/bull values were
+$79.28/$107.91/$137.10 against the exercise's historical, non-executable $150
+reference—not a current price assessment. The adversarial report still flags
+unbounded award delivery, minority cash/terminal attribution, and unfinished
+tax-retention and unconverted-preferred comparisons. These prevent declaring the
+investment research approved or purchase-ready. The run used all 64 tools and
+48 model calls; 13 repeated calls remain an efficiency concern.
+
+Post-run verification preserved the original experiment, pause, funding receipt,
+order/intent/activity counts and all 65 prior spend records. Exactly one new
+settled spend record was added. No second attempt or trade was made. Independent
+semantic review and the remaining paper-trial gates remain outstanding.
