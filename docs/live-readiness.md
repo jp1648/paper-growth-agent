@@ -5349,3 +5349,36 @@ accumulate in saved history or reset counters. Targeted research/checkpoint/stag
 and evaluation checks passed (234 tests), plus Ruff. This is an offline-tested
 planning improvement, not proof of economic completion; the next controlled run
 must still establish that. No paid retry was made for this change.
+
+### November 17: telemetry recovery released; paid validation awaits funding access
+
+Released source `434cace` as immutable image
+`sha256:3ed2db5a709ddbc1183124efa48f9bc23c316c0e22dabfa17dd1dfe1dc4e78f5`
+to both executor and research worker; all 47 installed Python source files match
+the reviewed build. Offline regression: 1,591 passed, eight external/opt-in checks
+skipped. Separate real-Postgres/dashboard/report checks: 51 passed, including
+commit acknowledgement loss, replay, byte-limited batches and concurrent readers.
+
+The state disk had filled and prevented reconciliation writes. It is now 40 GB
+(up from 20 GB); queued events and financial history were preserved. The original
+journal prefix, experiment, funding/spending, requests, orders, intents, acceptance,
+adjustments, config and pause were verified. Fresh reconciliation succeeds with
+$99,655.66 cash, one AAPL share and no open orders. The held-position review remains
+overdue, so the published unhealthy signal is legitimate; trading stays paused.
+
+The 1.5 GB full-payload index was removed after zero recorded reads since Nov5.
+A previously timed-out batch exported in 0.51 seconds after its removal. The
+latest release additionally uses WAL to avoid monitoring-read writer blockage
+and drains successful byte-limited batches without the old idle delay. Live checks
+found zero persistence/export errors in the new service invocations, successful
+monitor publication, and a queued historical event confirmed in Postgres by UUID.
+New portfolio traces are approximately 7.5 KB instead of 3.2 MB. About 190,000
+historical events remained queued at verification; this is recovery in progress,
+not a claim the dashboard is current or that earlier failed persistence is repaired.
+
+No paid research or new order was attempted. The user was asked to expose a fresh
+signed-in OpenAI billing balance: the connected browser was stuck at verification
+and available Chrome was a Guest window. Resume the one controlled observed
+research test only after funding verification and fresh operational preflight;
+its economic acceptance, independent review, held-AAPL refresh and paper-trial
+activation remain open. Do not reuse prior retired funding receipts or run IDs.
