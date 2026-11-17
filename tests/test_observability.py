@@ -709,3 +709,23 @@ def test_export_byte_limit_preserves_large_rows_and_commit_order(sink, monkeypat
     fail_commit = False
     assert sink.flush() == 1
     assert events(sink) == originals[1:]
+
+
+def test_byte_limited_success_drains_without_idle_delay(sink, monkeypatch):
+    calls = []
+    batches = iter([15, 1, 0])
+
+    def flush():
+        count = next(batches)
+        calls.append(count)
+        return count
+
+    def wait(seconds):
+        assert calls == [15, 1, 0]
+        assert seconds == 2
+        raise RuntimeError("idle boundary")
+
+    monkeypatch.setattr(sink, "flush", flush)
+    monkeypatch.setattr(sink.stop, "wait", wait)
+    with pytest.raises(RuntimeError, match="idle boundary"):
+        sink.work()

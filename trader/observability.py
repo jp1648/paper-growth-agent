@@ -183,7 +183,7 @@ class Sink:
                 failed, count = True, 0
             if self.stop.is_set():
                 return
-            if count < 200:
+            if count == 0:
                 self.stop.wait(2 if not failed else 15)
 
     def close(self):
