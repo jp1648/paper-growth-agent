@@ -5457,3 +5457,45 @@ or orders occurred in this review. Unseen cohort validation, current held-AAPL
 research and final funding/scheduling/safety approval remain outstanding. The
 independent report and conditional sensitivity script/results are private under
 `state/supervised-pg13-20261117/`.
+
+### November 17 goal: unseen validation and held AAPL refresh
+
+Prepared an independent COST FY2026 original-filing full/missing pair. Source
+review caught explicit omission hints in v1 and descriptive run-key leakage in
+v2 before candidate generation. Both remain preserved. Final v3 uses neutral IDs,
+identical source labels/cautions, full original evidence, and a missing variant
+with cash capex and filing access removed. The frozen suite hash is
+`0e15cf93edc259aad28774e1ebb94354be753cab9e9d8ea206c6ffc60539dcb5`.
+It is company-unseen within retained local evaluation artifacts, not model
+pretraining or historical investment-performance evidence.
+
+One run, `unseen-cost-20261117-1`, used a $10 combined ordinary reservation while
+preserving the $20 daily cap and $15 buffer. Full case completed in 358.82 seconds
+for estimated $5.5062425, with four conditional valuations and WATCH. Independent
+review supports its qualified abstention, but not purchase-ready completeness:
+lease servicing/refinancing, award terms and operating-growth/reinvestment
+assumptions remain unresolved. It consumed all 64 tools. Missing case failed in
+the catalyst stage with `OpenAIConnectionError` (status unavailable), no final
+decision and one unknown-cost call. It is not a successful abstention. Its known
+estimate is $0.5535875; combined known $6.0598300 is not a final billed amount.
+The full $10 remains recorded as unknown pending provider reconciliation. No
+retry occurred. Provider window: November 18, 01:29:08–01:36:14 UTC. Original
+results were preserved; independent hash-bound review/replay is stored separately
+under `state/goal-unseen-held-20261117/`. The paired validation remains incomplete.
+
+Held-position preparation found supervised acceptance dropped prior_thesis in
+both research paths. Commit e8fce37 uses the saved thesis and tests that durable
+re-entry retains the original admitted context even if the stored thesis changes.
+Fifteen acceptance tests and Ruff passed; independent review approved the small
+change. The corrected script is staged privately, not executed or activated.
+Read-only broker/data preflight at November 18 01:29:57 UTC confirmed one AAPL
+share, no open orders, unchanged pause and an overdue November 9 review deadline.
+After-hours reference was the November 17 validated IEX minute close, explicitly
+historical/non-executable. No new AAPL thesis or completed refresh is claimed.
+
+Post-run audit preserved the experiment, pause, funding receipt, order/intent/
+activity counts and all 66 earlier spend records. One unknown-charge record was
+added. Provider cost evidence and a fresh funding record are required before
+further paid work; the signed-in billing browser is not currently accessible.
+The user was asked to sign in while preparation continued. Goal remains active;
+no unattended trading, real-money action or automatic retry was enabled.
