@@ -52,7 +52,7 @@ For a fresh news-triggered reassessment, the catalyst specialist can conclude th
 
 Engineering defaults per investigation: 24 model calls, 48 tool calls, 600 seconds, 180,000 bytes of model-request context, 3,000 maximum output tokens per call, and $5 estimated model spend. The lead and all specialists share these limits, including parallel calls. Tool/model checks enforce the deadline between steps; an in-flight HTTP operation can finish after the deadline, but no decision is accepted afterward. OpenAI request timeout is 60 seconds and automatic retries are off.
 
-Before a model request, the budget uses the selected role’s token rates and reserves a conservative input allowance based on UTF-8 payload bytes plus framing overhead and the maximum output tokens. Confirmed usage replaces that reservation. Configured rates must be accurate; this is an estimated guard, not a provider billing cap. Failed calls may be billed with unknown usage. Repeated runs also share `research_daily_cost_usd` (selected $5/day pilot, configurable, zero disables new research). Durable SQLite reservations prevent restarts or concurrent runs from silently resetting the daily allowance. Unknown usage/crashes retain conservative reservations. Dates are New York run-start dates; ongoing investigations stop before making another call after midnight. Reconciliation and reporting continue when the research cap is exhausted; the cap is an application estimate, not an OpenAI billing limit. Hidden summarizer model calls are disabled; excessive context fails closed instead of silently adding cost.
+Before a model request, the budget uses the selected role’s token rates and reserves a conservative input allowance based on UTF-8 payload bytes plus framing overhead and the maximum output tokens. Returned token counts replace that reservation at configured price ceilings. Input ceilings must cover cache writes as well as uncached input; the shipped settings cover Standard short-context 12h writes and deliberately ignore cache-read/incentive savings. These remain estimates until provider reconciliation. Reverify ceilings for different models, context lengths, processing tiers or regional endpoints; this is an estimated guard, not a provider billing cap. Failed calls may be billed with unknown usage. Repeated runs also share `research_daily_cost_usd` (selected $5/day pilot, configurable, zero disables new research). Durable SQLite reservations prevent restarts or concurrent runs from silently resetting the daily allowance. Unknown usage/crashes retain conservative reservations. Dates are New York run-start dates; ongoing investigations stop before making another call after midnight. Reconciliation and reporting continue when the research cap is exhausted; the cap is an application estimate, not an OpenAI billing limit. Hidden summarizer model calls are disabled; excessive context fails closed instead of silently adding cost.
 
 The initial valuation tool discounts per-share annual cash flows and a terminal cash-flow multiple across three scenarios, using Decimal arithmetic. Assumptions remain model judgments. It is not a universal valuation method; unsupported businesses or insufficient evidence should be reported as gaps and cannot justify purchases. No general web browsing, paid transcript feed, automatic universe expansion, or external investor-relations crawler is included. SEC earnings exhibits are available only when filed; news is a bounded vendor feed. Coverage gaps must remain explicit.
 
@@ -120,3 +120,34 @@ also previews, retrievable with read_source. Each specialist has ten tool calls,
 then tools are removed and it must return a structured report with evidence gaps.
 The shared 48-tool, model-call, time and dollar guards still apply. A bounded report
 is not proof that the evidence is sufficient to trade.
+
+Structured claim coverage uses the runtime-only `runtime-claims-coverage-v1`
+completion contract inside the existing valuation normalization review. The four
+fixed categories are common shares, preferred/convertible claims, legacy awards,
+and noncontrolling interests. Supported treatment requires retained original SEC
+citations, a treatment explanation, and a point date for common shares; these
+checks establish neither semantic support nor correct economic treatment.
+Unread, undisclosed or unsupported claims remain valid incomplete research and
+block BUY/ADD even when a model clears its global gap flag. Legacy reports lacking
+coverage remain unreviewed; cached execution uses the same boundary. The existing
+single model-requested correction may repair valuation and rebuild its critic
+without resetting budgets. Compact claim gaps are propagated into that existing
+context; the diagnostic does not automatically schedule a correction or guarantee
+that remaining capacity is spent on repair. Missing evidence may still produce honest WATCH/abstention. Frozen
+replay candidates, original-case economics and the v8 scoring rubric are unchanged;
+this is a runtime diagnostic and execution gate, not a new economic score.
+
+An explicit `capital_expenditure_source` may select the original
+`PaymentsToAcquireProductiveAssets` fact when its cited SEC filing passage and
+rationale identify the cash-purchase line. The default remains
+`PaymentsToAcquirePropertyPlantAndEquipment`; no automatic alias or fallback is
+used. Original taxonomy, USD annual period, accession, filing basis and supporting
+passage are retained. The same selection must reach the historical proxy and any
+normalization bridge; conflicting tool/bridge selections fail. Explicit selection
+uses bridge version 5, while omitted selections preserve existing canonical
+payloads and calculation IDs. SEC cache schema 7 refreshes older caches that did
+not retain the additional original tag. Gross purchases are not silently netted
+against proceeds, acquisitions, financing principal, noncash lease additions or
+unpaid asset balances. Selection and exact arithmetic do not certify semantic
+support, normalized earnings or investment acceptance. Independent replay applies
+the unchanged v8 financial-provenance criteria to the retained selected tag.

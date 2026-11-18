@@ -163,3 +163,35 @@ def test_missing_account_eligibility_fails_closed(env, decision, missing):
 def test_config_rejects_unsafe_symbols(symbol):
     with pytest.raises(ValidationError):
         Settings(universe={symbol: {"sector": "Example", "cik": "1"}})
+
+
+@pytest.mark.parametrize("amount", [None, "missing", "NaN", "Infinity", "-1", True, "nonsense", "0", "1000"])
+def test_broker_nonmarginable_balance_blocks_entries(env, decision, amount):
+    service, broker, _ = env
+    if amount == "missing":
+        broker.raw_account.pop("non_marginable_buying_power")
+    else:
+        broker.raw_account["non_marginable_buying_power"] = amount
+    result = service.execute(decision, "restricted-balance")
+    assert result["status"] == "rejected"
+    assert any("non-marginable buying power" in r for r in result["reasons"])
+    assert broker.submits == 0
+
+
+def test_nonmarginable_ceiling_does_not_double_subtract_open_holds(env, decision):
+    service, broker, _ = env
+    service.execute(decision.model_copy(update={"symbol": "OTHER"}), "existing-other")
+    broker.raw_account["non_marginable_buying_power"] = "1001"
+    result = service.execute(decision, "remaining-available")
+    assert result["status"] == "submitted"
+    assert broker.submits == 2
+
+
+def test_nonmarginable_restriction_does_not_block_owned_protective_exit(env, decision):
+    service, broker, _ = env
+    entry = service.execute(decision, "entry")
+    broker.fixture_fill(entry["client_order_id"])
+    service.reconcile()
+    broker.raw_account.pop("non_marginable_buying_power")
+    result = service.execute(decision.model_copy(update={"action": "SELL", "exit_reason": "risk"}), "exit")
+    assert result["status"] == "submitted"

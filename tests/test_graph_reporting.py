@@ -15,7 +15,7 @@ class Evidence:
         return {
             "symbol": symbol,
             "fetched_at": AT.isoformat(),
-            "sources": [{"id": "fixture-sec-1", "content": "Offline fixture"}],
+            "sources": [{"id": "fixture-sec-1", "source": "SEC EDGAR", "content": "Offline fixture"}],
         }
 
 
@@ -30,7 +30,34 @@ class FixtureTeam:
         ref = {"evidence_ids": ["fixture-sec-1"]}
         reports = {
             "business": {**ref, "business_quality": "Fixture quality"},
-            "valuation": {**ref, "bear_value": "70", "base_value": "140", "bull_value": "170"},
+            "valuation": {
+                **ref,
+                "bear_value": "70",
+                "base_value": "140",
+                "bull_value": "170",
+                "normalization_review": {
+                    "claims_coverage": {
+                        name: {
+                            "status": "supported_conditional_treatment",
+                            "evidence_ids": ref["evidence_ids"],
+                            "as_of_date": "2025-12-31",
+                            "treatment_or_gap": "Synthetic fixture: stable claims already treated; not issuer evidence",
+                        }
+                        for name in (
+                            "common_shares",
+                            "preferred_or_convertible",
+                            "legacy_awards",
+                            "noncontrolling_interests",
+                        )
+                    },
+                    "cash_flow_basis": "Synthetic fixture proxy",
+                    "debt_and_cash": "Fixture assumes none",
+                    "dilution_and_sbc": "Fixture assumes none",
+                    "nonrecurring_items": "Fixture assumes none",
+                    "unresolved_material_gaps": False,
+                    "evidence_ids": ref["evidence_ids"],
+                },
+            },
             "catalysts": {**ref, "why_now": "Fixture catalyst"},
             "adversarial": {**ref, "unresolved_material_gaps": self.gaps},
         }
@@ -186,3 +213,82 @@ def test_first_day_loss_counts_toward_experiment_drawdown(env, decision, monkeyp
     assert report["max_drawdown"] == D(".002")
     assert report["experiment_price_return"] == D("-.002")
     assert report["matching_period_return"] == 0
+
+
+@pytest.mark.parametrize("fault", ["future_review", "future_quote", "future_news"])
+def test_future_inputs_cannot_debounce_forever_or_trigger_price_research(env, decision, fault):
+    service, broker, data = env
+    reviewed = AT + timedelta(days=1) if fault == "future_review" else AT - timedelta(hours=1)
+    service.store.put(
+        "ACME",
+        {
+            "reviewed_at": reviewed.isoformat(),
+            "decision": decision.model_dump(mode="json"),
+            "reference_price": "100",
+            "valuation": {},
+        },
+        "thesis",
+    )
+    if fault == "future_quote":
+        data.at = AT + timedelta(minutes=1)
+        data.ask = D("110")
+    if fault == "future_news":
+        data.news_items = [{"created_at": (AT + timedelta(days=1)).isoformat()}]
+    result = Runner(service, None).due("ACME", "intraday")
+    if fault == "future_review":
+        assert result == (True, "future-dated thesis requires fresh review")
+    else:
+        assert result[0] is False
+    assert broker.submits == 0
+
+
+def test_execution_slippage_coverage_and_notional_weighting(env, decision):
+    service, broker, _ = env
+    empty = portfolio_report(service)["execution_quality"]
+    assert empty["fill_count"] == 0
+    assert empty["aggregate_slippage_bps"] is None
+    cid = service.execute(decision, "execution-quality")["client_order_id"]
+    broker.fixture_fill(cid, qty="4", price="99", status="partially_filled")
+    broker.fixture_fill(cid, qty="6", price="100")
+    service.reconcile()
+    result = portfolio_report(service)
+    quality = result["execution_quality"]
+    assert quality["fill_count"] == quality["referenced_fill_count"] == 2
+    assert quality["fill_notional_usd"] == D("996")
+    assert quality["reference_notional_usd"] == D("1000")
+    assert quality["aggregate_slippage_usd"] == D("-4")
+    assert quality["aggregate_slippage_bps"] == D("-40")
+    assert quality["reference_coverage_complete"]
+    intent = service.store.get(cid, "intent")
+    intent.pop("quote")
+    service.store.put(cid, intent, "intent")
+    missing = portfolio_report(service)["execution_quality"]
+    assert not missing["reference_coverage_complete"]
+    assert missing["referenced_fill_count"] == 0
+    assert len(missing["unreferenced_activity_ids"]) == 2
+    assert missing["aggregate_slippage_usd"] is None
+    assert missing["aggregate_slippage_bps"] is None
+    assert missing["fill_notional_usd"] == D("996")
+    assert broker.submits == 1
+
+
+def test_sell_slippage_sign_and_partial_reference_coverage(env, decision):
+    service, broker, _ = env
+    entry = service.execute(decision, "entry-reference")["client_order_id"]
+    broker.fixture_fill(entry)
+    service.reconcile()
+    sell = decision.model_copy(update={"action": "SELL", "exit_reason": "risk", "limit_price": D("99.90")})
+    exit_id = service.execute(sell, "exit-reference")["client_order_id"]
+    broker.fixture_fill(exit_id, price="99.90")
+    service.reconcile()
+    result = portfolio_report(service)
+    assert result["execution_slippage"][-1]["usd_vs_submission_quote"] == D("0.90")
+    assert result["execution_quality"]["aggregate_slippage_usd"] == D("0.90")
+    intent = service.store.get(entry, "intent")
+    intent.pop("quote")
+    service.store.put(entry, intent, "intent")
+    quality = portfolio_report(service)["execution_quality"]
+    assert quality["referenced_fill_count"] == 1
+    assert quality["referenced_slippage_usd"] == D("0.90")
+    assert quality["aggregate_slippage_usd"] is None
+    assert quality["aggregate_slippage_bps"] is None

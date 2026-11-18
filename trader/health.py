@@ -30,6 +30,14 @@ def check_health(cfg):
             age = (now() - dt(item["at"])).total_seconds()
             if not -5 <= age <= max(300, cfg.poll_seconds * 5):
                 raise ValueError("Monitoring or reconciliation is stale")
+        review = read(experiment["id"], "position_review")
+        limit = read(experiment["id"], "loss_limit")
+        if limit and limit.get("latched"):
+            raise ValueError("Portfolio loss limit requires operator attention")
+        if limit and not limit.get("daily", {}).get("valid", True):
+            raise ValueError("Daily loss baseline requires operator attention")
+        if review and review.get("issues"):
+            raise ValueError("Held-position review requires operator attention")
 
 
 def main():

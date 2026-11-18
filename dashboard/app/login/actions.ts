@@ -1,12 +1,19 @@
 "use server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { matches, signSession } from "../../lib/session.mjs";
+import { matches } from "../../lib/session.mjs";
+import {
+  createSession,
+  revokeSession,
+  allowLogin,
+} from "../../lib/session-store.mjs";
+import { pool } from "../../lib/db";
 export async function login(form: FormData) {
+  if (!(await allowLogin(pool()))) redirect("/login?error=limited");
   const secret = process.env.DASHBOARD_PASSWORD || "";
   if (!matches(String(form.get("password") || ""), secret))
     redirect("/login?error=1");
-  (await cookies()).set("trader_session", signSession(secret), {
+  (await cookies()).set("trader_session", await createSession(pool(), secret), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
@@ -16,6 +23,8 @@ export async function login(form: FormData) {
   redirect("/");
 }
 export async function logout() {
-  (await cookies()).delete("trader_session");
+  const jar = await cookies();
+  await revokeSession(pool(), jar.get("trader_session")?.value);
+  jar.delete("trader_session");
   redirect("/login");
 }

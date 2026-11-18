@@ -37,7 +37,9 @@ export default async function Login({
             />
             {error && (
               <p role="alert" className="error">
-                Unable to sign in. Check your password.
+                {error === "limited"
+                  ? "Too many sign-in attempts. Try again in one minute."
+                  : "Unable to sign in. Check your password."}
               </p>
             )}
             <button className="primary" type="submit">

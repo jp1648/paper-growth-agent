@@ -27,6 +27,7 @@ try:
     with psycopg.connect(dsn("postgres", "postgres-password"), connect_timeout=10) as db:
         db.execute(SCHEMA)
         db.execute((root / "deploy/supabase-observability.sql").read_text())
+        db.execute((root / "deploy/dashboard-sessions.sql").read_text())
         for role, filename in [("trader_writer", "writer-password"), ("trader_dashboard", "reader-password")]:
             db.execute(
                 sql.SQL("ALTER ROLE {} LOGIN PASSWORD {}").format(

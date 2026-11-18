@@ -51,7 +51,9 @@ class ScriptedBroker:
     def lookup(self, cid):
         return copy.deepcopy(self.orders.get(cid))
 
-    def submit(self, payload):
+    def submit(self, payload, *, before_send=None):
+        if before_send is not None:
+            before_send()
         self.submits += 1
         order = {
             **payload,
@@ -73,7 +75,9 @@ class ScriptedBroker:
         for o in self.orders.values():
             if o["id"] == order_id:
                 o["status"] = "pending_cancel"
-                o["updated_at"] = (self.at + timedelta(seconds=1)).isoformat()
+                o["updated_at"] = (
+                    max(self.at, datetime.fromisoformat(o["updated_at"])) + timedelta(seconds=1)
+                ).isoformat()
 
     def clock(self):
         return {"timestamp": self.at.isoformat(), "is_open": self.open}
@@ -154,6 +158,8 @@ class FixtureData:
             symbol=symbol,
             bid=self.bid,
             ask=self.ask,
+            bid_size=D("1000"),
+            ask_size=D("1000"),
             timestamp=self.at,
             source="offline fixture",
             feed="iex",
@@ -202,6 +208,7 @@ def env(tmp_path, monkeypatch):
     broker, data = ScriptedBroker(), FixtureData()
     store = Store(cfg.database)
     service = Service(cfg, store, broker, data)
+    monkeypatch.setattr(service, "filings_since", lambda symbol, since: [])
     service.initialize()
     yield service, broker, data
     store.db.close()

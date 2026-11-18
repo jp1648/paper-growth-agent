@@ -1,0 +1,73 @@
+# enable-template
+# Single-host private service. Never publish its ports outside loopback.
+{{ if not (and (env "TEMPORAL_POSTGRES_ADDRESS") (env "TEMPORAL_POSTGRES_USER") (env "TEMPORAL_POSTGRES_PASSWORD")) }}
+{{ fail "Temporal PostgreSQL address, user and password are required" }}
+{{ end }}
+log:
+  stdout: true
+  level: info
+persistence:
+  numHistoryShards: 4
+  defaultStore: default
+  visibilityStore: visibility
+  datastores:
+    default:
+      sql:
+        pluginName: postgres12
+        databaseName: trader_temporal
+        connectAddr: {{ env "TEMPORAL_POSTGRES_ADDRESS" | quote }}
+        connectProtocol: tcp
+        user: {{ env "TEMPORAL_POSTGRES_USER" | quote }}
+        password: {{ env "TEMPORAL_POSTGRES_PASSWORD" | quote }}
+        maxConns: 2
+        maxIdleConns: 1
+        maxConnLifetime: 1h
+    visibility:
+      sql:
+        pluginName: postgres12
+        databaseName: trader_temporal_visibility
+        connectAddr: {{ env "TEMPORAL_POSTGRES_ADDRESS" | quote }}
+        connectProtocol: tcp
+        user: {{ env "TEMPORAL_POSTGRES_USER" | quote }}
+        password: {{ env "TEMPORAL_POSTGRES_PASSWORD" | quote }}
+        maxConns: 2
+        maxIdleConns: 1
+        maxConnLifetime: 1h
+global:
+  membership:
+    maxJoinDuration: 30s
+    broadcastAddress: {{ default "127.0.0.1" (env "TEMPORAL_BROADCAST_ADDRESS") | quote }}
+services:
+  frontend:
+    rpc:
+      grpcPort: 7233
+      membershipPort: 6933
+      bindOnIP: {{ default "127.0.0.1" (env "BIND_ON_IP") | quote }}
+  history:
+    rpc:
+      grpcPort: 7234
+      membershipPort: 6934
+      bindOnIP: {{ default "127.0.0.1" (env "BIND_ON_IP") | quote }}
+  matching:
+    rpc:
+      grpcPort: 7235
+      membershipPort: 6935
+      bindOnIP: {{ default "127.0.0.1" (env "BIND_ON_IP") | quote }}
+  worker:
+    rpc:
+      grpcPort: 7239
+      membershipPort: 6939
+      bindOnIP: {{ default "127.0.0.1" (env "BIND_ON_IP") | quote }}
+clusterMetadata:
+  enableGlobalNamespace: false
+  failoverVersionIncrement: 10
+  masterClusterName: active
+  currentClusterName: active
+  clusterInformation:
+    active:
+      enabled: true
+      initialFailoverVersion: 1
+      rpcName: frontend
+      rpcAddress: 127.0.0.1:7233
+publicClient:
+  hostPort: 127.0.0.1:7233

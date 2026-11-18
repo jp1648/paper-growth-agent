@@ -24,3 +24,4 @@ out/
 test-results/
 playwright-report/
 coverage/
+.coverage*
