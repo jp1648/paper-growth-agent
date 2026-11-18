@@ -29,11 +29,14 @@ def test_research_once_and_pause(env, decision):
             self.calls += 1
             assert service.kill_path.exists()
             assert context["research_only"]
+            assert context["portfolio"]["prior_thesis"] == service.store.get("ACME", "thesis")
             return {
                 "team_reports": {key: {} for key in ("business", "catalysts", "valuation", "adversarial")},
                 "decision": decision.model_dump(mode="json"),
             }
 
+    prior = {"decision": decision.model_dump(mode="json"), "run_key": "prior-held"}
+    service.store.put("ACME", prior, "thesis")
     team = Team()
     result = acceptance.run(service, "research", "ACME", "one", team=team)
     assert result["status"] == "complete"
@@ -51,6 +54,8 @@ def test_durable_acceptance_reenters_original_context_and_preserves_pause(env, d
     service, _, _ = env
     prepare(service, decision)
     service.cfg = service.cfg.model_copy(update={"temporal_address": "127.0.0.1:7233"})
+    prior = {"decision": decision.model_dump(mode="json"), "run_key": "prior-held"}
+    service.store.put("ACME", prior, "thesis")
     pause_stat = service.kill_path.stat().st_mtime_ns
     contexts = []
 
@@ -65,6 +70,8 @@ def test_durable_acceptance_reenters_original_context_and_preserves_pause(env, d
 
     monkeypatch.setattr(TemporalResearchClient, "start", start)
     assert acceptance.run(service, "research", "ACME", "durable")["status"] == "pending"
+    assert contexts[0]["portfolio"]["prior_thesis"] == prior
+    service.store.put("ACME", {"run_key": "changed-after-admission"}, "thesis")
     # Re-entry must not fetch a new quote or retain the caller's account lock.
     monkeypatch.setattr(acceptance, "research_input", lambda *a, **kw: pytest.fail("new context"))
     with service.lock():

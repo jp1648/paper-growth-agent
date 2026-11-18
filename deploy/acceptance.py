@@ -53,7 +53,7 @@ def durable_research(service, symbol, run_key):
                 "research_only": True,
                 **research_input(service, symbol, deferred=True),
                 "current_timestamp": now().isoformat(),
-                "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": None},
+                "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": store.get(symbol, "thesis")},
             }
             record = {
                 "mode": "research",
@@ -197,7 +197,7 @@ def run(
                     "research_only": True,
                     **pricing,
                     "current_timestamp": now().isoformat(),
-                    "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": None},
+                    "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": store.get(symbol, "thesis")},
                 }
                 result = (
                     worker.run(context, finalize_from=finalize_from) if finalize_from else worker.run(context)
