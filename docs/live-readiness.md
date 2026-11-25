@@ -5681,3 +5681,18 @@ does not unpause trading or automatically accept a thesis. Independent review
 and explicit accepted-result promotion remain required. First-cycle funding,
 prospective study approval, final recovery checkpoint and opening/re-pause
 controls remain separate prerequisites for the November 27 paper trial.
+
+
+### November 25 opening-control review
+
+The separate first-cycle funding installer passed independent offline review
+and 29 focused tests. It validates exact provider-balance evidence, rejects
+non-regular/symlink pause markers without blocking on FIFOs, and excludes
+active research, including evaluations claimed before their first reservation.
+Terminal history is preserved. Fresh provider evidence, final settled baseline
+and exact proposal approval remain necessary before applying it.
+
+The re-pause guard passed independent review and 12 tests after fixing FIFO
+blocking and directory durability when preserving existing or racing markers.
+The dated systemd installer remains under preparation; these are offline
+mechanics approvals, not installed launch controls or paper activation.
