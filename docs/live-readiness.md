@@ -5730,3 +5730,48 @@ canonical twelve-week sampling and five-company rotation checks. It defaults
 to rollback and preserves pause/history. This is code-mechanics approval only.
 The actual calendar, accepted AAPL thesis, fresh first-cycle funding, exact
 proposal review and runtime installation remain required. No study was activated.
+
+
+### November 25 authorized same-day AAPL attempt
+
+The user authorized raising testing limits instead of waiting for another day.
+The single $20 AAPL attempt used a temporary daily ceiling of $24.1021225,
+including $4.1021225 already spent. The existing $40 allocation, $15 buffer,
+original pause, paper endpoint and other controls remained intact. Both runtime
+containers were verified against the temporary configuration. The November 26
+start timer was disabled and the stable ID `held-aapl-refresh-20261126-1` retained.
+
+The actual Temporal run `01a21438-190d-7309-8b02-178389b42fbe` reached a valuation
+rebuild after the lead requested further work. Its next model call was refused:
+262,710 input bytes exceeded 240,000, while calls were 30/60 and projected cost
+was $6.25255/$20. Thus increasing the dollar cap allowed today's test but did
+not resolve context growth. No final research result was accepted or promoted,
+and no order was submitted by this research-only attempt. The workflow entered
+its manual-resolution wait with no active provider activity. Original artifacts
+and the reservation remain preserved pending terminal accounting and restoration
+of the ordinary daily cap. Saved usage estimates are not provider invoices.
+
+The exact blocked execution was subsequently cooperatively canceled, with no
+pending activities. Existing offline accounting verified saved usage and settled
+the original reservation at $4.878760, `aborted_accounted`, unknown=false. Total
+November 25 estimated spend is $8.9808825. The original 89 completed operations,
+partial reports, ledger backups and immutable accounting receipt are preserved.
+The initial recovery helper failed before cancellation because its working
+directory resolved the relative ledger path incorrectly; the reviewed correction
+used the established runtime working directory and retained that failed attempt.
+
+After confirmed terminal state and settled charges, the reviewed restoration
+returned the ordinary $20/day configuration. Both actual runtime container mounts
+and pinned images were verified; the pause remained unchanged. No successful
+research acceptance or thesis promotion is claimed. The acceptance attempt's old
+pending record remains historical alongside the authoritative canceled-workflow
+marker; future admission must interpret those records explicitly, not silently
+ignore pending work.
+
+The offline context audit measured approximately 118 KB of initial correction
+context, including 43 KB of calculations, plus subsequent source passages and
+conversation history. Existing lossless calculation projection would save about
+17 KB, which alone does not prove sufficient against the 22,710-byte overrun.
+Only six of 64 tool calls remained. Next work is an offline correction-context
+and remaining-tool-budget fix, with a justified context setting if needed;
+waiting for a daily rollover does not repair this failure.

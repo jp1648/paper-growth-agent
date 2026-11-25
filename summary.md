@@ -32,10 +32,16 @@ correction was deployed, the second retry completed all four reports and a
 zero-share WATCH; independent review accepted the missing-evidence abstention
 case only. It does not establish complete investment research. Both retries cost
 an estimated $4.1021225, with no unknown charges. Original failures remain.
-Held AAPL research is still overdue. Its independently reviewed one-shot start
-is installed for November 26 at 10:00 a.m. New York time and requires fresh
-$20 admission. Installation readback showed the service inactive, no AAPL run
-record and the original pause intact. Scheduling is not completed research.
+Held AAPL research is still overdue. Following the user's authorization to raise
+testing limits, its single $20 attempt was brought forward to November 25 with a
+temporary $24.1021225 daily ceiling; the November 26 duplicate timer was disabled.
+The same stable run ID was preserved. The valuation rebuild stopped at 262,710
+input bytes against the 240,000-byte context limit, with 30/60 model calls and a
+projected next-call cost of $6.25255/$20. This is a context failure, not a dollar
+budget failure. Final research acceptance remains incomplete. The exact execution was canceled
+and its original reservation settled from saved usage at an estimated $4.878760
+($8.9808825 total November 25). The ordinary $20 daily ceiling was restored and
+verified in both containers. These estimates are not provider invoices.
 Trading remains paused.
 Preserve original runs and history.
 
