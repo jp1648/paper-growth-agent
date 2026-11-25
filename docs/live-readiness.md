@@ -5712,3 +5712,21 @@ Receipt: private `opening-candidate/guard-install-result.json`, installation tim
 2026-11-25T19:16:07Z. These controls restore/preserve the pause; they do not approve
 a study, allocate funds, unpause trading or establish research acceptance. Final
 study approval, fresh recovery and actual first-cycle observation remain pending.
+
+
+### November 25 remaining acceptance tools reviewed
+
+A separate read-only AAPL capture companion passed independent review and 15
+focused tests. It preserves SQLite backup snapshots, the durable manifest,
+original sources, decoded operation/state records and declared dependencies.
+It verifies matching result/audit/commit hashes and exactly one explicitly
+settled, finite nonnegative spending record. Actual capture and economic review
+await the completed AAPL run; the review template remains UNREVIEWED.
+
+The external study installer passed independent rereview: 35 author tests and
+two independent negative probes. Those probes originally exposed acceptance of
+rehashed all-AAPL or concentrated first-day schedules; both now reject through
+canonical twelve-week sampling and five-company rotation checks. It defaults
+to rollback and preserves pause/history. This is code-mechanics approval only.
+The actual calendar, accepted AAPL thesis, fresh first-cycle funding, exact
+proposal review and runtime installation remain required. No study was activated.
