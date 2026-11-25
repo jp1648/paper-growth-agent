@@ -151,3 +151,26 @@ against proceeds, acquisitions, financing principal, noncash lease additions or
 unpaid asset balances. Selection and exact arithmetic do not certify semantic
 support, normalized earnings or investment acceptance. Independent replay applies
 the unchanged v8 financial-provenance criteria to the retained selected tag.
+
+Specialist and final-lead contexts use the same reversible calculation projection:
+identical embedded normalization assumptions and provenance are replaced with
+explicit paths to the retained copy within that calculation. Original calculations,
+citations, correction provenance and paginated `read_source` remain unchanged.
+This removes duplication without summarizing evidence or spending another model call.
+
+For tool caps above 64, half the additional slots are reserved for the single
+correction and its dependent reports. A 96-call cap reserves 30 correction slots
+and initially assigns 15 to each specialist plus two lead auxiliary calls and
+four delegations. Unused completed business/catalyst allowances can still transfer
+to initial valuation. Correction allocations add to cumulative role limits;
+restart restores spent counters, and global tool/model/context/cost guards remain
+binding. A larger tool cap does not authorize additional dollar spending.
+
+The November 25 AAPL correction exceeded 240,000 input bytes at 262,710 bytes,
+with 58/64 tools used. Offline projection of its last admitted saved request reduces
+serialized input from 239,904 to 222,125 bytes. Applying that same seed reduction
+to the uncaptured blocked request estimates 244,931 bytes, still over the old cap.
+A supervised fresh attempt may therefore use explicitly authorized 320,000-byte
+and 96-tool testing bounds, retaining the $20 cost cap and all evidence/risk gates.
+These are recommended testing overrides, not changed defaults or proof of research
+acceptance. No failed run should be resumed under silently changed authority.

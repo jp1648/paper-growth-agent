@@ -2333,9 +2333,13 @@ def test_larger_configured_tool_pool_reaches_specialists_with_lead_reserve():
 
     budget = Budget(Settings(research_max_tool_calls=100))
     guard = Guard(budget, "valuation", {"read_document"})
-    assert guard.specialist_allowance == 20
-    assert len(ROLES) * (guard.specialist_allowance + 1) + guard.lead_allowance + 14 == 100
-    assert guard.lead_allowance == 2
+    assert guard.specialist_allowance == 16
+    assert budget.correction_reserve == 32
+    assert (
+        len(ROLES) * (guard.specialist_allowance + 1) + guard.lead_allowance + budget.correction_reserve
+        == 100
+    )
+    assert guard.lead_allowance == 0
 
 
 @pytest.mark.parametrize(
@@ -2800,10 +2804,11 @@ def test_correction_provenance_distinguishes_report_changes_inputs_and_missing_c
     assert desk.correction == original
 
 
+@pytest.mark.parametrize("tool_cap", [64, 96])
 @pytest.mark.parametrize("repair_role", ["business", "catalysts", "valuation"])
 @pytest.mark.parametrize("catalyst_initial_calls", [6, 11])
 def test_initial_guards_with_optional_transfer_retain_complete_repair_capacity(
-    repair_role, catalyst_initial_calls, monkeypatch
+    tool_cap, repair_role, catalyst_initial_calls, monkeypatch
 ):
     import copy
     import hashlib
@@ -2812,7 +2817,7 @@ def test_initial_guards_with_optional_transfer_retain_complete_repair_capacity(
     from trader.models import dumps
     from trader.research_team import CORRECTION_TOOLS, ROLES, Guard
 
-    cfg = Settings(research_max_tool_calls=64, input_cost_per_million=2, output_cost_per_million=10)
+    cfg = Settings(research_max_tool_calls=tool_cap, input_cost_per_million=2, output_cost_per_million=10)
     budget = Budget(cfg)
     provider = Evidence()
     desk = ResearchDesk(
@@ -2839,11 +2844,13 @@ def test_initial_guards_with_optional_transfer_retain_complete_repair_capacity(
     monkeypatch.setattr(desk, "specialist", specialist)
     desk.dispatch_roles(ROLES, "initial")  # Four real Guard-metered delegations.
     before = copy.deepcopy(desk.reports)
-    assert budget.tools == 50 and sum(budget.role_tool_calls[r] for r in ROLES) == 44
-    assert budget.role_tool_calls["valuation"] == 22 - catalyst_initial_calls
-    assert budget.initial_valuation_allowance == 22 - catalyst_initial_calls
+    base = budget.initial_specialist_allowance
+    assert budget.tools == tool_cap - budget.correction_reserve
+    assert sum(budget.role_tool_calls[r] for r in ROLES) == 4 * base
+    assert budget.role_tool_calls["valuation"] == 2 * base - catalyst_initial_calls
+    assert budget.initial_valuation_allowance == 2 * base - catalyst_initial_calls
     grant_events = [event for kind, event in budget.events if kind == "research_initial_valuation_grant"]
-    assert len(grant_events) == 1 and grant_events[0]["transferred_calls"] == 11 - catalyst_initial_calls
+    assert len(grant_events) == 1 and grant_events[0]["transferred_calls"] == base - catalyst_initial_calls
     tool = desk.correction_tool()
     args = {
         "role": repair_role,
@@ -2855,7 +2862,13 @@ def test_initial_guards_with_optional_transfer_retain_complete_repair_capacity(
         request, lambda _: ToolMessage(content=dumps(tool.invoke(args)), tool_call_id="repair")
     )
     assert "Required corrected reports" in result.content
-    assert budget.tools == 64 and not budget.failed
+    assert budget.tools == tool_cap and not budget.failed
+    saved = budget.checkpoint()
+    restored = Budget(cfg)
+    restored.restore(saved)
+    assert restored.checkpoint()["tools"] == tool_cap
+    assert restored.correction_tool_limits == budget.correction_tool_limits
+    assert restored.correction_reserve == budget.correction_reserve
     assert lead.tool_calls == 2  # Correction is global work, not a second auxiliary charge.
     assert desk.correction["reports"] == before
     assert set(desk.reports) == set(ROLES)
@@ -3208,3 +3221,48 @@ def test_valuation_receives_live_budget_without_mutating_saved_history():
     assert "0 tool calls remain" in messages[-1].content
     assert tools == []
     assert budget.tools == 63 and budget.models == 0
+
+
+@pytest.mark.parametrize("correction", [False, True])
+def test_specialist_uses_reversible_calculation_projection(correction, monkeypatch):
+    import copy
+
+    cfg = Settings()
+    provider = Evidence()
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, provider.get("ACME"), Budget(cfg), None
+    )
+    desk.reports = {"business": {"evidence_ids": []}, "catalysts": {"evidence_ids": []}}
+    assumptions = {"rationale": "sourced conditional treatment " * 200, "evidence_ids": ["fixture-sec"]}
+    desk.calculations = {
+        "calculation-test": {
+            "inputs": {"normalization_bridge": assumptions},
+            "normalization_bridge": {"assumptions": copy.deepcopy(assumptions)},
+        }
+    }
+    original = copy.deepcopy(desk.calculations)
+    if correction:
+        desk.correction = {
+            "reason": "test repair",
+            "reports": {**desk.reports, "adversarial": {}},
+            "calculations": copy.deepcopy(original),
+        }
+    monkeypatch.setattr(desk, "claims_coverage", lambda *args: {})
+    monkeypatch.setattr(desk, "correction_valuation_provenance", dict)
+    monkeypatch.setattr(desk, "correction_source_handoff", lambda *args: {})
+    monkeypatch.setattr(desk, "agent", lambda *args: object())
+    monkeypatch.setattr(desk, "validate", lambda schema, report: report)
+    captured = {}
+
+    def invoke(agent, schema, payload, *args):
+        captured.update(json.loads(payload["messages"][0]["content"]))
+        return {"structured_response": {"evidence_ids": []}}
+
+    monkeypatch.setattr(desk, "invoke_report", invoke)
+    desk.specialist("valuation", {"messages": [AIMessage(content="review")]})
+    projected = captured["calculations"]["calculation-test"]
+    assert projected["inputs"]["normalization_bridge"]["same_as"] == "normalization_bridge.assumptions"
+    projected["inputs"]["normalization_bridge"] = projected["normalization_bridge"]["assumptions"]
+    assert captured["calculations"] == original == desk.calculations
+    if correction:
+        assert desk.correction["calculations"] == original

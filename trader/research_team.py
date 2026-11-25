@@ -273,7 +273,11 @@ class Budget:
         self.models = self.tools = 0
         self.role_tool_calls = {}
         self.correction_tool_limits = {}
-        initial_pool = max(0, cfg.research_max_tool_calls - CORRECTION_RESERVE)
+        # Preserve the 64-call plan; larger pools split added capacity between
+        # initial research and the dependent repair/critique tail, rather than
+        # letting initial specialists consume every added slot. No counters reset.
+        self.correction_reserve = CORRECTION_RESERVE + max(0, cfg.research_max_tool_calls - 64) // 2
+        initial_pool = max(0, cfg.research_max_tool_calls - self.correction_reserve)
         self.initial_specialist_allowance = max(0, (initial_pool - len(ROLES)) // len(ROLES))
         self.lead_allowance = max(0, initial_pool - len(ROLES) * (1 + self.initial_specialist_allowance))
         self.initial_valuation_allowance = self.initial_specialist_allowance
@@ -324,7 +328,7 @@ class Budget:
             base = self.initial_specialist_allowance
             spent = {role: self.role_tool_calls.get(role, 0) for role in sorted(prerequisites)}
             unused = {role: max(0, base - count) for role, count in spent.items()}
-            initial_pool = max(0, self.cfg.research_max_tool_calls - CORRECTION_RESERVE)
+            initial_pool = max(0, self.cfg.research_max_tool_calls - self.correction_reserve)
             # Four delegations, the critic, and the lead retain their original slots.
             unclaimed_pool = max(
                 0,
@@ -345,7 +349,7 @@ class Budget:
                         "initial_pool": initial_pool,
                         "lead_allowance": self.lead_allowance,
                         "critic_allowance": base,
-                        "correction_reserve": CORRECTION_RESERVE,
+                        "correction_reserve": self.correction_reserve,
                     },
                 )
             )
@@ -1869,7 +1873,7 @@ class ResearchDesk:
             context = {
                 **self.context,
                 "reports": copy.deepcopy(self.reports),
-                "calculations": copy.deepcopy(self.calculations),
+                "calculations": self.calculation_context(),
                 "arithmetic": self.arithmetic_context(),
                 "evidence": self.source_previews(self.sources.values()),
                 "assignment": task["messages"][-1].content,
@@ -2200,7 +2204,8 @@ class ResearchDesk:
             "instruction": "Unresolved claims block BUY/ADD even if a report says no material gaps. Use the existing single correction, targeting valuation unless a decision-material business prerequisite needs changing; preserve honest unknowns when repair is unavailable. This diagnostic does not prove economic treatment or source interpretation and does not change frozen replay/scoring criteria.",
         }
 
-    def final_context(self):
+    def calculation_context(self):
+        """Project exact duplicates only; original calculations remain readable and audited."""
         calculations = copy.deepcopy(self.calculations)
         for identifier, calculation in calculations.items():
             bridge = calculation.get("normalization_bridge")
@@ -2213,7 +2218,7 @@ class ResearchDesk:
             ):
                 inputs["normalization_bridge"] = {
                     "same_as": "normalization_bridge.assumptions",
-                    "note": f"Final-context projection only; read_source({identifier}) returns the full saved calculation.",
+                    "note": f"Context projection only; read_source({identifier}) returns the full saved calculation.",
                 }
             if (
                 isinstance(bridge, dict)
@@ -2223,8 +2228,12 @@ class ResearchDesk:
             ):
                 calculation["financial_provenance"] = {
                     "same_as": "normalization_bridge.historical_provenance",
-                    "note": f"Final-context projection only; read_source({identifier}) returns the full saved calculation.",
+                    "note": f"Context projection only; read_source({identifier}) returns the full saved calculation.",
                 }
+        return calculations
+
+    def final_context(self):
+        calculations = self.calculation_context()
         context = {
             **self.context,
             "reports": self.reports,
