@@ -5775,3 +5775,56 @@ conversation history. Existing lossless calculation projection would save about
 Only six of 64 tool calls remained. Next work is an offline correction-context
 and remaining-tool-budget fix, with a justified context setting if needed;
 waiting for a daily rollover does not repair this failure.
+
+### November 25 context repair and completed rerun
+
+Commit `a43a0c5` applies the existing reversible calculation projection to
+specialists as well as the lead, retaining original evidence and calculations.
+Larger tool budgets now reserve half the additional allowance for correction
+and its dependent critique. Offline replay reduced one saved request from
+239,904 to 222,125 bytes; projection alone was insufficient to justify keeping
+the 240,000-byte ceiling. The supervised test therefore used 320,000 bytes and
+96 tools, with 60 model calls and the existing $20 run cap. Its temporary daily
+ceiling was $28.9808825, including previous spend.
+
+Offline verification: 1,636 passed, seven skipped, one deselected; Ruff checks and
+formatting passed. CI 45691661406 succeeded. Both containers received the pinned
+reviewed image ending `009769313be3fa508b07d4c338520fcc0b8e9f0ffc24720d37269deb3def5f66`.
+
+`held-aapl-refresh-20261125-2` completed all four specialist reports, a requested
+valuation correction, a fresh adversarial review and the final lead decision.
+Temporal execution `01a2145e-2029-70e4-8887-483bc8a147cf` completed; its immutable
+commit and settled accounting were verified before ingesting acceptance. It
+used 50 model calls and 96 tool calls across 146 completed journal operations.
+The largest valuation context was 311,490 bytes. Estimated model cost settled
+at $11.2428000, with no unknown amount, bringing November 25 to $20.2236825.
+These are saved-usage estimates, not provider invoices. No duplicate retry is
+authorized or needed.
+
+Mechanical research completion is established; independent economic acceptance
+and thesis promotion remain separate. Trading remains paused, with no orders
+from this research-only attempt. The ordinary $20/day, 240,000-byte and 64-tool
+configuration was restored
+and verified in both containers, retaining the new image and unchanged pause.
+All 71 spending records were settled. The completed packet was captured and
+all 25 file hashes verified. Its final proposal is SELL one AAPL share at the
+saved reference bid of $354.59, while explicitly acknowledging unresolved
+material valuation gaps. It was not promoted or executed; independent review
+must assess the sale rationale separately from failure to substantiate a buy.
+The completed independent review returned **changes required** and withholds
+economic acceptance: conditional
+valuation and unresolved material normalization/claims gaps do not adequately
+support the stronger SELL recommendation. All six scenario calculations were
+also independently reproduced to the cent; arithmetic consistency does not
+validate the forecasts. The base case is 82.8% terminal value. Removing only
+the assumed extra prior-year PPE restoration moves the bull sensitivity from
+$352.04 to $363.02, crossing the supplied $354.72 ask; that is a sensitivity,
+not a new fair-value estimate. Required next work is a quantitative operating
+driver bridge, supported normalization/claims bounds, use of available
+financing terms and a symmetric sell-versus-retain rule. Repair those offline
+from the preserved packet before considering another paid run. The proposed
+SELL remains unapproved and the existing thesis/position remain unchanged.
+
+A worker exited 139 on one controlled shutdown; a later
+controlled shutdown exited normally. Native teardown remains a follow-up, not a
+proven fix or a reason to weaken shutdown gates.

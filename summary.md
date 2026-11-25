@@ -32,16 +32,20 @@ correction was deployed, the second retry completed all four reports and a
 zero-share WATCH; independent review accepted the missing-evidence abstention
 case only. It does not establish complete investment research. Both retries cost
 an estimated $4.1021225, with no unknown charges. Original failures remain.
-Held AAPL research is still overdue. Following the user's authorization to raise
-testing limits, its single $20 attempt was brought forward to November 25 with a
-temporary $24.1021225 daily ceiling; the November 26 duplicate timer was disabled.
-The same stable run ID was preserved. The valuation rebuild stopped at 262,710
-input bytes against the 240,000-byte context limit, with 30/60 model calls and a
-projected next-call cost of $6.25255/$20. This is a context failure, not a dollar
-budget failure. Final research acceptance remains incomplete. The exact execution was canceled
-and its original reservation settled from saved usage at an estimated $4.878760
-($8.9808825 total November 25). The ordinary $20 daily ceiling was restored and
-verified in both containers. These estimates are not provider invoices.
+Held AAPL research required a refresh. The first brought-forward attempt failed
+at the 240,000-byte context limit, was canceled and settled at an estimated
+$4.878760. Its original history remains preserved and its duplicate timer is
+disabled. The subsequent context/tool repair is deployed. New stable run
+`held-aapl-refresh-20261125-2` completed all four reports, valuation correction,
+fresh critique and final lead decision. It used 50 model calls and 96 tools,
+settling at $11.2428000 estimated cost ($20.2236825 total November 25). These
+estimates are not provider invoices. Offline checks passed: 1,636 tests, with
+seven skipped and one deselected; CI succeeded. The temporary 320 KB/96-tool
+allowances enabled this test, and ordinary limits were subsequently restored in
+both containers. The proposed SELL of one paper AAPL share remains unexecuted
+and unpromoted. Completed independent review withholds economic acceptance
+because material valuation gaps remain; technical completion is established. One abnormal native worker shutdown remains a follow-up,
+although later controlled shutdowns and both service restarts succeeded.
 Trading remains paused.
 Preserve original runs and history.
 
