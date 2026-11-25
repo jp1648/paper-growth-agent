@@ -112,7 +112,17 @@ class DailyReservation:
     def for_durable_run(cls, store, cfg, run_key):
         return cls(store, cfg, run_key, durable=True)
 
-    def __init__(self, store, cfg, run_key, *, unrestricted_research=False, testing=False, durable=False):
+    def __init__(
+        self,
+        store,
+        cfg,
+        run_key,
+        *,
+        unrestricted_research=False,
+        testing=False,
+        durable=False,
+        require_funding=False,
+    ):
         self.store, self.key = store, str(uuid4())
         # Reserve before any API call; a crash keeps the full allowance charged to this day.
         with store.db:
@@ -173,12 +183,14 @@ class DailyReservation:
                 ).fetchone()
             ):
                 raise DailyBudgetExceeded("Settle outstanding model charges before another testing run")
-            if store.get("active", "paper_study") is not None:
+            if require_funding or store.get("active", "paper_study") is not None:
                 from .paper_dispatch import funding_gate
 
                 reason = funding_gate(store, cfg, now())
                 if unrestricted_research or reason:
-                    raise DailyBudgetExceeded(reason or "Unbounded research is forbidden during a study")
+                    raise DailyBudgetExceeded(
+                        reason or "Unbounded research cannot use bounded funding admission"
+                    )
             status = spending_status(store, cfg.research_daily_cost_usd)
             self.unrestricted_research = unrestricted_research
             self.allowance = (
@@ -214,6 +226,10 @@ class DailyReservation:
                 "unknown_total": unrestricted_research,
                 "status": "reserved",
             }
+            if require_funding:
+                self.record["funding_evidence_sha256"] = store.get(
+                    "confirmed", "research_funding", scope="global"
+                )["evidence_sha256"]
             if durable:
                 self.record.update(
                     durable=True, durable_allowance=self.allowance, config_sha256=fingerprint(cfg)

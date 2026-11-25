@@ -99,6 +99,80 @@ def research_input(service, symbol, *, deferred):
     return {"quote": service.data.quote(symbol).model_dump(mode="json"), "research_reference": None}
 
 
+def commit_research(store, state, result, *, review=None):
+    """Publish a thesis, immutable decision and audit atomically; never execute orders."""
+    from .observability import emit
+    from .paper_dispatch import fingerprint
+
+    key, symbol = state["run_key"], state["symbol"]
+    result_hash = fingerprint(result)
+    stamp = now().isoformat()
+    marker = {"at": stamp, "result_sha256": result_hash, "review": review}
+    with store.db:
+        store.db.execute("BEGIN IMMEDIATE")
+        committed = store.get(key, "research_committed")
+        if committed:
+            if committed.get("result_sha256") != result_hash or committed.get("review") != review:
+                raise ValueError("Research commit identity conflicts with existing receipt")
+            return False
+        legacy = store.get(key, "graph_decision")
+        if legacy is not None and legacy != result["decision"]:
+            raise ValueError("Run key already has a different immutable decision")
+        existing = store.get(symbol, "thesis")
+        if review is not None:
+            if fingerprint(existing) != review["prior_thesis_sha256"]:
+                raise ValueError("Prior thesis changed since accepted research admission")
+            if existing and dt(existing["reviewed_at"]) >= dt(result["research_completed_at"]):
+                raise ValueError("Reviewed research would overwrite a newer thesis")
+        documents = [("graph_decision", key, result["decision"])]
+        if not existing or dt(existing["reviewed_at"]) <= dt(result["research_completed_at"]):
+            thesis = {
+                "run_key": key,
+                "decision": result["decision"],
+                "reviewed_at": result["research_completed_at"],
+                "reference_price": (
+                    result["research_reference"]["price"]
+                    if result.get("research_reference")
+                    else result["quote"]["ask"]
+                ),
+                "reference_basis": result.get("research_reference")
+                or {
+                    "basis": "broker_quote_ask",
+                    "timestamp": result["quote"]["timestamp"],
+                    "feed": result["quote"]["feed"],
+                },
+                "evidence_ids": sorted(x["id"] for x in result["evidence"]["sources"]),
+                "valuation": result["valuation"],
+                "team_reports": result["team_reports"],
+                "team_report_times": result.get("team_report_times", {}),
+                "research_sources": result["evidence"]["sources"],
+                "research_calculations": result.get("calculations", {}),
+                "research_arithmetic_records": result.get("arithmetic_records", []),
+            }
+            if review is not None:
+                thesis.update(research_only=True, independent_review=review)
+            documents.append(("thesis", symbol, thesis))
+        if review is not None:
+            documents.append(("acceptance_review", key, review))
+        documents.append(("research_committed", key, marker))
+        for kind, document_key, value in documents:
+            store.db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?) ON CONFLICT(scope,kind,key) DO UPDATE SET body=excluded.body",
+                (store.scope, kind, document_key, dumps(value)),
+            )
+        body = {**state, **result}
+        if review is not None:
+            body["independent_review"] = review
+        store.db.execute(
+            "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+            (store.scope, stamp, "research_decision", dumps(body)),
+        )
+    for kind, document_key, value in documents:
+        emit("document." + kind, {"key": document_key, "value": value}, experiment_id=store.scope)
+    emit("research_decision", body, experiment_id=store.scope, run_key=key)
+    return True
+
+
 def build_graph(service, team, *, research_client=None):
     store = service.store
 
@@ -174,7 +248,7 @@ def build_graph(service, team, *, research_client=None):
             reference = research_client.reference_for(s)
             if reference is not None:
                 result = research_client.poll(reference)
-                commit_research(s, result)
+                commit_research(store, s, result)
                 return result
         cached = store.get(s["run_key"], "research_result")
         if cached:
@@ -182,7 +256,7 @@ def build_graph(service, team, *, research_client=None):
                 raise ValueError("Cached research lacks a verified durable workflow reference")
             if cached["decision"]["symbol"] != s["symbol"]:
                 raise ValueError("Research run key belongs to another symbol")
-            commit_research(s, cached)
+            commit_research(store, s, cached)
             return cached
         pricing = research_input(service, s["symbol"], deferred=bool(s.get("research_only")))
         context = {**s, **pricing, "current_timestamp": now().isoformat()}
@@ -215,44 +289,8 @@ def build_graph(service, team, *, research_client=None):
             raise ValueError("Run key already has a different immutable decision")
         result["research_completed_at"] = now().isoformat()
         store.put(s["run_key"], result, "research_result")
-        commit_research(s, result)
+        commit_research(store, s, result)
         return result
-
-    def commit_research(s, result):
-        if store.get(s["run_key"], "research_committed"):
-            return
-        store.put(s["run_key"], result["decision"], "graph_decision")
-        existing = store.get(s["symbol"], "thesis")
-        if not existing or dt(existing["reviewed_at"]) <= dt(result["research_completed_at"]):
-            store.put(
-                s["symbol"],
-                {
-                    "run_key": s["run_key"],
-                    "decision": result["decision"],
-                    "reviewed_at": result["research_completed_at"],
-                    "reference_price": (
-                        result["research_reference"]["price"]
-                        if result.get("research_reference")
-                        else result["quote"]["ask"]
-                    ),
-                    "reference_basis": result.get("research_reference")
-                    or {
-                        "basis": "broker_quote_ask",
-                        "timestamp": result["quote"]["timestamp"],
-                        "feed": result["quote"]["feed"],
-                    },
-                    "evidence_ids": sorted(x["id"] for x in result["evidence"]["sources"]),
-                    "valuation": result["valuation"],
-                    "team_reports": result["team_reports"],
-                    "team_report_times": result.get("team_report_times", {}),
-                    "research_sources": result["evidence"]["sources"],
-                    "research_calculations": result.get("calculations", {}),
-                    "research_arithmetic_records": result.get("arithmetic_records", []),
-                },
-                "thesis",
-            )
-        store.log("research_decision", {**s, **result})
-        store.put(s["run_key"], {"at": now()}, "research_committed")
 
     def risk(s):
         if s.get("research_only") or s["symbol"] in service.cfg.research_only_universe:

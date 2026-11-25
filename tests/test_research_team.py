@@ -658,23 +658,26 @@ def test_old_specialist_reports_are_not_refreshed_by_recent_review(env, decision
     assert "Valuation" in model.calls[start:]
 
 
-def test_restart_after_research_save_recovers_journal_without_model_calls(env, decision, monkeypatch):
+def test_restart_after_research_save_recovers_journal_without_model_calls(env, decision):
     research, model = team(env, decision)
     service, broker, _ = env
     graph = build_graph(service, research)
-    put = service.store.put
+    import sqlite3
 
-    def crash(key, value, kind="state", **kwargs):
-        if kind == "graph_decision":
-            raise RuntimeError("Injected interruption")
-        return put(key, value, kind, **kwargs)
-
-    monkeypatch.setattr(service.store, "put", crash)
-    with pytest.raises(RuntimeError, match="interruption"):
+    service.store.db.execute(
+        "CREATE TEMP TRIGGER fail_publish BEFORE INSERT ON documents "
+        "WHEN NEW.kind='graph_decision' BEGIN SELECT RAISE(ABORT, 'Injected interruption'); END"
+    )
+    with pytest.raises(sqlite3.IntegrityError, match="interruption"):
         graph.invoke({"symbol": "ACME", "run_key": "recover"})
     assert broker.submits == 0
+    assert service.store.get("recover", "research_result")
+    assert service.store.get("recover", "graph_decision") is None
+    assert service.store.get("ACME", "thesis") is None
+    assert service.store.get("recover", "research_committed") is None
+    assert not service.store.events("research_decision")
     calls = len(model.calls)
-    monkeypatch.setattr(service.store, "put", put)
+    service.store.db.execute("DROP TRIGGER fail_publish")
     graph.invoke({"symbol": "ACME", "run_key": "recover"})
     assert len(model.calls) == calls
     assert service.store.get("ACME", "thesis")

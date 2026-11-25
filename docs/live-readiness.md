@@ -5499,3 +5499,62 @@ added. Provider cost evidence and a fresh funding record are required before
 further paid work; the signed-in billing browser is not currently accessible.
 The user was asked to sign in while preparation continued. Goal remains active;
 no unattended trading, real-money action or automatic retry was enabled.
+
+### November 25 billing reconciliation
+
+Authenticated Chrome access restored provider evidence for the failed COST pair.
+The all-project/all-key/all-source daily cost export reports $0.1700242 for
+November 18 UTC. All nonempty minute usage falls within 01:29–01:36 UTC in the
+recorded project. Sol and Astra request/input/output totals exactly match local
+records. Terra has one additional request, 14,895 input tokens and 621 output
+tokens, consistent with the lost response. The whole day's cost is assigned to
+the pair; no per-request dollar amount or research success is inferred.
+
+Applied the existing atomic, predecessor-checked reconciliation procedure after
+its offline self-test and a database backup. Audit ID:
+`provider-reconciliation-20261125-unseen-cost-1`. Original reservation and source
+CSV hashes are preserved in the audit. Runtime readback confirms 67 spend records,
+zero unsettled/unknown charges, unchanged pause/config/funding receipt and no new
+orders or intents. Provider corrections remain possible after the export date.
+
+Credit-grants UI shows $156.20 available: $56.20 expires November 29 and $100
+expires December 10. Dates have no displayed expiry time and balances are rounded
+to cents. Billing overview separately shows a canceled purchasing plan; no billing
+settings were changed. Fresh runtime funding allocation/admission remains to be
+completed before paid research. Missing-evidence acceptance and held-AAPL refresh
+remain incomplete. No new model calls, orders or trading activation occurred.
+
+### November 25 research funding admission and operational audit
+
+Independently reviewed and installed a $40 cumulative allocation for the
+missing-evidence evaluation and held-AAPL refresh. The fresh authenticated grant
+observation was 18:00:14 UTC. Display precision is conservatively accounted for
+with $156.19 available, retaining the $15 buffer and unchanged $20 run/day caps.
+The allocation expires November 29 at 00:00 UTC (conservative start of earliest
+grant expiry date); it does not fund the complete prospective paper study.
+
+Installation first passed rollback validation, then explicit apply. Readback at
+18:03:27 UTC exactly matches the reviewed receipt; all 67 spending records,
+original experiment, pause, config and order/intent counts remain unchanged.
+Two staging attempts stopped before ledger mutation due to a container path and
+private-directory ownership mismatch; corrected staging retained the exact
+reviewed installer/proposal and an SQLite backup. Per-run admission is still
+required before paid work.
+
+The offline Python suite passed 1,591 tests (7 skipped, 1 deselected). Independent
+deployment review verified all 47 deployed Python module hashes against the
+then-current source and a fresh broker snapshot of one AAPL share with no open
+orders. Health remains unhealthy because the held AAPL review is overdue; fresh
+reconciliation and heartbeat are present. A proposed November 27–February 24
+study has 60 sessions and 36 slots, but is not approved or active. It requires
+an audited extension preserving the original experiment and final release,
+funding, research acceptance, monitoring and re-pause checks.
+
+Independent research review identified two required implementation improvements:
+ordinary paid evaluation funding admission must be atomic with reservation;
+supervised promotion of an accepted AAPL thesis must be atomic and bound to the
+independently reviewed durable result. Both implementations now have independent code approval. The final offline
+suite passed 1,623 tests (7 skipped, 1 deselected), and Ruff, formatting and
+secret scans passed. The release is not yet deployed; code approval is not
+acceptance of an actual research output. No new model calls, orders or trading
+activation occurred.

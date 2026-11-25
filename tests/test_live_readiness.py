@@ -7,6 +7,7 @@ from conftest import AT
 from test_graph_reporting import FixtureTeam
 
 from trader.models import dec
+from trader.paper_dispatch import fingerprint
 from trader.research import build_graph
 
 
@@ -18,6 +19,10 @@ def test_direct_graph_rejects_expired_or_future_research(env, decision, age):
     cached = service.store.get("cached", "research_result")
     cached["research_completed_at"] = (AT - timedelta(hours=age)).isoformat()
     service.store.put("cached", cached, "research_result")
+    # Bind the faulty fixture so this test reaches the freshness gate, not tamper detection.
+    marker = service.store.get("cached", "research_committed")
+    marker["result_sha256"] = fingerprint(cached)
+    service.store.put("cached", marker, "research_committed")
     result = graph.invoke({"symbol": "ACME", "run_key": "cached"})
     assert result["execution"]["status"] == "rejected"
     assert "Research is stale or future-dated" in result["execution"]["reasons"]
@@ -504,6 +509,10 @@ def test_cached_buy_rechecks_adversarial_review(env, decision, fault, entry):
     else:
         saved["critique"]["evidence_ids"] = []
     service.store.put("critic-cache", saved, "research_result")
+    # Bind the faulty fixture to independently exercise the adversarial execution gate.
+    marker = service.store.get("critic-cache", "research_committed")
+    marker["result_sha256"] = fingerprint(saved)
+    service.store.put("critic-cache", marker, "research_committed")
     if entry == "service":
         result = service.execute(decision, "critic-cache")
     else:

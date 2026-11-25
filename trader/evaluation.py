@@ -664,7 +664,13 @@ def run_suite(
             }
         )
         budget_cfg = cfg.model_copy(update={"research_max_cost_usd": cap})
-        reservation = DailyReservation(root, budget_cfg, "evaluation:" + run_id, testing=testing)
+        reservation = DailyReservation(
+            root,
+            budget_cfg,
+            "evaluation:" + run_id,
+            testing=testing,
+            require_funding=models is None and not testing,
+        )
         allowance = reservation.allowance
         ledger = Store(local_cfg.database)
         ledger.experiment = {"id": "evaluation:" + run_id}
