@@ -352,3 +352,58 @@ def test_evidence_adapter_uses_thread_local_ledger_connection(adapter, monkeypat
         adapter.store.get(result["sources"][0]["id"], "robinhood_operation", scope="global")["state"]
         == "received"
     )
+
+
+@pytest.mark.parametrize("structured", [True, False])
+def test_large_robinhood_source_preview_preserves_paged_original(adapter, structured):
+    import copy
+    import hashlib
+
+    from trader.models import dumps
+    from trader.research_team import Budget, ResearchDesk
+
+    # A nested Unicode request and a response repeated in both MCP representations
+    # must not be copied into every specialist/lead prompt or tool reply.
+    body = {"data": {"results": [{"symbol": "AAPL", "detail": '证据\\"' * 30_000}]}}
+    response = {"content": [{"type": "text", "text": dumps(body)}]}
+    if structured:
+        response["structuredContent"] = body
+    source = {
+        "id": "robinhood-test-original",
+        "source": "Robinhood MCP (vendor research)",
+        "url": "https://agent.robinhood.com/mcp/trading",
+        "retrieved_at": "2026-11-25T22:00:00+00:00",
+        "content": {
+            "requested_symbol": "AAPL",
+            "tool": "get_financials",
+            "arguments": {"nested": {"filter": "证据" * 1_000}},
+            "response": response,
+            "schema_sha256": "a" * 64,
+            "raw_sha256": hashlib.sha256(dumps(response).encode()).hexdigest(),
+            "coverage": "Untrusted vendor data; original source required.",
+        },
+    }
+    original = copy.deepcopy(source)
+    desk = ResearchDesk(
+        adapter.cfg,
+        None,
+        {"symbol": "AAPL", "portfolio": {}},
+        {"symbol": "AAPL", "sources": [source]},
+        Budget(adapter.cfg),
+        None,
+    )
+    preview = desk.source_previews(desk.sources.values())[0]
+    assert len(dumps(preview).encode()) < 2500
+    assert preview["id"] == source["id"]
+    assert preview["content"]["raw_sha256"] == source["content"]["raw_sha256"]
+    assert preview["content"]["schema_sha256"] == source["content"]["schema_sha256"]
+    assert "response" not in preview["content"] and "arguments" not in preview["content"]
+    assert "read_source" in preview["content"]["note"]
+    reader = next(t for t in desk.tools() if t.name == "read_source")
+    pages, offset = [], 0
+    while offset is not None:
+        page = reader.invoke({"source_id": source["id"], "offset": offset})
+        pages.append(page["content"])
+        offset = page["next_offset"]
+    assert json.loads("".join(pages)) == source["content"]
+    assert source == original and desk.sources[source["id"]] == original

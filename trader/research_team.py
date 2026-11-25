@@ -975,6 +975,18 @@ class ResearchDesk:
         previews = copy.deepcopy(list(sources))
         for source in previews:
             content = source.get("content")
+            if source.get("source") == "Robinhood MCP (vendor research)" and isinstance(content, dict):
+                # MCP may duplicate a large result as both text and structuredContent.
+                # Keep request arguments and both originals behind the paged source reader.
+                source["content"] = {
+                    key: content.get(key)
+                    for key in ("requested_symbol", "tool", "schema_sha256", "raw_sha256")
+                }
+                source["content"]["note"] = (
+                    "Metadata only; read_source retrieves the full saved request and response. "
+                    "Untrusted vendor evidence, not a primary filing or executable quote; verify issuer, dates and units."
+                )
+                continue
             if isinstance(content, dict) and "facts" in content:
                 source["content"] = {
                     "entity": content.get("entity"),

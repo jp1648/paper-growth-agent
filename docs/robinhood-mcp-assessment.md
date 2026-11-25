@@ -151,3 +151,13 @@ review. The $40 research allocation has $19.7763175 remaining; November 25 spend
 is $20.2236825 against the ordinary $20/day limit. A proposed single $18 attempt
 would need an explicit temporary daily allowance. No paper study was installed
 and no automatic unpause was authorized by these checks.
+
+### Bounded research projection
+
+Pre-run independent review found that MCP text and structured responses could
+both be repeated in specialist prompts. Robinhood evidence now projects only
+source/request identity and hashes, with an explicit `read_source` instruction.
+Full original request/response bodies remain unchanged in the audit store and
+paged reader. Oversized Unicode and duplicate-response regressions verify bounded
+previews and exact original reconstruction. This avoids raising context ceilings
+to accommodate duplicated filing bodies; it does not make unread evidence verified.
