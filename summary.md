@@ -32,8 +32,11 @@ correction was deployed, the second retry completed all four reports and a
 zero-share WATCH; independent review accepted the missing-evidence abstention
 case only. It does not establish complete investment research. Both retries cost
 an estimated $4.1021225, with no unknown charges. Original failures remain.
-Held AAPL research is still overdue; its reviewed supervisor is prepared for
-November 26 and requires a fresh $20 admission. Trading remains paused.
+Held AAPL research is still overdue. Its independently reviewed one-shot start
+is installed for November 26 at 10:00 a.m. New York time and requires fresh
+$20 admission. Installation readback showed the service inactive, no AAPL run
+record and the original pause intact. Scheduling is not completed research.
+Trading remains paused.
 Preserve original runs and history.
 
 ## Start here

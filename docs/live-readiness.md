@@ -5665,3 +5665,19 @@ Owner, reconciliation, heartbeat and telemetry arrival are current. Health remai
 blocked solely by overdue AAPL research. No active paper study or experiment
 extension exists. The first-cycle plan and its separate $20 funding installer
 remain offline candidates; no trial activation or additional paid attempt occurred.
+
+
+### November 25 one-shot AAPL start installed
+
+The independently reviewed supervisor and timer are installed for November 26
+at 15:00 UTC (10:00 a.m. New York). Timer readback confirms active/waiting;
+the service is inactive with PID 0. Post-installation readback confirms the
+original pause hash, 69 spending records and no new AAPL run record. The stable
+identity is `held-aapl-refresh-20261126-1`; inspect and attach to that identity
+after launch, never start a duplicate because an observation times out.
+
+This starts research only, subject to fresh funding and runtime admission. It
+does not unpause trading or automatically accept a thesis. Independent review
+and explicit accepted-result promotion remain required. First-cycle funding,
+prospective study approval, final recovery checkpoint and opening/re-pause
+controls remain separate prerequisites for the November 27 paper trial.
