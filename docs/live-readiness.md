@@ -5612,3 +5612,33 @@ acceptance remains pending. AAPL supervision is prepared but unlaunched. Current
 daily headroom $18.8150275 cannot admit the configured $20 reservation; a fresh
 NY day and accepted shared-failure diagnosis are required. No trading activation
 or new order is claimed.
+
+### November 25 correction deployment and bounded second retry
+
+Correction commit `c25a00a` passed independent review, 1,628 offline tests
+(7 skipped, 1 deselected), and exact-revision CI including safety mutations.
+Both paused containers now run digest
+`aef27f5df54112a0f3948a84650301c5789ab2a6f0996118ed8f0abb3bea8af7`.
+All 47 module hashes and the acceptance helper were verified. The 68 settled
+spending records, funding, pause, config and financial history were preserved;
+only expected operational timestamps/marks and validated quote records changed.
+
+Telegram accepted a clearly labeled one-time TEST/no-trade message, ID 4, with
+a durable receipt recorded before sending. This proves provider acceptance,
+not operator reading. Initial setup stopped before sending because its private
+receipt directory was absent; absence of an attempt receipt was verified before
+preparing the directory. Historical broker fill alerts remain separate evidence.
+
+The repaired AAPL supervisor passed independent review and 19 offline tests.
+Pause restoration is create-only and preserves newer operator markers; the
+review file has a separate pinned read-only UID501 mount. Actual AAPL research
+has not run. Final plan binding and future daily funding admission are required.
+
+One deliberate post-fix missing-evidence experiment was independently approved
+with unchanged frozen case/rubric, a $6 cap, $20 daily ceiling, existing $40
+allocation and $15 buffer. Stable ID `cost-case-b-retry-20261125-2` is running
+under `trader-cost-missing-20261125-2`; observe this handle, never restart it
+because a status read times out. An initial staging encoding error created only
+an empty launcher and stopped before execution; that directory was preserved,
+then all corrected staged hashes were verified. Final research acceptance and
+settlement remain outstanding. No orders or trial activation occurred.
