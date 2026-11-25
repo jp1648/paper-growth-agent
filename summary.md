@@ -70,9 +70,12 @@ denial and Postgres traces passed; see docs/robinhood-mcp-assessment.md.
 This does not close investment acceptance: the durable AAPL result remains
 unapproved, and a new result requires independent review. The later authorized $18 attempt stopped during valuation correction on an
 unlisted filing accession; no final decision was committed. Recorded model
-usage is $8.9845275, with the full $18 conservatively retained as unknown until
-accounting evidence resolves it. The workflow is canceled, not retried. An
-offline navigation-error fix is tested but not yet deployed. See the latest
+usage is $8.9845275. Independent review subsequently verified all 37 saved
+model exchanges and the exact local pre-fetch failure; the ledger now settles
+that estimate through an additive audit, preserving the original unknown
+receipt and pending operation. The workflow is canceled, not retried. The
+reviewed navigation-error fix is deployed and source-verified in both containers;
+worker shutdown exited 0 and services restarted with pause and history intact. See the latest
 November 25 attempt in docs/live-readiness.md. No orders were submitted.
 Trading remains paused.
 Preserve original runs and history.

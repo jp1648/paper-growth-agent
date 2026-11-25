@@ -5996,3 +5996,41 @@ higher limits or start research. Fifty-nine focused checks passed. Production
 restoration verified no running workflows, a clean worker stop, preserved pause,
 and both restarted containers on the same image. Evidence is in
 `state/robinhood-acceptance-20261125-unknown-restore/`.
+
+
+### Navigation fix deployed and reservation reconciled
+
+The follow-up release is built from `1e1f3eafd23fa7281a8950dd85eb41c64c3804e9`
+and deployed to both executor and research worker as image
+`sha256:631795932298cc99e7798df9a5ad96490842bf4aacd196e50ecac2219d27585d`.
+Cloud Build `5b971660-c3a5-42b8-a4c4-a8496ba85a6e` succeeded. Production
+verification matched every Python module hash and Temporal 1.37.0, checked
+natural client exit, and preserved ordinary config, pause and protected history.
+The deployment's worker shutdown exited 0. Initial idle checks deferred while
+routine maintenance ran; no competing work was interrupted to pass them.
+
+Read-only forensic verification recovered the exact pending function call from
+the saved model response and matched its canonical request hash. The accession
+was absent from the frozen company filing list; the original deployed source
+and matching Temporal activity stack establish a local rejection before
+`provider.documents`. All 37 model operations have one matching attempt and
+saved HTTP response; frozen route, price, request identity and token usage
+checks reproduce **$8.9845275 estimated model cost**. This is not a provider bill.
+
+Independent review approved that proof and the separate reconciliation helper.
+Twenty-five focused reconciliation tests passed, including changed evidence,
+exchange bytes, pending operation, receipt, terminal state, stale projection,
+rollback and idempotence cases. Under stopped services and account/run locks,
+the helper appended `local-usage-reconciliation-20261125-robinhood-1` and updated
+only the exact spend projection from unknown $18 to settled $8.9845275.
+All seven operation-journal tables, the original unknown receipt, pending tool
+operation, funding and unrelated records remain intact. No retry authority was
+created. Ordinary limits remain $20/run and $20/day; November 25 estimated
+spend is $29.20821 after the previously authorized one-time higher daily cap.
+
+Private proof and release records are under `state/navigation-accounting-20261125/`
+and `state/navigation-release-20261125/`. The portfolio snapshot remains one
+AAPL share, $99,655.93 cash and no open orders. No new paid investigation or
+order was initiated. The fixed behavior has offline coverage, but a new
+durable research result and independent investment acceptance remain outstanding.
+Trading stays paused.
