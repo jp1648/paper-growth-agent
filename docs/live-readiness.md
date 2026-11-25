@@ -5696,3 +5696,19 @@ The re-pause guard passed independent review and 12 tests after fixing FIFO
 blocking and directory durability when preserving existing or racing markers.
 The dated systemd installer remains under preparation; these are offline
 mechanics approvals, not installed launch controls or paper activation.
+
+
+### November 25 deadline guard installed while paused
+
+The exact independently reviewed dated installer passed 30 combined installer/guard
+tests and the real VM read-only preflight. It installed the persistent re-pause
+timer for November 27 at 18:00 UTC (1 p.m. New York) and the executor's prestart
+deadline guard. Actual readback confirms the expected timer target, active/waiting
+state, exact deadline and effective prestart drop-in. Exercising the guard preserved
+the original pause bytes/inode; the executor remained active. All 69 spending
+records are unchanged and the November 26 AAPL timer remains armed.
+
+Receipt: private `opening-candidate/guard-install-result.json`, installation time
+2026-11-25T19:16:07Z. These controls restore/preserve the pause; they do not approve
+a study, allocate funds, unpause trading or establish research acceptance. Final
+study approval, fresh recovery and actual first-cycle observation remain pending.
