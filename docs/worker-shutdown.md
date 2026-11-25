@@ -44,6 +44,25 @@ one observed zero completed callbacks and the three-runtime child aborted
 This Linux result is an additional native regression demonstration, not an
 exact reproduction of the production x86-64 incident.
 
-Production needs a reviewed image containing the new lockfile and a controlled,
-idle stop/restart check before this is described as deployed. Keep all runtime
-shutdown failures visible and retain the ordinary maintenance/accounting gates.
+## Production verification — November 25
+
+Reviewed revision `268f8c3` was built as image digest
+`sha256:8584e13831d41377ab9f631615ec43a27a8bc37c9d795baf6215bd2ac42e750a`
+and deployed to the executor and research worker. Both containers verified all
+47 module hashes and Temporal 1.37.0. A natural client idle probe passed; the
+actual new worker stopped with exit 0 and restarted successfully. Pause/config,
+original experiment and protected ledger state were preserved. Receipts are in
+`state/sdk-release-20261125/`.
+
+Deployment uncovered unrelated storage exhaustion: Cloud SQL had auto-stopped
+at its configured ceiling, and the VM boot disk was full. Both capacities were
+expanded without deleting data. A portable journal timestamp bug in the private
+release helper was corrected. Executor exit 143 is admitted only when the exact
+invocation's journal corroborates the requested Docker SIGTERM stop; worker 143,
+worker 139 and unexplained shutdown failures remain rejected. The corrected
+release/recovery checks passed 47 focused tests. Initial failed checks and the
+scheduled postclose report's independently reviewed state delta remain retained.
+
+This verifies the deployed SDK lifecycle, not the unavailable historical crash
+stack or investment acceptance. Keep runtime shutdown failures visible and retain
+ordinary maintenance/accounting gates.

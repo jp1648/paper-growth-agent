@@ -71,3 +71,23 @@ This is a bound on password checks, not denial-of-service protection. Someone ca
 consume the workspace-wide allowance and temporarily deny new logins; fixed windows
 also permit a boundary burst. Trusted edge throttling/identity-aware access and
 sustained hostile-load testing remain required for stronger availability guarantees.
+
+## November 25 storage exhaustion recovery
+
+Cloud SQL `trader-telemetry` automatically stopped with
+`cloudsql.instances.databaseShutdownOutOfStorage`. Its 20 GB disk had automatic
+increase enabled but capped at the same 20 GB. This was a system protection
+shutdown, not a user request to suspend the database. Temporal workflow queries
+then timed out because no database connection was available.
+
+The recovery expanded SQL storage to 40 GB and permits automatic growth up
+to 60 GB. Operation `7f123eef-b83c-4c13-b189-9fa700000026` completed at
+21:35:35 UTC; the subsequent Temporal idle preflight passed. These are bounded capacity increases, not deletion of telemetry or
+research history. The VM boot disk also required a separate 20-to-40 GiB increase
+after pulling a new image; the persistent state disk is separate and unchanged.
+Storage has ongoing billing cost. Retain rollback images and audit records.
+
+Check capacity on both the boot and state filesystems, and the SQL disk/growth
+ceiling. The current executor monitor's `disk_used_ratio` measures the state
+filesystem only; it cannot establish boot-disk headroom. Capacity recovery alone
+is not proof that alert coverage or long-term growth management is complete.

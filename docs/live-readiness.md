@@ -5887,3 +5887,64 @@ terms or historical tax/working-capital attribution. The reviewed sensitivities
 are useful analysis, not certified bounds that silently close those gaps.
 Both the revised research guidance and SDK candidate passed independent review.
 The deployment, live model behavior and full research gate are not claimed.
+
+
+## November 25 primary-evidence completion
+
+A separate 36-file supplement retrieved the final borrowing prospectus and
+certificate, plan/award forms, proxy and actual executive ownership filings.
+Original sources, retrieval timestamps, hashes and exact excerpt offsets remain
+under `state/evidence-completion-20261125/`; no original result was rewritten.
+Manifest: `b896ac60eeb7665cdb89eaa8f9d41c7b6f42cad496844affa7e6ea4466577d64`.
+Independent review: `state/evidence-completion-review-20261125/review.json`,
+SHA-256 `64f70dd1c3826b963b1c4cf2471188de2a636f9d1ecd6f0a9f54500a5208f983`.
+
+The floating spreads and fixing convention are now sourced. The current-tax
+bridge leaves an explicit $0.518B residual; combined cash conversion retains
+actual cash effects without an invented addback. Executive award terms cannot
+be generalized to all employees. Future rates and the actual application of
+borrowing proceeds are forecast/policy uncertainties, not missing historical
+facts that another retrieval can necessarily resolve.
+
+The independent reviewer reproduced three annual paths, 36 sensitivity cells
+and 27 normalization stresses, and accepted completed public-source diligence
+for **DEFER_VALUATION_ACTION**. Inaccessible internal detail is not required to
+justify abstention. This supersedes the earlier characterization that all these
+items remained retrieval work. It does not approve actionable valuation coverage,
+the original SELL, or runtime promotion. The supplement is not the durable run's
+immutable final artifact: any new result must incorporate the evidence and receive
+its own independent review. Original gap flags and history remain intact.
+Trading remains paused; no new model calls or orders were made for this supplement.
+
+See [Robinhood MCP assessment](robinhood-mcp-assessment.md) for the optional
+research-data integration; it cannot manufacture undisclosed company facts.
+
+### SDK deployment and production shutdown acceptance
+
+Revision `268f8c3`, image digest
+`sha256:8584e13831d41377ab9f631615ec43a27a8bc37c9d795baf6215bd2ac42e750a`,
+is deployed to both containers with verified module hashes and Temporal 1.37.0.
+The real worker's controlled shutdown exited 0, natural client exit passed,
+and the services restarted. Configuration, pause and protected state remained
+intact. The historical crash stack is still unavailable; see
+[shutdown evidence](worker-shutdown.md). This supersedes the earlier
+candidate-only deployment status.
+
+The preflight also found Cloud SQL's automatic out-of-storage shutdown and a
+full VM boot disk. Capacity was expanded without deleting history; see
+[storage recovery](google-cloud.md#november-25-storage-exhaustion-recovery).
+The corrected release helper and narrow stopped-state continuation passed 47
+focused regressions. Initial failed receipts and the independently reviewed
+postclose-report delta are preserved under `state/sdk-release-20261125/`.
+No model calls or broker orders were initiated for this deployment. Neither SDK
+verification nor the accepted no-action supplement opens trading automatically.
+
+Final read-only verification at 21:47:53 UTC confirmed the exact candidate image
+and module hashes in both containers, all four services active, unchanged pause
+and ordinary config, unchanged protected records and original journal prefix.
+The independently reviewed interruption entry at sequence 60575 explicitly records
+the maintenance gap; it is retained, not removed to pass a whitelist. Paper cash
+is $99,655.93, holdings are one AAPL share, and open orders are empty. Final receipts:
+`final-operational-verification.json` and `final-operational-review.json` in the
+release evidence directory. No actionable research acceptance or unpause follows
+from these operational checks.

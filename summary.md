@@ -54,8 +54,16 @@ its no-action process outcome, not full opening research or a trade.
 The shutdown investigation reproduced a native Temporal 1.36 finalization
 failure on macOS and Linux; the upstream 1.37 fix passes both and is pinned in
 the candidate. All 1,638 offline tests passed, with seven skipped and one
-deselected. The production image has not been changed; the exact historical
-exit-139 stack remains unproved. See docs/worker-shutdown.md.
+deselected. The SDK 1.37 image is now deployed on both production containers. The controlled
+worker shutdown exited 0, natural client exit passed, and services restarted with
+pause/config/protected state preserved. The exact historical exit-139 stack
+remains unproved. See docs/worker-shutdown.md.
+A later 36-file primary-source supplement closes attainable filing-retrieval
+work. Independent review accepts a scoped DEFER/no-action research conclusion;
+undisclosed award inventory and future funding/rates remain explicit uncertainty,
+not reasons to demand inaccessible internal data before abstaining. This does
+not promote the original SELL or satisfy the exact durable-result opening gate.
+See the latest primary-evidence section in docs/live-readiness.md.
 Trading remains paused.
 Preserve original runs and history.
 
