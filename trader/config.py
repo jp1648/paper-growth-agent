@@ -71,6 +71,9 @@ class Settings(Model):
     research_max_output_tokens: int = Field(default=3000, ge=256, le=8000)
     research_max_cost_usd: Decimal = Field(default=Decimal(20), gt=0, le=100)
     research_daily_cost_usd: Decimal = Field(default=Decimal(20), ge=0, le=1000)
+    robinhood_enabled: bool = False
+    robinhood_daily_calls: int = Field(default=12, ge=0, le=100)
+    robinhood_cache_hours: int = Field(default=4, ge=1, le=24)
     x_enabled: bool = False
     x_daily_calls: int = Field(default=6, ge=0, le=30)
     x_cache_hours: int = Field(default=4, ge=1, le=24)

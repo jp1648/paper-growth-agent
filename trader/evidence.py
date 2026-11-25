@@ -70,6 +70,22 @@ class EvidenceProvider:
         self._lock = threading.Lock()
         self._last_request = 0.0
 
+    def research_catalog(self):
+        from .robinhood import RobinhoodResearch
+
+        return RobinhoodResearch(self.cfg, self.store).catalog()
+
+    def research_data(self, symbol, capability, arguments):
+        from .robinhood import RobinhoodResearch
+        from .store import Store
+
+        # Model tools run in worker threads; never reuse the caller's SQLite connection.
+        store = Store(self.store.path)
+        try:
+            return RobinhoodResearch(self.cfg, store).fetch(symbol, capability, arguments)
+        finally:
+            store.db.close()
+
     @traced("evidence.request")
     def request(self, url):
         parsed = urlsplit(url)

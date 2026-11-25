@@ -50,6 +50,11 @@ sec_user_agent = "" # Your application name and contact email, as required by SE
 input_cost_per_million = "5"
 output_cost_per_million = "10"
 
+# Optional Robinhood research MCP (OAuth setup: docs/robinhood-mcp-assessment.md).
+robinhood_enabled = false
+robinhood_daily_calls = 12
+robinhood_cache_hours = 4
+
 [role_models.research_lead]
 model = "gpt-6-astra" # Planning, delegation, and final synthesis.
 reasoning_effort = "high"

@@ -191,3 +191,15 @@ still be proposed for a broken thesis or portfolio constraint. This is research
 guidance, not a blanket SELL veto or a change to deterministic execution gates.
 Prompt-contract tests cannot certify economic reasoning; independent review of
 the actual output remains necessary.
+
+### Optional Robinhood MCP research
+
+`robinhood_enabled` exposes `research_data_catalog` and `research_data` to the
+research team. The fixed allowlist covers filing discovery/content/facts,
+financials, earnings dates/results, fundamentals and analyst ratings. Authenticate
+with the local OAuth command in [Robinhood setup](robinhood-mcp-assessment.md#implemented-research-adapter).
+The research tool tries Robinhood first, then returns applicable existing SEC and
+Alpaca news evidence with explicit partial-coverage warnings. Existing original
+filing tools remain available. No broker/account/order tools or executable quotes
+are routed through MCP. This opt-in does not unpause trading or clear acceptance
+gaps, and is excluded from historical evaluations.

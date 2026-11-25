@@ -27,6 +27,8 @@ def runtime_fingerprint():
                     "langchain-core",
                     "langchain-openai",
                     "temporalio",
+                    "mcp",
+                    "jsonschema",
                     "pydantic",
                 )
             },

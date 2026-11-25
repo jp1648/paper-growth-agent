@@ -57,3 +57,64 @@ supplies a server-enforced read-only scope; that still needs verification.
 No Robinhood connection, account opening, authentication, integration or order was
 performed. Direct SEC retrieval remains the immediate path for the current AAPL
 acceptance work.
+
+## Implemented research adapter
+
+Trader now includes an opt-in MCP client and two research tools:
+`research_data_catalog` retrieves authenticated schemas for the fixed read
+allowlist, and `research_data` requests one of those capabilities. Order,
+account, portfolio, transfer and other tools are blocked again at the HTTP
+transport boundary, even if they appear in the remote catalog. This integration
+does not replace Alpaca quotes or any execution/risk input.
+
+Authenticate on the same computer where this command runs:
+
+```sh
+uv run python -m trader.robinhood_connect --token-file state/robinhood-oauth.json
+```
+
+Open the printed Robinhood URL and complete sign-in. The callback listens only
+on `127.0.0.1:18765`; the SDK verifies OAuth state and PKCE. The command only
+initializes MCP and lists tools. It does not read accounts or submit trades.
+OAuth tokens and client registration are stored with mode 0600 outside the
+ledger and telemetry. Runtime refresh uses the same private file; interactive
+sign-in is never attempted by an unattended research worker. Configure
+`robinhood_enabled = true` only after connection and read verification. The
+credential file lives next to the configured ledger; do not commit it, paste it
+into chat or place it in dashboard/browser configuration. Remote deployment
+requires transferring that file privately to the worker's state directory.
+
+The default allowance is 12 data-call attempts per New York day, with a four-hour
+exact-request cache (`robinhood_daily_calls`, `robinhood_cache_hours`). This is
+not a dollar budget: provider billing/entitlements remain separate, and recorded
+cost is unknown rather than reported as zero. Completed original responses,
+request arguments, schema hash, response hash and retrieval timestamps are
+retained under durable operation IDs. Ambiguous calls leave a persistent block
+across restarts. Inspect provider usage and the operation before resolving that
+block; do not delete unknown records to retry. Schema discovery does not request
+financial data and is separate from the data-call allowance.
+
+When a supported filing, facts, financials, fundamentals or earnings request is
+unavailable, the tool returns existing SEC facts/filing navigation and Alpaca
+news, explicitly labeled as partial fallback coverage. It does not pretend that
+news is a consensus series or that an index is a full filing. Original passages
+remain available through `filing_documents`/`read_document`. No equivalent
+analyst-rating fallback is claimed. Vendor extracts must be checked against
+original issuer/accession/date/unit evidence before valuation. Historical
+evaluations never call live Robinhood tools. Tool traces and research checkpoints
+use the existing observability/replay path; SDK errors are sanitized at the
+credential boundary.
+
+### Local connection verification — November 25, 2026
+
+OAuth completed successfully in Chrome on this Mac. Authenticated discovery
+returned all nine allowlisted research tools. One bounded AAPL fundamentals
+request succeeded through the audited adapter, with original response and schema
+hash retained in the private, isolated `state/robinhood-verification/ledger.sqlite`.
+Operation: `robinhood-e9c9aafb96f5429ba963d40453be426b`. The returned issuer was
+AAPL; this verifies acquisition, not accuracy or investment acceptance. Provider
+cost remains unknown, not zero. No account or order tools were called.
+
+Offline validation: 1,670 passed, seven skipped, one deselected; Ruff lint and
+format checks passed. Production deployment and credential provisioning remain
+outstanding. Production configuration and trading pause were not changed.
