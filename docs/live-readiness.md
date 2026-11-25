@@ -5642,3 +5642,26 @@ because a status read times out. An initial staging encoding error created only
 an empty launcher and stopped before execution; that directory was preserved,
 then all corrected staged hashes were verified. Final research acceptance and
 settlement remain outstanding. No orders or trial activation occurred.
+
+
+### November 25 missing-evidence acceptance completed
+
+`cost-case-b-retry-20261125-2` completed in 321 seconds with all four specialist
+reports and a final zero-share WATCH. Independent review accepted the unchanged
+missing-evidence abstention rubric; exact recording/case hashes and an offline
+review replay are retained. Valuation stayed unknown because capex and original
+filing/ownership evidence were unavailable. This is neither complete COST
+investment research nor a new unseen holdout success. The original failures and
+separate independently accepted analyst remediation remain distinct evidence.
+
+Estimated retry2 spend settled at $2.9171500, with no unknown calls. The 68 prior
+spending records, funding, pause and protected history were preserved. Combined
+November 25 retry spend is $4.1021225; daily headroom $15.8978775 cannot admit the
+configured $20 AAPL reservation. These are local estimates, not provider invoices.
+
+Fresh deployed readiness audit confirms both c25 containers/module hashes,
+69 settled records, original pause/config, one AAPL share and no open orders.
+Owner, reconciliation, heartbeat and telemetry arrival are current. Health remains
+blocked solely by overdue AAPL research. No active paper study or experiment
+extension exists. The first-cycle plan and its separate $20 funding installer
+remain offline candidates; no trial activation or additional paid attempt occurred.
