@@ -118,3 +118,36 @@ cost remains unknown, not zero. No account or order tools were called.
 Offline validation: 1,670 passed, seven skipped, one deselected; Ruff lint and
 format checks passed. Production deployment and credential provisioning remain
 outstanding. Production configuration and trading pause were not changed.
+
+### Production deployment and verification — November 25, 2026
+
+Revision `9dcc529` was built from a tracked-only context and deployed to both
+executor and research worker as image digest
+`sha256:501f9d2a99588eca87f9845d8c2a5a7e52328172dcfe6cd52dd9c56beab213ad`.
+OAuth credentials were privately provisioned for the runtime user. The sole
+configuration change is `robinhood_enabled = true`; the trading pause remains.
+
+Authenticated production discovery returned all nine allowlisted tools. One
+AAPL fundamentals request succeeded, with source
+`robinhood-060779576887444bae68ccf92842a033`; a repeat used the identical cached
+source. An injected provider outage returned the 14 retained original sources
+as explicitly partial fallback coverage. Analyst ratings correctly had no
+fabricated fallback. An attempted order-tool name was denied before network
+access. These are acquisition and failure-path checks, not investment acceptance.
+PostgreSQL contains matching start/end traces and durable operation/cache events
+under `robinhood-production-verification-20261125`.
+
+The guarded release preserved the original experiment, protected ledger records,
+journal prefix and pause. Final broker GET verification showed cash $99,655.93,
+one AAPL share and zero open orders. No model calls or orders were made. Provider
+dollar usage remains unknown, not reported as free. Private release receipts are
+under `state/robinhood-release-20261125/`.
+
+Investment acceptance remains closed: the original durable AAPL result still
+has material valuation/critique gap flags and no complete-research approval.
+The separately accepted DEFER supplement does not rewrite that result. A fresh
+bounded result incorporating the corrected analysis needs its own independent
+review. The $40 research allocation has $19.7763175 remaining; November 25 spend
+is $20.2236825 against the ordinary $20/day limit. A proposed single $18 attempt
+would need an explicit temporary daily allowance. No paper study was installed
+and no automatic unpause was authorized by these checks.

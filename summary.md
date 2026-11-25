@@ -64,6 +64,12 @@ undisclosed award inventory and future funding/rates remain explicit uncertainty
 not reasons to demand inaccessible internal data before abstaining. This does
 not promote the original SELL or satisfy the exact durable-result opening gate.
 See the latest primary-evidence section in docs/live-readiness.md.
+Robinhood MCP research is now deployed and enabled in both production containers.
+Authenticated AAPL acquisition, caching, injected-outage fallback, order-tool
+denial and Postgres traces passed; see docs/robinhood-mcp-assessment.md.
+This does not close investment acceptance: the durable AAPL result remains
+unapproved, and a new result requires independent review. No new model run or
+order was made for this integration.
 Trading remains paused.
 Preserve original runs and history.
 
