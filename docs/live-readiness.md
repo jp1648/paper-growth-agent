@@ -5948,3 +5948,41 @@ is $99,655.93, holdings are one AAPL share, and open orders are empty. Final rec
 `final-operational-verification.json` and `final-operational-review.json` in the
 release evidence directory. No actionable research acceptance or unpause follows
 from these operational checks.
+
+
+## November 25 authorized Robinhood research attempt
+
+The user authorized one $18 attempt, temporarily allowing $38.2236825 for the
+New York day while retaining the $15 funding buffer. Stable run
+`held-aapl-robinhood-20261125-1` used manifest
+`ecfd4fd49493cdc26529c5422253a781041413225036a516aa61fc5005ea63c7`.
+The deployed image `sha256:6694f5fe55b5b93926aa901511fe88065cda47fd6e3fa24876c1fd128e52b083`
+includes bounded metadata-only Robinhood source previews; original content
+remains available through the paged reader. Both containers were verified.
+
+This attempt completed 37 model calls and 68 tool calls, including initial
+business, catalyst, valuation, adversarial and lead stages. During the valuation
+correction, `filing_documents` received an accession outside the saved company
+filing list. Its ValueError was classified as invalid stage configuration,
+blocking the workflow. No final research result or investment decision was
+committed. The workflow was canceled at 23:12:24 UTC; it was not retried.
+
+The original accounting closer records $8.9845275 of known model usage estimates,
+not a provider bill. Because the interrupted tool has no completion receipt,
+the full $18 remains reserved as unknown with an immutable `aborted_accounted`
+receipt. No journal operation was deleted, synthesized or marked complete to
+release that reserve. Known model estimates for the day are $29.20821; budget
+accounting conservatively remains $38.2236825 including the retained reserve.
+
+The offline fix makes only an unlisted accession a handled navigation error:
+no network request or new evidence is allowed, and genuine provider validation
+failures still fail closed. Regressions cover prohibited path/URL inputs,
+subsequent valid retrieval, durable error completion and replay without a second
+dispatch or double-counting. The final full suite passed 1,677 tests (seven skipped,
+one deselected), including the durable replay regression.
+This follow-up fix has not been deployed or exercised by a new paid run.
+
+Private evidence is under `state/robinhood-acceptance-20261125/`, including
+`terminal.json`, `diagnosis.json`, `accounting-close-2.json`, and the independent
+failure review. Partial reports and an offline fix do not satisfy investment
+acceptance. Trading remains paused; this attempt submitted no orders.

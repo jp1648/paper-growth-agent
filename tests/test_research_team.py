@@ -722,8 +722,9 @@ def test_decimal_valuation_and_fabricated_calculation_rejected():
     with pytest.raises(ValueError, match="deterministic"):
         desk.validate(Valuation, output | {"base_value": "1000"})
     assert tools["read_document"].invoke({"document_id": "/private/project/.env"})["available"] is False
-    with pytest.raises(ValueError, match="Accession"):
-        tools["filing_documents"].invoke({"symbol": "ACME", "accession": "../../.env"})
+    assert "No document was fetched" in tools["filing_documents"].invoke(
+        {"symbol": "ACME", "accession": "../../.env"}
+    )
 
 
 def test_budget_deadline_calls_and_cost():
@@ -1670,8 +1671,7 @@ def test_filing_lookup_handles_text_sources_without_inventing_accessions():
     provider.documents.return_value = []
     assert lookup.invoke({"symbol": "ACME", "accession": "0000000001-26-000001"}) == []
     provider.documents.assert_called_once()
-    with pytest.raises(ValueError, match="Accession"):
-        lookup.invoke({"symbol": "ACME", "accession": "../../.env"})
+    assert "No document was fetched" in lookup.invoke({"symbol": "ACME", "accession": "../../.env"})
     provider.documents.assert_called_once()
 
 
@@ -3266,3 +3266,143 @@ def test_specialist_uses_reversible_calculation_projection(correction, monkeypat
     assert captured["calculations"] == original == desk.calculations
     if correction:
         assert desk.correction["calculations"] == original
+
+
+@pytest.mark.parametrize(
+    "accession",
+    ["0000000001-26-999999", "../../.env", "https://example.com/unlisted-filing.htm"],
+)
+def test_unlisted_accession_is_recoverable_without_fetching_or_relaxing_access(accession):
+    import copy
+    from types import SimpleNamespace
+
+    from trader.evidence import EvidenceProvider
+    from trader.research_team import Guard
+
+    cfg = Settings(
+        universe={"ACME": Security(cik="1", sector="Technology")},
+        sec_user_agent="Trader offline test test@example.com",
+    )
+    requests = []
+
+    def respond(request):
+        requests.append(str(request.url))
+        assert str(request.url) == "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/index.json"
+        return httpx.Response(200, json={"directory": {"item": [{"name": "annual.htm"}]}})
+
+    provider = EvidenceProvider(cfg, None, None, httpx.Client(transport=httpx.MockTransport(respond)))
+    budget = Budget(cfg)
+    evidence = Evidence().get("ACME")
+    desk = ResearchDesk(cfg, provider, {"symbol": "ACME", "portfolio": {}}, evidence, budget, None)
+    original = copy.deepcopy(desk.sources)
+    lookup = next(t for t in desk.tools() if t.name == "filing_documents")
+    guard = Guard(budget, "valuation", {"filing_documents"})
+
+    def invoke(value, call_id):
+        call = {
+            "name": "filing_documents",
+            "id": call_id,
+            "type": "tool_call",
+            "args": {"symbol": "ACME", "accession": value},
+        }
+        return guard.wrap_tool_call(SimpleNamespace(tool_call=call), lambda req: lookup.invoke(req.tool_call))
+
+    error = invoke(accession, "unlisted")
+    assert error.status == "error" and "exact accessionNumber" in error.content
+    assert "read_source" in error.content and "no evidence" in error.content
+    assert not requests and not desk.documents and desk.sources == original
+    good = invoke("0000000001-26-000001", "listed")
+    assert good.status == "success"
+    assert json.loads(good.content)[0]["url"].endswith("/000000000126000001/annual.htm")
+    assert len(requests) == 1 and len(desk.documents) == 1
+    assert budget.tools == guard.tool_calls == 2 and desk.sources == original
+    events = [body for kind, body in budget.events if kind == "research_tool_result"]
+    assert [body["succeeded"] for body in events] == [False, True]
+    provider.client.close()
+
+
+def test_filing_provider_validation_failure_is_not_navigation_feedback():
+    from unittest.mock import Mock
+
+    cfg = Settings()
+    provider = Mock()
+    provider.documents.side_effect = ValueError("Provider evidence validation failed")
+    desk = ResearchDesk(
+        cfg, provider, {"symbol": "ACME", "portfolio": {}}, Evidence().get("ACME"), Budget(cfg), None
+    )
+    lookup = next(t for t in desk.tools() if t.name == "filing_documents")
+    with pytest.raises(ValueError, match="Provider evidence validation failed"):
+        lookup.invoke({"symbol": "ACME", "accession": "0000000001-26-000001"})
+    assert not desk.documents
+
+
+def test_unlisted_accession_error_completes_durable_call_and_replays_without_dispatch(tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from trader.research_checkpoint import ResearchCheckpoint
+    from trader.research_journal import Journal
+    from trader.research_team import Guard
+
+    cfg = Settings()
+    provider = Mock()
+    provider.documents.return_value = Evidence().documents("ACME", {})
+    path = tmp_path / "operations.sqlite"
+    invalid = {
+        "name": "filing_documents",
+        "id": "unlisted-accession",
+        "type": "tool_call",
+        "args": {"symbol": "ACME", "accession": "0000000001-26-999999"},
+    }
+    for restarted in (False, True):
+        with Journal(path, {"run": "accession-recovery"}).lease() as journal:
+            checkpoint = ResearchCheckpoint(
+                journal,
+                path.parent / "graph.sqlite",
+                phase="correction",
+                role="valuation",
+                thread_id="accession-recovery",
+            )
+            try:
+                desk = ResearchDesk(
+                    cfg,
+                    provider,
+                    {"symbol": "ACME", "portfolio": {}},
+                    Evidence().get("ACME"),
+                    Budget(cfg),
+                    None,
+                )
+                checkpoint.attach_desk(desk)
+                lookup = next(t for t in desk.tools() if t.name == "filing_documents")
+                guard = Guard(desk.budget, "valuation", {"filing_documents"}, checkpoint=checkpoint)
+                error = guard.wrap_tool_call(
+                    SimpleNamespace(tool_call=invalid),
+                    lambda req, restarted=restarted, lookup=lookup: (
+                        pytest.fail("Completed error must replay")
+                        if restarted
+                        else lookup.invoke(req.tool_call)
+                    ),
+                )
+                assert error.status == "error" and "no evidence" in error.content
+                assert journal.inspect_operations() == {"complete_operations": 1, "pending_operations": []}
+                assert desk.budget.tools == guard.tool_calls == 1
+                provider.documents.assert_not_called()
+                if restarted:
+                    valid = {
+                        **invalid,
+                        "id": "listed-accession",
+                        "args": {"symbol": "ACME", "accession": "0000000001-26-000001"},
+                    }
+                    result = guard.wrap_tool_call(
+                        SimpleNamespace(tool_call=valid),
+                        lambda req, lookup=lookup: lookup.invoke(req.tool_call),
+                    )
+                    assert result.status == "success"
+                    assert journal.inspect_operations() == {
+                        "complete_operations": 2,
+                        "pending_operations": [],
+                    }
+                    assert desk.budget.tools == guard.tool_calls == 2
+                    provider.documents.assert_called_once()
+            finally:
+                checkpoint.close()

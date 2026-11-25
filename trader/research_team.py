@@ -1191,7 +1191,7 @@ class ResearchDesk:
 
         @tool
         def filing_documents(symbol: str, accession: str) -> list[dict]:
-            """List primary filing and earnings exhibit documents for a discovered SEC accession."""
+            """List documents only for an exact accessionNumber in company_evidence's saved filing list (read_source shows the full list). An unlisted accession returns navigation feedback without fetching it."""
             with self.lock:
                 bundle = self.companies.get(symbol)
                 if not bundle:
@@ -1206,7 +1206,11 @@ class ResearchDesk:
                     return []
                 filing = next((f for f in filings if f["accessionNumber"] == accession), None)
                 if not filing:
-                    raise ValueError("Accession not in retrieved company filings")
+                    raise ToolException(
+                        "Accession not in retrieved company filings. Use an exact accessionNumber "
+                        "from company_evidence; read_source provides the complete saved filing list. "
+                        "No document was fetched and this error supplies no evidence."
+                    )
                 docs = self.provider.documents(symbol, filing)
                 result = []
                 for doc in docs:
@@ -1214,6 +1218,9 @@ class ResearchDesk:
                     self.documents[identifier] = doc
                     result.append({"document_id": identifier, **doc})
                 return result
+
+        # A guessed accession is correctable navigation, never authority to fetch an arbitrary URL.
+        filing_documents.handle_tool_error = True
 
         def document_matches(text, query, start_offset=0):
             matches = []

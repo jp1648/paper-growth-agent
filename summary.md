@@ -68,8 +68,12 @@ Robinhood MCP research is now deployed and enabled in both production containers
 Authenticated AAPL acquisition, caching, injected-outage fallback, order-tool
 denial and Postgres traces passed; see docs/robinhood-mcp-assessment.md.
 This does not close investment acceptance: the durable AAPL result remains
-unapproved, and a new result requires independent review. No new model run or
-order was made for this integration.
+unapproved, and a new result requires independent review. The later authorized $18 attempt stopped during valuation correction on an
+unlisted filing accession; no final decision was committed. Recorded model
+usage is $8.9845275, with the full $18 conservatively retained as unknown until
+accounting evidence resolves it. The workflow is canceled, not retried. An
+offline navigation-error fix is tested but not yet deployed. See the latest
+November 25 attempt in docs/live-readiness.md. No orders were submitted.
 Trading remains paused.
 Preserve original runs and history.
 
