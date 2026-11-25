@@ -5828,3 +5828,62 @@ SELL remains unapproved and the existing thesis/position remain unchanged.
 A worker exited 139 on one controlled shutdown; a later
 controlled shutdown exited normally. Native teardown remains a follow-up, not a
 proven fix or a reason to weaken shutdown gates.
+
+
+### November 25 offline valuation and native shutdown repair
+
+The follow-up work is offline; no new paid research, thesis promotion, order or
+production restart was performed. The captured AAPL result remains unchanged.
+The live configuration was checked against the restored ordinary hash, and its
+completed research reservation remains settled at $11.2428000.
+
+The worker investigation isolated a real native callback/finalization defect in
+Temporal 1.36.0. One- and three-runtime subprocess tests failed on macOS and in
+a network-disabled Linux ARM64 container. Both passed with the official 1.37.0
+fix. The dependency floor and lock now require that fix; no application exit
+bypass or accepted exit-139 rule was added. Independent review approved the
+narrow change. The exact historical production SIGSEGV has no saved native
+stack, so its cause remains an inference, not a proved diagnosis.
+
+Validation of the candidate: 1,638 tests passed, seven skipped, one deselected;
+Ruff checks and formatting passed. The focused 28-test worker suite includes
+real local Temporal restart/replay integration. See [worker shutdown](worker-shutdown.md)
+for reproduction and rollout limits. Production still runs the previously
+reviewed image; deployment and an idle controlled stop/restart check are needed
+before claiming the new SDK is verified in production.
+
+The separate AAPL analytical supplement preserves the original result and
+rebuilds the saved filing evidence into annual revenue/margin/expense, tax and
+cash-conversion, reinvestment and financing components. It verifies the
+$313.75M fixed annual coupons, cash reconciliation and later cover-share count,
+while retaining a coherent dated share base. Combined cash conversion avoids
+deducting tax timing twice. Outstanding awards and actual refinancing terms
+remain specific evidence gaps, not fabricated zeroes.
+
+The chosen 10% required-return cases calculate $75.94/$134.24/$205.07 per share.
+These are conditional scenarios, not approved fair values. A favorable
+operating path with 8% required return and 5% terminal growth calculates
+$401.50, above the frozen $354.72 ask. This demonstrates why a selected bull
+case cannot be treated as a ceiling. The proposed research rule requires
+supported material range coverage for either a purchase or valuation exit,
+uses explicit friction and distinct entry/exit bands, and otherwise defers
+valuation action. It was not installed as a trading setting. Protective exits
+for independently supported risk reasons remain available under existing gates.
+
+The packet's strict threshold/equality behavior and compensation-stress wording
+were corrected after independent review; its first version remains preserved.
+The final supplement manifest is
+`3a36ecd915dd3020434383acf2b8c94a55294ea7c1b8530fbcca87467bfa5ba7`.
+Research prompts now require the numeric operating bridge and symmetric
+valuation-exit reasoning. Offline prompt changes are not proof that a future
+model run will satisfy those requirements. No result or thesis was promoted.
+
+Independent review accepted the corrected offline analytical supplement after
+recomputing all three operating paths, 36 return/terminal grid cells and 27
+normalization stresses. The disposition is DEFER_VALUATION_ACTION. Full opening
+research acceptance remains false: retained evidence does not establish the
+outstanding performance-award maximum/accrued equivalents, actual refinancing
+terms or historical tax/working-capital attribution. The reviewed sensitivities
+are useful analysis, not certified bounds that silently close those gaps.
+Both the revised research guidance and SDK candidate passed independent review.
+The deployment, live model behavior and full research gate are not claimed.

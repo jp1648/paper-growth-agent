@@ -174,3 +174,20 @@ A supervised fresh attempt may therefore use explicitly authorized 320,000-byte
 and 96-tool testing bounds, retaining the $20 cost cap and all evidence/risk gates.
 These are recommended testing overrides, not changed defaults or proof of research
 acceptance. No failed run should be resumed under silently changed authority.
+
+Valuation methodology also requires a compact numeric operating-driver bridge
+from business mix and margins through expenses, tax/cash conversion and
+reinvestment to horizon cash flow. An aggregate cash-conversion residual must
+not be combined with a second deduction for cash-tax timing already inside it.
+Available debt coupons and maturities should inform incremental financing
+sensitivity; an undisclosed floating rate is not zero. Material normalization
+alternatives must be carried through to the proposed action.
+
+The lead applies symmetric evidence standards to valuation-driven purchases and
+exits: compare selling with retaining the position, including horizon, friction
+and upside/downside. An unsupported buy does not establish a sell; the chosen
+optimistic case is not a ceiling. A separately supported protective exit can
+still be proposed for a broken thesis or portfolio constraint. This is research
+guidance, not a blanket SELL veto or a change to deterministic execution gates.
+Prompt-contract tests cannot certify economic reasoning; independent review of
+the actual output remains necessary.

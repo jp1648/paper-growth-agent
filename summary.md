@@ -46,6 +46,16 @@ both containers. The proposed SELL of one paper AAPL share remains unexecuted
 and unpromoted. Completed independent review withholds economic acceptance
 because material valuation gaps remain; technical completion is established. One abnormal native worker shutdown remains a follow-up,
 although later controlled shutdowns and both service restarts succeeded.
+Offline follow-up now supplies a reproducible operating-driver valuation, cash
+and financing reconciliation, normalization sensitivities and a symmetric
+sell/retain rule. It defers valuation action rather than endorsing the prior
+SELL; absent award/financing disclosures remain explicit. Independent review accepted the conditional offline analytical repair and
+its no-action process outcome, not full opening research or a trade.
+The shutdown investigation reproduced a native Temporal 1.36 finalization
+failure on macOS and Linux; the upstream 1.37 fix passes both and is pinned in
+the candidate. All 1,638 offline tests passed, with seven skipped and one
+deselected. The production image has not been changed; the exact historical
+exit-139 stack remains unproved. See docs/worker-shutdown.md.
 Trading remains paused.
 Preserve original runs and history.
 
