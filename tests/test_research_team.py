@@ -1779,7 +1779,7 @@ def test_saved_empty_passage_cannot_support_a_report(content):
     kind, rejected = desk.budget.events[-1]
     assert kind == "research_rejected_report"
     assert rejected["empty_passage_ids"] == ["empty-saved"]
-    assert rejected["report"] == Valuation.model_validate(report).model_dump(mode="json")
+    assert rejected["report"] == report  # Preserve the exact rejected output, including absent fields.
     assert desk.sources["empty-saved"]["content"] == content
 
 

@@ -8,6 +8,10 @@ from pydantic import Field, field_validator
 from .models import Model, dt
 
 
+class ClaimEvidenceError(ValueError):
+    """A registered citation is not original disclosure for structured claims."""
+
+
 class ClaimCoverage(Model):
     status: Literal[
         "supported_conditional_treatment",
@@ -92,7 +96,7 @@ def validate_claim_coverage(valuation, sources, cutoff):
             or (isinstance(sources[ref].get("content"), str) and not sources[ref]["content"].strip())
             for ref in refs
         ):
-            raise ValueError("Claim coverage requires original SEC disclosure evidence")
+            raise ClaimEvidenceError("Claim coverage requires original SEC disclosure evidence")
         for ref in refs:
             for field in ("available_at", "published_at"):
                 published = sources[ref].get(field)

@@ -354,3 +354,106 @@ def test_full_source_timestamp_cutoff_and_timezone(field, timestamp, accepted):
     else:
         with pytest.raises(ValueError):
             validate_claim_coverage(valuation(), worker.sources, cutoff)
+
+
+@pytest.mark.parametrize("outcome", ["gap", "repeat", "budget", "future"])
+def test_claim_citation_correction_preserves_abstention_and_limits(outcome):
+    import json
+    from unittest.mock import Mock
+
+    from trader.claims import ClaimEvidenceError
+    from trader.research_team import ResearchLimit
+
+    worker = desk()
+    worker.sources["facts"] = {
+        "source": "SEC EDGAR accession-selected research evidence",
+        "content": {"facts": {"shares": 100}},
+    }
+    invalid = valuation()
+    invalid["evidence_ids"].append("facts")
+    invalid["normalization_review"]["claims_coverage"]["common_shares"]["evidence_ids"] = ["facts"]
+    repaired = copy.deepcopy(invalid)
+    repaired["normalization_review"]["claims_coverage"]["common_shares"].update(
+        status="unsupported_treatment",
+        evidence_ids=[],
+        as_of_date=None,
+        treatment_or_gap="Original share disclosure not inspected; structured facts do not close coverage.",
+    )
+    repaired["normalization_review"]["unresolved_material_gaps"] = True
+    if outcome == "future":
+        repaired["normalization_review"]["claims_coverage"]["legacy_awards"]["as_of_date"] = "2999-01-01"
+    agent = Mock()
+    agent.invoke.side_effect = [
+        {"structured_response": invalid, "messages": []},
+        {"structured_response": invalid if outcome == "repeat" else repaired, "messages": []},
+    ]
+    if outcome == "budget":
+        worker.budget.failed = True
+        with pytest.raises(ResearchLimit):
+            worker.invoke_report(agent, Valuation, {"messages": []}, {})
+        assert agent.invoke.call_count == 1
+        return
+    if outcome in {"repeat", "future"}:
+        with pytest.raises(ClaimEvidenceError if outcome == "repeat" else ValueError):
+            worker.invoke_report(agent, Valuation, {"messages": []}, {})
+    else:
+        result = worker.invoke_report(agent, Valuation, {"messages": []}, {})["structured_response"]
+        assert result["base_value"] is None and result["calculation_id"] is None
+        assert claim_gaps(result)[0]["claim"] == "common_shares"
+        assert result["normalization_review"]["unresolved_material_gaps"] is True
+    assert agent.invoke.call_count == 2
+    prompt = json.loads(agent.invoke.call_args.args[0]["messages"][-1]["content"])
+    assert "not structured financial facts" in prompt["validation_error"]
+    rejected = [body for kind, body in worker.budget.events if kind == "research_rejected_report"]
+    assert rejected[0]["report"] == invalid
+    if outcome == "future":
+        assert rejected[-1]["report"] == repaired
+
+
+def test_durable_claim_correction_cannot_repeat_after_worker_restart(tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from trader.claims import ClaimEvidenceError
+    from trader.research_checkpoint import ResearchCheckpoint
+    from trader.research_journal import Journal
+
+    worker = desk()
+    worker.sources["filing"]["source"] = "SEC EDGAR accession-selected research evidence"
+    invalid = valuation()
+    agent = Mock(name="valuation_graph")
+    agent.name = "valuation"
+    agent.get_state.return_value = SimpleNamespace(config={})
+    agent.invoke.side_effect = [
+        {"structured_response": invalid, "messages": []},
+        SystemExit("worker stopped after correction admission"),
+    ]
+    path = tmp_path / "private" / "operations.sqlite"
+    with Journal(path, {"run": "claim-correction"}).lease() as journal:
+        checkpoint = ResearchCheckpoint(
+            journal, path.parent / "graph.sqlite", phase="initial", role="valuation", thread_id="one"
+        )
+        checkpoint.attach_desk(worker)
+        worker.checkpoints["valuation"] = checkpoint
+        with pytest.raises(SystemExit):
+            worker.invoke_report(agent, Valuation, {"messages": []}, {})
+        assert journal.load_state()["budget"]["events"]
+        checkpoint.close()
+    restarted = desk()
+    with Journal(path, {"run": "claim-correction"}).lease() as journal:
+        checkpoint = ResearchCheckpoint(
+            journal, path.parent / "graph.sqlite", phase="initial", role="valuation", thread_id="one"
+        )
+        checkpoint.attach_desk(restarted)
+        restarted.checkpoints["valuation"] = checkpoint
+        agent.reset_mock()
+        agent.get_state.return_value = SimpleNamespace(
+            config={"configurable": {"checkpoint_id": "persisted"}}
+        )
+        agent.invoke.side_effect = [{"structured_response": invalid, "messages": []}]
+        with pytest.raises(ClaimEvidenceError):
+            restarted.invoke_report(agent, Valuation, {"messages": []}, {})
+        # Query/resume persisted graph once, never start a new correction.
+        assert agent.invoke.call_count == 1
+        assert agent.invoke.call_args.args[0] is None
+        checkpoint.close()

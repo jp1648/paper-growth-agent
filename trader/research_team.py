@@ -33,7 +33,7 @@ from langsmith import tracing_context
 from pydantic import BaseModel, Field, TypeAdapter
 
 from .alpaca import safe_error
-from .claims import ClaimsCoverage, claim_gaps, validate_claim_coverage
+from .claims import ClaimEvidenceError, ClaimsCoverage, claim_gaps, validate_claim_coverage
 from .evidence import SEC_MAX_RESPONSE_BYTES, EvidenceTooLarge
 from .financials import (
     CapitalExpenditureSource,
@@ -1632,6 +1632,31 @@ class ResearchDesk:
         "research.validate", inputs=lambda self, schema, output: {"schema": schema.__name__, "output": output}
     )
     def validate(self, schema, output):
+        try:
+            return self._validate(schema, output)
+        except (ValueError, TypeError) as exc:
+            details = {"schema": schema.__name__, "error": str(exc), "report": copy.deepcopy(output)}
+            if isinstance(output, dict) and isinstance(output.get("evidence_ids"), list):
+                if isinstance(exc, UnknownEvidence):
+                    details["unknown_evidence_ids"] = sorted(
+                        set(output["evidence_ids"]) - self.sources.keys()
+                    )
+                elif str(exc) == "Research/decision cited an empty SEC passage":
+                    details["empty_passage_ids"] = sorted(
+                        ref
+                        for ref in output["evidence_ids"]
+                        if ref in self.sources
+                        and self.sources[ref].get("source") == "SEC EDGAR filing passage"
+                        and (
+                            not isinstance(self.sources[ref].get("content"), str)
+                            or not self.sources[ref]["content"].strip()
+                        )
+                    )
+            with self.budget.lock:
+                self.budget.events.append(("research_rejected_report", details))
+            raise
+
+    def _validate(self, schema, output):
         result = schema.model_validate(output).model_dump(mode="json")
         if schema is Valuation and isinstance(output, dict):
             original_review = output.get("normalization_review")
@@ -1648,26 +1673,8 @@ class ResearchDesk:
             )
         )
         if empty:
-            with self.budget.lock:
-                self.budget.events.append(
-                    (
-                        "research_rejected_report",
-                        {"schema": schema.__name__, "empty_passage_ids": empty, "report": result},
-                    )
-                )
             raise ValueError("Research/decision cited an empty SEC passage")
         if unknown:
-            with self.budget.lock:
-                self.budget.events.append(
-                    (
-                        "research_rejected_report",
-                        {
-                            "schema": schema.__name__,
-                            "unknown_evidence_ids": unknown,
-                            "report": result,
-                        },
-                    )
-                )
             raise UnknownEvidence("Research/decision cited unknown evidence")
         if schema is Valuation:
             review = result.get("normalization_review")
@@ -1711,13 +1718,34 @@ class ResearchDesk:
         output = checkpoint.invoke(agent, state, config) if checkpoint else agent.invoke(state, config)
         try:
             self.validate(schema, output.get("structured_response"))
-        except UnknownEvidence:
+        except (UnknownEvidence, ClaimEvidenceError) as exc:
             report = schema.model_validate(output["structured_response"]).model_dump(mode="json")
             unknown = sorted(set(report["evidence_ids"]) - self.sources.keys())
+            correction_identity = [
+                checkpoint.phase if checkpoint else "local",
+                schema.__name__,
+                checkpoint.role if checkpoint else schema.__name__,
+            ]
+            if checkpoint and any(
+                kind == "research_citation_correction"
+                and body.get("correction_identity") == correction_identity
+                for kind, body in self.budget.events
+            ):
+                raise
             self.budget.check()
             self.budget.events.append(
-                ("research_citation_correction", {"schema": schema.__name__, "rejected_ids": unknown})
+                (
+                    "research_citation_correction",
+                    {
+                        "schema": schema.__name__,
+                        "rejected_ids": unknown,
+                        "correction_identity": correction_identity,
+                    },
+                )
             )
+            instruction = "Unknown original-source citations. Correct the report once; do not invent support or change claims just to pass validation. Document navigation and calculation IDs are not evidence IDs. Use only supporting registered sources, and disclose unsupported claims as gaps."
+            if isinstance(exc, ClaimEvidenceError):
+                instruction = "Claim coverage requires inspected original SEC disclosure evidence, not structured financial facts or derived calculations. Correct the report once. Retrieve supporting original passages if available within the existing budget; otherwise mark the affected claim unread or unsupported_treatment, with empty claim evidence_ids and an explicit gap. Do not relabel a source, invent support, or claim research completion. Preserve unresolved material gaps and unknown valuation values. Other report evidence may retain relevant structured facts."
             repair_state = {
                 "messages": [
                     *output["messages"],
@@ -1725,7 +1753,7 @@ class ResearchDesk:
                         "role": "user",
                         "content": dumps(
                             {
-                                "validation_error": "Unknown original-source citations. Correct the report once; do not invent support or change claims just to pass validation. Document navigation and calculation IDs are not evidence IDs. Use only supporting registered sources, and disclose unsupported claims as gaps.",
+                                "validation_error": instruction,
                                 "rejected_ids": unknown,
                                 "registered_source_ids": sorted(self.sources),
                             }
@@ -1733,6 +1761,10 @@ class ResearchDesk:
                     },
                 ]
             }
+            if checkpoint:
+                # Save before dispatch: even a crash before graph checkpointing
+                # must not authorize a second correction on activity replay.
+                checkpoint.journal.save_state(self.checkpoint())
             output = (
                 checkpoint.invoke(agent, repair_state, config, resume=False)
                 if checkpoint

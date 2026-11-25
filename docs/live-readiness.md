@@ -5558,3 +5558,57 @@ suite passed 1,623 tests (7 skipped, 1 deselected), and Ruff, formatting and
 secret scans passed. The release is not yet deployed; code approval is not
 acceptance of an actual research output. No new model calls, orders or trading
 activation occurred.
+
+### November 25 reviewed release and research remediation
+
+Release `ee6fba9` is pushed and CI passed, including database-backed backend
+checks, safety mutations, dashboard browser tests and secret scanning. It includes
+reviewed atomic funding admission for ordinary paid evaluations and atomic
+promotion of independently accepted durable research while paused. Security
+audits required minimal patches to OpenTelemetry API 1.45.2 and Next.js 16.4.5;
+both audits are clean. Local full suite: 1,623 passed, 7 skipped, 1 deselected.
+
+Both executor/worker now use agent digest `6b2d6fe63392c8e4b0d1d2498e12fde004e0556ea0957ec3eef061e2b51109b5`.
+Post-release verification confirms all 47 module hashes, the staged acceptance
+helper, original pause/config, protected documents and journal prefix. A transient
+maintenance process initially blocked preflight before cutover; its termination
+and absent cutover were checked before proceeding. The initial post-check flagged
+normal quote-cache updates. An independently reviewed verification-only amendment
+permits validated updates to existing configured quote rows; no second deployment
+or history reset occurred.
+
+The patched dashboard digest `b27ccdc122ef40fb10de017ae24e097df1155dfbf5f8e2153cd3de08762fa01b`
+serves all traffic and the existing login tag. Configuration apart from image is
+unchanged; login returns 200 and unauthenticated data API returns 401. Telegram
+getMe/getChat read-only checks confirm the configured bot/private chat; no message
+was sent, so this is not a fresh delivery test. Reconciliation, owner fencing and
+heartbeat pass; overdue AAPL review still makes health fail correctly.
+
+Independent analyst remediation of the original COST full case is now accepted
+as completed conditional research, with 318 independently reproduced scalar
+checks and retained primary-source hashes. It corrects lease cash normalization
+and supplies treasury, operating/reinvestment, award and sensitivity analysis.
+The original model output is not reclassified as successful, and this does not
+authorize a purchase. The approved single $6 missing-evidence retry under stable ID
+`cost-case-b-retry-20261125-1` finished with failed acceptance. Its local estimated
+cost settled at $1.1849725 with no unknown calls; prior 67 spending records,
+funding, pause and order counts were preserved. Business and catalysts completed;
+valuation failed and neither adversarial review nor final decision ran.
+
+Postgres traces retained the exact rejected valuation and exception. The report
+withheld all valuation values and disclosed material gaps, but marked common-share
+coverage supported using structured financial facts. Claim validation requires
+original SEC disclosure evidence and correctly rejected that source. Independent
+review reproduced the failure. This is not successful missing-evidence abstention.
+A narrow one-correction implementation has independent code approval. It retains
+all rejected outputs and persists a phase/role correction marker before dispatch,
+preventing worker reentry from opening another correction. It does not relax
+source eligibility or change the original failed result. Full offline suite: 1,628 passed, 7 skipped, 1 deselected; Ruff and format checks passed. Deployment and another actual accepted research result remain outstanding.
+
+A unique recovery snapshot was uploaded and its exact generation/hash verified.
+The final current-state check rejected changing quote-cache records, so no success
+receipt was written. Preserve this snapshot and failed attempt; final recovery
+acceptance remains pending. AAPL supervision is prepared but unlaunched. Current
+daily headroom $18.8150275 cannot admit the configured $20 reservation; a fresh
+NY day and accepted shared-failure diagnosis are required. No trading activation
+or new order is claimed.

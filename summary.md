@@ -27,8 +27,11 @@ error. Provider exports have now reconciled that run to $0.1700242, with no
 unresolved research charges remaining. Available grant balances totaled $156.20
 at the billing check. An independently reviewed $40 research allocation was
 installed November 25, with $20/day, $20/run and a $15 buffer unchanged. It expires
-conservatively November 29 at 00:00 UTC. The missing-evidence test and held AAPL
-refresh remain outstanding; each paid attempt still requires fresh admission.
+conservatively November 29 at 00:00 UTC. The November 25 missing-evidence retry failed claim-source validation after two
+reports, costing an estimated $1.1849725 with no unknown calls. Exact rejected
+output is retained in Postgres traces; a bounded correction is under offline
+review. The held AAPL refresh remains outstanding; each paid attempt still
+requires fresh admission.
 Preserve original runs and history.
 
 ## Start here
