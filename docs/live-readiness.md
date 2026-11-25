@@ -5986,3 +5986,13 @@ Private evidence is under `state/robinhood-acceptance-20261125/`, including
 `terminal.json`, `diagnosis.json`, `accounting-close-2.json`, and the independent
 failure review. Partial reports and an offline fix do not satisfy investment
 acceptance. Trading remains paused; this attempt submitted no orders.
+
+After cancellation, a separately reviewed restoration-only helper returned both
+containers to the exact ordinary configuration (SHA-256
+`fada4d29386f33c3b656a97da9a11c1967aa1f8d0d9009698503a31b4cb9acd9`),
+including the $20/day limit. Its only exception allows restoration with this
+exact canceled run's hash-bound $18 unknown reservation intact; it cannot install
+higher limits or start research. Fifty-nine focused checks passed. Production
+restoration verified no running workflows, a clean worker stop, preserved pause,
+and both restarted containers on the same image. Evidence is in
+`state/robinhood-acceptance-20261125-unknown-restore/`.
