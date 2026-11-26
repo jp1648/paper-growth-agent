@@ -216,3 +216,36 @@ An offline projection of Run6's exact saved peak lead request reduced 425,041 to
 
 
 Research agents disable the framework's implicit human-message eviction while retaining its default file tools and 20,000-token tool-result offload. Large single-line JSON context can otherwise become a file whose first read truncates mid-line without a usable continuation, hiding a correction reason or price reference. The full original human context now reaches the research Guard, which applies lossless pooling and the existing exact request-size, cost, model and time admission checks before a provider call. Oversized requests fail before dispatch; this is not an unbounded-context or replay exemption. Correction delivery does not establish completion or economic acceptance.
+
+### Continuing settled, incomplete research
+
+An explicitly authorized child run can reuse a canceled parent's verified evidence
+without changing its immutable identity or replaying paid calls. The parent must
+have known settled accounting, no pending operations or unanswered provider
+dispatches, and unchanged original manifest, snapshot and journal tables. The
+first implementation refuses continuation chains and reconciled parent projections;
+those require a separately reviewed extension, not an accounting exception.
+
+The child's frozen context names the parent reference and canonical bundle hash
+in `continuation`. Its private run directory contains `continuation.json`, exported
+with `research_continuation.export_parent_bundle`. A separate
+`research_continuation_authorization` ledger record binds that child, experiment,
+code/config/context hashes, bundle hash, reviewer, expiry, child dollar cap and
+combined parent-plus-child dollar ceiling. A transactional parent claim prevents
+two children consuming the same authority; retrying the same child is idempotent.
+Existing funding, daily allowance, pause, reconciliation and reservation gates
+still apply, including before each paid dispatch. This does not create funding.
+
+The explicit path is acquisition admission → import → valuation → adversarial
+review → lead → ordinary research commit. Import makes no provider calls. It
+replays saved arithmetic locally and preserves original evidence, publication
+times and report dates. Only business/catalyst prerequisites are reused, labeled
+unaccepted; old valuation, critique, decisions, budget state and provider responses
+are not imported as completed child work. Fresh valuation, fresh critique and a
+new final decision are mandatory. Parent lineage remains visible to those agents
+and in the resulting audit. The child has its own journal and spending record;
+the parent cost is retained once, not reset or charged again.
+
+This route produces research only. Independent investment acceptance and all
+paper execution gates remain separate; importing calculations or completing a
+workflow never unpauses trading or authorizes an order.

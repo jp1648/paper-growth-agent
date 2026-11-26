@@ -57,6 +57,12 @@ def validate_manifest(manifest, cfg, experiment_id):
     ):
         raise ValueError("Research-only context and initialized experiment required")
     dt(context["current_timestamp"])
+    if "continuation" in context:
+        from .research_continuation_authority import validate_descriptor
+
+        validate_descriptor(context["continuation"])
+        if context["continuation"]["parent"]["run_key"] == context["run_key"]:
+            raise ValueError("Continuation must have its own immutable run identity")
     expected = {
         "run_key": context["run_key"],
         "experiment_id": experiment_id,

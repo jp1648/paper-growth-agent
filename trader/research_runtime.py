@@ -128,6 +128,10 @@ def check_runtime(config_path, root, reference):
                 cfg, store, manifest["context"]
             ):
                 raise ValueError("Research stop control changed")
+            if manifest["context"].get("continuation") is not None:
+                from .research_continuation_authority import check_continuation
+
+                check_continuation(cfg, store, root, manifest["context"])
         except (ValueError, TypeError, KeyError, OSError) as exc:
             raise StageConfigurationError("Research runtime or account controls changed") from exc
         records = store.db.execute(

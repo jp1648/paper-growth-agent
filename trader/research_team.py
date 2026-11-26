@@ -2609,6 +2609,11 @@ class ResearchDesk:
                 "evidence": self.source_previews(self.sources.values()),
                 "assignment": task["messages"][-1].content,
                 "claims_coverage": self.claims_coverage(),
+                **(
+                    {"inherited_research": copy.deepcopy(self.continuation["parent_lineage"])}
+                    if "parent_lineage" in self.continuation
+                    else {}
+                ),
                 "registered_documents": [
                     {"document_id": identifier, "url": document.get("url")}
                     for identifier, document in self.documents.items()
@@ -3036,6 +3041,11 @@ class ResearchDesk:
         calculations = self.calculation_context()
         context = {
             **self.context,
+            **(
+                {"inherited_research": copy.deepcopy(self.continuation["parent_lineage"])}
+                if "parent_lineage" in self.continuation
+                else {}
+            ),
             "reports": self.reports,
             "report_sha256": {
                 name: hashlib.sha256(dumps(report).encode()).hexdigest()

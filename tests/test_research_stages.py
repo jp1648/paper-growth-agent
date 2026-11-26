@@ -170,6 +170,65 @@ def call(engine, stage):
     return engine({"run_key": "durable-one", "manifest_hash": engine.manifest_hash, "stage": stage})
 
 
+def test_continuation_has_explicit_import_and_fresh_valuation_critique_lead(tmp_path, monkeypatch):
+    engine, counts, db = setup(tmp_path)
+    bundle = {"snapshot": {"desk": {"companies": {"ACME": {"symbol": "ACME", "sources": []}}}}}
+    engine.context["continuation"] = {
+        "parent": {"run_key": "parent", "manifest_hash": "b" * 64},
+        "bundle_sha256": fingerprint(bundle),
+    }
+    engine.binding["context_sha256"] = fingerprint(engine.context)
+    engine.manifest_hash = fingerprint(engine.binding)
+    consumed = []
+
+    def authority(*args, consume=False, **kwargs):
+        consumed.append(consume)
+        return bundle
+
+    def imported(desk, value):
+        assert value == bundle and desk.budget.models == desk.budget.tools == 0
+        desk.sources = {"source-one": {"id": "source-one", "content": "Retained original"}}
+        desk.reports = {r: {"evidence_ids": ["source-one"]} for r in ("business", "catalysts")}
+        desk.report_times = {r: now().isoformat() for r in desk.reports}
+        desk.continuation = {
+            "parent_lineage": {
+                "bundle_sha256": fingerprint(bundle),
+                "status": "unaccepted_prerequisite_research",
+            }
+        }
+        return desk.checkpoint()
+
+    monkeypatch.setattr("trader.research_continuation_authority.check_continuation", authority)
+    monkeypatch.setattr("trader.research_continuation.import_into_desk", imported)
+    first = call(engine, "acquisition")
+    assert first["next_stage"] == "import" and counts == {"evidence": 0}
+    with pytest.raises(StageConfigurationError):
+        call(engine, "valuation")
+    receipt = call(engine, "import")
+    assert receipt["next_stage"] == "valuation"
+    assert call(engine, "import") == receipt
+    assert counts == {"evidence": 0}
+    for stage in ("valuation", "adversarial", "lead", "commit"):
+        call(engine, stage)
+    assert counts == {"evidence": 0, "valuation": 1, "adversarial": 1, "lead": 1}
+    store = Store(db)
+    assert (
+        store.get("durable-one", "research_audit")["parent_lineage"]["status"]
+        == "unaccepted_prerequisite_research"
+    )
+    assert store.get("ACME", "thesis") is None
+    assert store.get("research_stage_receipt:durable-one:business", "research_stage_receipt") is None
+    assert consumed[0] is True and not any(consumed[1:])
+    store.db.close()
+
+
+def test_ordinary_run_cannot_enter_import(tmp_path):
+    engine, _, _ = setup(tmp_path)
+    call(engine, "acquisition")
+    with pytest.raises(StageConfigurationError, match="explicit continuation"):
+        call(engine, "import")
+
+
 def test_full_stages_reserve_once_commit_research_only_and_return_saved_receipts(tmp_path):
     engine, counts, db = setup(tmp_path)
     stages = ["acquisition", "business", "catalysts", "valuation", "adversarial", "lead", "commit"]

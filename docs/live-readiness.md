@@ -6483,3 +6483,25 @@ charge. Original artifacts, experiment and pause are preserved. Candidate
 
 Ordinary configuration was restored and verified in both running containers on
 image `4511f79c…`; the temporary allowances are no longer installed.
+
+
+### November 26: continuation candidate verified offline
+
+The new continuation path verifies the canceled parent's original manifest,
+settlement and every journal table, then imports evidence and locally replayed
+calculations into a separately authorized child. Only dated business/catalyst
+prerequisites are inherited, explicitly unaccepted. New valuation, adversarial
+review and final lead decision remain mandatory; parent dispatches, budget state
+and final decisions are never replayed as child work. A transactional single-child
+claim prevents duplicate continuation authority. Existing funding, pause,
+reconciliation and per-dispatch checks remain active.
+
+A read-only production export verified the exact canceled parent, and offline
+import reproduced all 33 calculations. The actual-agent first valuation request
+was 369,423 bytes against the 500,000-byte limit, with zero provider calls. This
+is first-request feasibility, not proof of complete economic acceptance or the
+cost of the remaining sequence. The candidate passes 1,881 offline tests (seven
+skipped, one deselected), Ruff and formatting. Composed tests verify real export,
+authority consumption, import, fresh specialist sequence, replay and unchanged
+parent artifacts, including funding refusal after claim consumption. No paid
+continuation has started, and trading remains paused.

@@ -121,6 +121,19 @@ class ResearchStages:
                 old = self._receipt(store, stage)
                 if old is not None:
                     return old
+                imported = None
+                if self.context.get("continuation") is not None:
+                    from .research_continuation_authority import check_continuation
+
+                    imported = check_continuation(
+                        self.cfg,
+                        store,
+                        self.private_dir.parent,
+                        self.context,
+                        consume=stage == "acquisition",
+                    )
+                elif stage == "import":
+                    raise StageConfigurationError("Import requires explicit continuation authority")
                 if store.db.execute(
                     "SELECT 1 FROM documents WHERE scope='global' AND kind='research_spend' "
                     "AND json_extract(body,'$.run_key')=? AND json_extract(body,'$.experiment_id')=? "
@@ -145,7 +158,13 @@ class ResearchStages:
                 if reason:
                     raise StageBudgetError(reason)
                 if stage == "acquisition":
-                    receipt = self._acquisition(store, journal, reservation, provider, stop)
+                    receipt = (
+                        {"status": "next", "next_stage": "import", "receipt_ref": self._receipt_ref(stage)}
+                        if imported is not None
+                        else self._acquisition(store, journal, reservation, provider, stop)
+                    )
+                elif stage == "import":
+                    receipt = self._import_parent(journal, reservation, provider, imported)
                 else:
                     saved = journal.load_state()
                     if not isinstance(saved, dict) or saved.get("version") != 1:
@@ -163,7 +182,7 @@ class ResearchStages:
             raise StageAmbiguous("An external operation needs reconciliation") from exc
         except ResearchCancelled as exc:
             raise StageAmbiguous("Research stage was stopped before another operation") from exc
-        except (BindingMismatch, JournalError, ValueError, sqlite3.IntegrityError) as exc:
+        except (BindingMismatch, JournalError, ValueError, TypeError, sqlite3.IntegrityError) as exc:
             raise StageConfigurationError("Research stage identity or state is invalid") from exc
         except (DailyBudgetExceeded, ResearchLimit) as exc:
             raise StageBudgetError("Research budget or reservation is unavailable") from exc
@@ -175,6 +194,33 @@ class ResearchStages:
 
     def _receipt_ref(self, stage):
         return f"research_stage_receipt:{self.context['run_key']}:{stage}"
+
+    def _import_parent(self, journal, reservation, provider, bundle):
+        from .research_continuation import import_into_desk
+
+        saved = journal.load_state()
+        if saved is None:
+            evidence = copy.deepcopy(bundle["snapshot"]["desk"]["companies"][self.context["symbol"]])
+            desk = self.desk_factory(
+                self.cfg,
+                provider,
+                self.context,
+                evidence,
+                Budget(self.cfg, reservation.allowance),
+                self.models,
+                defer_correction=True,
+            )
+            journal.save_state(import_into_desk(desk, bundle))
+        elif (
+            saved.get("context") != self.context
+            or saved.get("budget", {}).get("models") != 0
+            or saved.get("budget", {}).get("tools") != 0
+            or set(saved.get("desk", {}).get("reports", {})) != {"business", "catalysts"}
+            or saved.get("desk", {}).get("continuation", {}).get("parent_lineage", {}).get("bundle_sha256")
+            != fingerprint(bundle)
+        ):
+            raise StageConfigurationError("Import checkpoint conflicts with fresh continuation")
+        return {"status": "next", "next_stage": "valuation", "receipt_ref": self._receipt_ref("import")}
 
     def _require_predecessor(self, store, stage):
         records = [
@@ -426,6 +472,11 @@ class ResearchStages:
             "finalize_from": None,
             "team_report_times": desk.report_times,
             "events": copy.deepcopy(budget.events),
+            **(
+                {"parent_lineage": copy.deepcopy(desk.continuation["parent_lineage"])}
+                if "parent_lineage" in desk.continuation
+                else {}
+            ),
         }
 
     def _commit(self, store, journal, desk, reservation):
