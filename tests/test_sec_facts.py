@@ -67,7 +67,7 @@ def test_legacy_unverified_cache_is_refetched(env, monkeypatch):
     legacy["sec_schema"] = 4
     source.store.put("ACME", legacy, "evidence_cache")
     bundle = source.get("ACME")
-    assert bundle["sec_schema"] == 7
+    assert bundle["sec_schema"] == 8
     assert bundle["sources"][0]["content"]["cik"] == "0000000001"
 
 
@@ -315,7 +315,7 @@ def test_fetch_keeps_verified_same_day_filing_but_excludes_date_only_facts(env, 
     assert [s["published_at"] for s in bundle["sources"] if s["id"].startswith("news-")] == [
         (AT - timedelta(seconds=1)).isoformat()
     ]
-    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 7
+    assert source.store.get("ACME", "evidence_cache")["sec_schema"] == 8
 
 
 @pytest.mark.parametrize("offset,expected", [(-1, 1), (1, 0)])
@@ -375,7 +375,7 @@ def test_old_schema_cache_refreshes_to_retain_allocated_compensation(env, monkey
 
     monkeypatch.setattr(source, "request", request)
     bundle = source.get("ACME", fresh=False)
-    assert bundle["sec_schema"] == 7 and len(requests) == 2
+    assert bundle["sec_schema"] == 8 and len(requests) == 2
     content = bundle["sources"][0]["content"]
     assert content["facts"]["AllocatedShareBasedCompensationExpense"]["USD"][0]["val"] == 25
     assert content["fact_taxonomies"]["AllocatedShareBasedCompensationExpense"] == "us-gaap"
@@ -385,7 +385,7 @@ def test_old_schema_cache_refreshes_to_retain_allocated_compensation(env, monkey
         source, "fetch", lambda symbol: pytest.fail("Upgraded fresh cache should be reusable")
     )
     cached = source.get("ACME", fresh=False)
-    assert cached["sec_schema"] == 7
+    assert cached["sec_schema"] == 8
     assert cached["sources"][0]["content"] == content
 
 
@@ -410,4 +410,157 @@ def test_productive_assets_retained_as_original_tag_without_alias(env, monkeypat
     assert original["facts"]["PaymentsToAcquireProductiveAssets"]["USD"][0]["val"] == 100
     assert original["fact_taxonomies"]["PaymentsToAcquireProductiveAssets"] == "us-gaap"
     assert "PaymentsToAcquirePropertyPlantAndEquipment" not in original["facts"]
-    assert bundle["sec_schema"] == 7
+    assert bundle["sec_schema"] == 8
+
+
+@pytest.mark.parametrize("form", ["FWP", "424B2", "DEF 14A", "DEF 14A/A"])
+def test_financing_and_proxy_filings_reach_registered_document_tools(env, monkeypatch, form):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    from trader.research_team import Budget, ResearchDesk
+
+    monkeypatch.setattr("trader.evidence.now", lambda: AT)
+    source = provider(env, monkeypatch)
+    original = source.request
+    accession = "0000000001-26-000002"
+    index_url = "https://www.sec.gov/Archives/edgar/data/1/000000000126000002/index.json"
+    requests = []
+
+    def request(url):
+        requests.append(url)
+        if "companyfacts" in url:
+            return original(url)
+        if url == index_url:
+            return httpx.Response(200, json={"directory": {"item": [{"name": "financing.htm"}]}})
+        assert url == "https://data.sec.gov/submissions/CIK0000000001.json"
+        return httpx.Response(
+            200,
+            json={
+                "cik": 1,
+                "name": "ACME",
+                "filings": {
+                    "recent": {
+                        "form": ["4", form],
+                        "accessionNumber": ["0000000001-26-000001", accession],
+                        "acceptanceDateTime": [(AT - timedelta(minutes=1)).isoformat()] * 2,
+                        "filingDate": [AT.date().isoformat()] * 2,
+                        "primaryDocument": ["insider.htm", "financing.htm"],
+                    }
+                },
+            },
+        )
+
+    monkeypatch.setattr(source, "request", request)
+    bundle = source.fetch("ACME")
+    filings = bundle["sources"][1]["content"]["filings"]
+    assert [f["form"] for f in filings] == [form]
+    desk = ResearchDesk(
+        source.cfg, source, {"symbol": "ACME", "portfolio": {}}, bundle, Budget(source.cfg), None
+    )
+    lookup = next(t for t in desk.tools() if t.name == "filing_documents")
+    docs = lookup.invoke({"symbol": "ACME", "accession": accession})
+    assert docs[0]["form"] == form
+    assert docs[0]["url"] == index_url.removesuffix("index.json") + "financing.htm"
+    assert docs[0]["document_id"] in desk.documents
+    assert requests[-1] == index_url
+
+
+@pytest.mark.parametrize("form", ["FWP", "424B2", "DEF 14A"])
+@pytest.mark.parametrize("fault", ["accession", "future", "naive", "unequal"])
+def test_added_filing_forms_keep_verification_gates(form, fault):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    from trader.evidence import _recent_filings
+
+    recent = {
+        "form": [form],
+        "accessionNumber": ["0000000001-26-000002"],
+        "acceptanceDateTime": [AT.isoformat()],
+    }
+    if fault == "accession":
+        recent["accessionNumber"][0] = "../../private"
+    elif fault == "future":
+        recent["acceptanceDateTime"][0] = (AT + timedelta(seconds=1)).isoformat()
+    elif fault == "naive":
+        recent["acceptanceDateTime"][0] = AT.replace(tzinfo=None).isoformat()
+    else:
+        recent["form"].append(form)
+    with pytest.raises(ValueError):
+        _recent_filings(recent, AT)
+
+
+def test_previous_form_filter_cache_is_refetched(env, monkeypatch):
+    source = provider(env, monkeypatch)
+    legacy = source.fetch("ACME")
+    legacy["sec_schema"] = 7
+    source.store.put("ACME", legacy, "evidence_cache")
+    assert source.get("ACME")["sec_schema"] == 8
+
+
+def test_full_verified_filing_index_preserves_old_plan_with_bounded_preview(env, monkeypatch):
+    from datetime import timedelta
+
+    from conftest import AT
+
+    from trader.research_team import Budget, ResearchDesk
+
+    monkeypatch.setattr("trader.evidence.now", lambda: AT)
+    source = provider(env, monkeypatch)
+    original = source.request
+    recent = {
+        "form": ["8-K"] * 45,
+        "accessionNumber": [f"0000000001-26-{i:06d}" for i in range(45)],
+        "acceptanceDateTime": [(AT - timedelta(days=i + 1)).isoformat() for i in range(45)],
+        "filingDate": [(AT - timedelta(days=i + 1)).date().isoformat() for i in range(45)],
+        "primaryDocument": ["filing.htm"] * 45,
+    }
+    recent["accessionNumber"][-1] = "0001193125-22-066169"
+    recent["acceptanceDateTime"][-1] = "2022-03-09T12:00:00+00:00"
+    recent["filingDate"][-1] = "2022-03-09"
+    monkeypatch.setattr(
+        source,
+        "request",
+        lambda url: (
+            original(url)
+            if "companyfacts" in url
+            else httpx.Response(200, json={"cik": 1, "name": "ACME", "filings": {"recent": recent}})
+        ),
+    )
+    bundle = source.fetch("ACME")
+    index = bundle["sources"][1]
+    assert len(index["content"]["filings"]) == 45
+    assert index["content"]["filings"][-1]["accessionNumber"] == "0001193125-22-066169"
+    desk = ResearchDesk(
+        source.cfg, source, {"symbol": "ACME", "portfolio": {}}, bundle, Budget(source.cfg), None
+    )
+    preview = next(p for p in desk.source_previews(bundle["sources"]) if p["id"] == index["id"])
+    assert len(preview["content"]["filings"]) == 8
+    reader = next(t for t in desk.tools() if t.name == "read_source")
+    offset = 0
+    pages = []
+    while True:
+        page = reader.invoke({"source_id": index["id"], "offset": offset})
+        pages.append(page)
+        if page.get("next_offset") is None:
+            break
+        assert page["next_offset"] > offset
+        offset = page["next_offset"]
+    import json
+
+    assert "0001193125-22-066169" in json.dumps(pages)
+    assert desk.sources[index["id"]]["content"] == index["content"]
+    requested = []
+
+    def document_index(url):
+        requested.append(url)
+        return httpx.Response(200, json={"directory": {"item": [{"name": "plan.htm"}]}})
+
+    monkeypatch.setattr(source, "request", document_index)
+    lookup = next(t for t in desk.tools() if t.name == "filing_documents")
+    docs = lookup.invoke({"symbol": "ACME", "accession": "0001193125-22-066169"})
+    assert requested == ["https://www.sec.gov/Archives/edgar/data/1/000119312522066169/index.json"]
+    assert docs[0]["url"].endswith("/000119312522066169/plan.htm")

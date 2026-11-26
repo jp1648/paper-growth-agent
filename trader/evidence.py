@@ -52,7 +52,7 @@ def _recent_filings(recent, cutoff):
         raise ValueError("SEC recent submissions are malformed")
     filings = []
     for i, form in enumerate(forms):
-        if form.removesuffix("/A") not in {"10-K", "10-Q", "8-K", "20-F", "6-K"}:
+        if form.removesuffix("/A") not in {"10-K", "10-Q", "8-K", "20-F", "6-K", "FWP", "424B2", "DEF 14A"}:
             continue
         filing = {key: values[i] for key, values in recent.items()}
         if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", filing["accessionNumber"]):
@@ -124,7 +124,7 @@ class EvidenceProvider:
             cached = self.store.get(symbol, "evidence_cache")
             if (
                 cached
-                and cached.get("sec_schema") == 7
+                and cached.get("sec_schema") == 8
                 and not fresh
                 and timedelta(0)
                 <= started_at - dt(cached["fetched_at"])
@@ -232,7 +232,7 @@ class EvidenceProvider:
                     "cik": cik,
                     "name": raw["name"],
                     "sic_description": raw.get("sicDescription"),
-                    "filings": _recent_filings(recent, started_at)[:40],
+                    "filings": _recent_filings(recent, started_at),
                 }
             identifier = "sec-" + hashlib.sha256(dumps(content).encode()).hexdigest()[:20]
             sources.append(
@@ -273,7 +273,7 @@ class EvidenceProvider:
                 }
             )
         bundle = {
-            "sec_schema": 7,
+            "sec_schema": 8,
             "symbol": symbol,
             "fetched_at": started_at.isoformat(),
             "sources": sources,
