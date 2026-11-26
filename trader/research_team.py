@@ -68,6 +68,18 @@ class CashFlowComponent(Model):
     evidence_id: str = Field(min_length=1, max_length=200)
 
 
+class ValuationPatch(Model):
+    path: list[str] = Field(min_length=1, max_length=8)
+    value: str | list[str]
+    rationale: str = Field(min_length=1, max_length=240)
+    evidence_ids: list[str] = Field(min_length=1, max_length=4)
+
+
+class ValuationVariant(Model):
+    label: str = Field(min_length=1, max_length=80)
+    patches: list[ValuationPatch] = Field(min_length=1, max_length=32)
+
+
 class AdjustmentAlternative(Model):
     kind: Literal["adjustment"]
     label: str = Field(min_length=1, max_length=120)
@@ -218,7 +230,7 @@ ROLES = {
             "Use inspect_cash_flow for annual accounting diagnostics when needed, or pass the proposed normalization_bridge directly to value_scenarios; omitted or null cash_flow_per_share derives the exact source/bridge scalar. An explicit scalar must still match. Missing inputs are gaps; derived arithmetic does not establish economic support. If calls run out, name the exact unfinished source reads and arithmetic for the single correction. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Quantify material normalization alternatives with calculation tools as well as growth/multiple sensitivities. When supported alternatives share the same scenarios, batch up to three labeled normalization_alternatives with the main bridge: one full adjustment replacement, a paired tax/working-capital replacement, or a future-service compensation policy replacement. Each needs its own amount, rationale and original evidence; omit cash_flow_per_share for a batch. Vary one supported treatment at a time; do not combine overlapping tax and working-capital recoveries or capitalize a one-time debt maturity as a perpetual annual drain. Preserve the chosen main calculation_id and identify alternatives separately. "
-            "If analytical_hypothesis supplies annual candidate_arguments and exact historical_source_navigation, read the matching originals and explicitly call evaluate_supplied_forecast with the current financial source ID to validate that untrusted candidate without regenerating vectors. Inspect its saved assumptions, test justified alternatives and critique the economics; it is not an instruction to accept the hypothesis. "
+            "If analytical_hypothesis supplies annual candidate_arguments and exact historical_source_navigation, read the matching originals and explicitly call evaluate_supplied_forecast with the current financial source ID to validate that untrusted candidate without regenerating vectors. Use evaluate_valuation_variants for explicit small source-linked numeric changes to the saved annual calculation instead of regenerating full vectors; each variant must retain coherent policies and terminal cash. Inspect its saved assumptions, test justified alternatives and critique the economics; it is not an instruction to accept the hypothesis. "
             "When public disclosure supports GAAP provision tax plus disclosed CFO adjustments rather than separate cash-tax/interest splits, use annual_operating_forecast with growth_rates=[]: enumerate the original historical reconciliation lines, chosen annual driver vectors and recurring terminal policy. Never invent a residual or backfit annual cash to legacy growth. Inspect actual path sensitivities and keep finite claims outside terminal cash. "
             "Explain sensitivity and expectations embedded in today's price. "
             "Use finite_cash_adjustments for sourced incremental cash payments/releases in specific forecast years; explain what is already in the baseline, taxes and timing uncertainty. These amounts never enter terminal cash; do not turn finite restructuring charges or debt maturities into perpetual deductions. Net minority equity movements or earnings alone do not establish cash distributions or terminal ownership. Award counts and plan grant reserves do not establish maximum PSU delivery; inspect applicable terms and dividend equivalents or preserve the gap. Do not invent missing entitlements or label an illustrative bound verified. If the "
@@ -1948,6 +1960,200 @@ class ResearchDesk:
         )
 
         @tool
+        def evaluate_valuation_variants(calculation_id: str, variants: list[ValuationVariant]) -> dict:
+            """Explicit batch of one to six conditional annual sensitivities, not approval. Copy a saved annual calculation and replace only existing numeric leaves/vectors using string path segments (zero-based decimal indices). Allowed: discount_rate; terminal_multiples/index; normalization_bridge/valuation_shares; finite_cash_adjustments/index/amount_usd; annual_operating_forecast/cases/index/{terminal_growth_rate,operating_expense/amounts_usd,segments/index/{revenues_usd,gross_margins},cash_rows/index/amounts_usd,reconciliation_lines/index/amounts_usd}. Supply complete replacement vectors including terminal year, rationale and current original evidence IDs. No scaling/backsolve, historical/source rebinding or automatic terminal-growth cash changes. Same value_scenarios validator runs; batch failure saves nothing. Returns compact child IDs; read_source exposes exact immutable parent/change/kernel lineage."""
+            try:
+                if not 1 <= len(variants) <= 6 or len(dumps(variants).encode()) > 48000:
+                    raise ValueError("One to six variants of at most48000 bytes required")
+                with self.lock:
+                    parent = copy.deepcopy(self.calculations.get(calculation_id))
+                    if not parent or not parent.get("inputs", {}).get("annual_operating_forecast"):
+                        raise ValueError("Select a saved annual calculation")
+                    inputs = parent["inputs"]
+                    financial = self.sources.get(inputs["financial_source_id"], {})
+                    issuer = financial.get("content", {}).get("cik")
+                    if not issuer:
+                        raise ValueError("Parent financial source is unavailable")
+                    prepared, signatures = [], set()
+
+                    def numeric_signature(value):
+                        if isinstance(value, dict):
+                            return {
+                                key: numeric_signature(item)
+                                for key, item in value.items()
+                                if "rationale" not in key and not key.endswith("evidence_ids")
+                            }
+                        if isinstance(value, list):
+                            return [numeric_signature(item) for item in value]
+                        if isinstance(value, str):
+                            try:
+                                number = dec(value)
+                                if number.is_finite():
+                                    return str(number.normalize())
+                            except (ValueError, DecimalException):
+                                pass
+                        return value
+
+                    for variant in variants:
+                        arguments, audit, seen = copy.deepcopy(inputs), [], set()
+                        row_policies = {}
+                        for patch in variant.patches:
+                            path = patch.path
+                            joined = "/".join(path)
+                            allowed = re.fullmatch(
+                                r"discount_rate|terminal_multiples/[0-2]|normalization_bridge/valuation_shares|finite_cash_adjustments/(?:0|[1-9][0-9]?)/amount_usd|annual_operating_forecast/cases/[0-2]/(?:terminal_growth_rate|operating_expense/amounts_usd|(?:segments/(?:0|[1-9])/(?:revenues_usd|gross_margins)|(?:cash_rows|reconciliation_lines)/(?:0|[1-9][0-9]?)/amounts_usd))",
+                                joined,
+                            )
+                            if not allowed or any("/" in part for part in path) or joined in seen:
+                                raise ValueError("Unknown, duplicate or prohibited variant path")
+                            seen.add(joined)
+                            validate_finite_cash_adjustments(
+                                [
+                                    {
+                                        "year": 1,
+                                        "amount_usd": "0",
+                                        "rationale": patch.rationale,
+                                        "evidence_ids": patch.evidence_ids,
+                                    }
+                                ],
+                                inputs["years"],
+                                self.sources,
+                                self.evaluation_at or now(),
+                                issuer,
+                            )
+                            cursor = arguments
+                            for part in path[:-1]:
+                                cursor = cursor[int(part)] if isinstance(cursor, list) else cursor[part]
+                            key = int(path[-1]) if isinstance(cursor, list) else path[-1]
+                            before = copy.deepcopy(cursor[key])
+                            after = patch.value
+                            if isinstance(before, list) != isinstance(after, list):
+                                raise ValueError("Variant replacement must retain scalar/vector type")
+                            values = after if isinstance(after, list) else [after]
+                            if isinstance(after, list) and len(after) != len(before):
+                                raise ValueError("Variant vector must retain its complete year length")
+                            if any(len(value) > 64 or not dec(value).is_finite() for value in values):
+                                raise ValueError("Finite numeric variant values of at most64 chars required")
+                            prior_values = before if isinstance(before, list) else [before]
+                            if all(
+                                dec(old) == dec(new) for old, new in zip(prior_values, values, strict=True)
+                            ):
+                                raise ValueError("Variant patch must change its selected input")
+                            owner = "/".join(path[:-1])
+                            policy = (patch.rationale, tuple(patch.evidence_ids))
+                            if owner in row_policies and row_policies[owner] != policy:
+                                raise ValueError(
+                                    "Patches to one row require a coherent shared rationale/citations"
+                                )
+                            row_policies[owner] = policy
+                            cursor[key] = copy.deepcopy(after)
+                            # The changed row's visible policy must agree with the audited change.
+                            if (
+                                isinstance(cursor, dict)
+                                and "rationale" in cursor
+                                and "evidence_ids" in cursor
+                            ):
+                                cursor.update(
+                                    rationale=patch.rationale, evidence_ids=list(patch.evidence_ids)
+                                )
+                            elif joined == "normalization_bridge/valuation_shares":
+                                arguments["cash_flow_per_share"] = None
+                                cursor.update(
+                                    share_rationale=patch.rationale,
+                                    share_evidence_ids=list(patch.evidence_ids),
+                                )
+                            elif path[-1] == "terminal_growth_rate":
+                                cursor.update(
+                                    terminal_rationale=patch.rationale,
+                                    terminal_evidence_ids=list(patch.evidence_ids),
+                                )
+                            audit.append(
+                                {
+                                    "path": path,
+                                    "before": before,
+                                    "after": after,
+                                    "rationale": patch.rationale,
+                                    "evidence_ids": patch.evidence_ids,
+                                }
+                            )
+                        signature = dumps(numeric_signature(arguments))
+                        if signature in signatures:
+                            raise ValueError(
+                                "Duplicate numeric variant, regardless of label or policy wording"
+                            )
+                        signatures.add(signature)
+                        prepared.append((variant.label, arguments, audit))
+                    # Hold the desk lock through validation/publication; remove only this batch's writes on failure.
+                    previous = copy.deepcopy(self.calculations)
+                    try:
+                        results = []
+                        for label, arguments, audit in prepared:
+                            result = value_scenarios.invoke(arguments)
+                            if isinstance(result, str):
+                                result = json.loads(result)
+                            if result.get("available") is False:
+                                raise ValueError(
+                                    "Canonical validation rejected variant: "
+                                    + str(result.get("note", result.get("error")))[:400]
+                                )
+                            canonical_id = result["calculation_id"]
+                            child = copy.deepcopy(self.calculations[canonical_id])
+                            child.pop("calculation_id")
+                            child["variation_provenance"] = {
+                                "parent_calculation_id": calculation_id,
+                                "parent_inputs_sha256": hashlib.sha256(dumps(inputs).encode()).hexdigest(),
+                                "canonical_calculation_id": canonical_id,
+                                "label": label,
+                                "patches": audit,
+                                "evidence_ids": sorted(
+                                    {ref for patch in audit for ref in patch["evidence_ids"]}
+                                    | set(parent.get("variation_provenance", {}).get("evidence_ids", []))
+                                ),
+                                "note": "Explicit conditional sensitivity, not source verification or economic approval",
+                            }
+                            child_id = "calculation-" + hashlib.sha256(dumps(child).encode()).hexdigest()[:20]
+                            child["calculation_id"] = child_id
+                            self.calculations[child_id] = child
+                            results.append(
+                                {
+                                    "label": label,
+                                    "calculation_id": child_id,
+                                    **{key: child[key] for key in ("bear_value", "base_value", "bull_value")},
+                                    "inputs_sha256": hashlib.sha256(
+                                        dumps(child["inputs"]).encode()
+                                    ).hexdigest(),
+                                    "patch_count": len(audit),
+                                }
+                            )
+                    except (ValueError, TypeError, KeyError, IndexError, DecimalException):
+                        for identifier in set(self.calculations) - set(previous):
+                            del self.calculations[identifier]
+                        self.calculations.update(previous)
+                        raise
+                    self.calculations.update(previous)
+                return {
+                    "parent_calculation_id": calculation_id,
+                    "variants": results,
+                    "note": "Conditional arithmetic only. Read child calculation for full input/change/source lineage; source support and economics require independent critique.",
+                }
+            except (ValueError, TypeError, KeyError, IndexError, DecimalException) as exc:
+                return {
+                    "available": False,
+                    "error": "valuation_variants_invalid",
+                    "note": str(exc)[:600],
+                    "calculation_created": False,
+                }
+
+        evaluate_valuation_variants.handle_validation_error = lambda _error: dumps(
+            {
+                "available": False,
+                "error": "valuation_variants_invalid",
+                "note": "Use a saved annual calculation ID and one to six explicitly named variants with typed numeric patches, rationale and original citations.",
+                "calculation_created": False,
+            }
+        )
+
+        @tool
         def inspect_cash_flow(
             financial_source_id: str,
             financial_period_end: str,
@@ -2075,6 +2281,7 @@ class ResearchDesk:
             search_document,
             value_scenarios,
             evaluate_supplied_forecast,
+            evaluate_valuation_variants,
             inspect_valuation,
             inspect_cash_flow,
             sum_cash_flows,
@@ -2158,6 +2365,7 @@ class ResearchDesk:
             forecast_refs.update(
                 (calculation or {}).get("annual_operating_forecast", {}).get("evidence_ids", [])
             )
+            forecast_refs.update((calculation or {}).get("variation_provenance", {}).get("evidence_ids", []))
             if not forecast_refs.issubset(result["evidence_ids"]):
                 raise ValueError("Valuation must cite all operating forecast evidence")
             finite_refs = {
@@ -2368,16 +2576,18 @@ class ResearchDesk:
             "business": {
                 "value_scenarios",
                 "evaluate_supplied_forecast",
+                "evaluate_valuation_variants",
                 "inspect_valuation",
                 "inspect_cash_flow",
             },
             "catalysts": {
                 "value_scenarios",
                 "evaluate_supplied_forecast",
+                "evaluate_valuation_variants",
                 "inspect_valuation",
                 "inspect_cash_flow",
             },
-            "adversarial": {"value_scenarios", "evaluate_supplied_forecast"},
+            "adversarial": {"value_scenarios", "evaluate_supplied_forecast", "evaluate_valuation_variants"},
         }.get(role, set())
         tools = [t for t in tools if t.name not in excluded]
         try:
@@ -2819,6 +3029,70 @@ class ResearchDesk:
         )
         return context
 
+    def verify_calculations(self, calculations):
+        """Replay exact canonical arithmetic and every variant edge before accepting saved reports."""
+        tools = {tool.name: tool for tool in self.tools()}
+        verified, visiting = set(), set()
+
+        def verify(identifier):
+            if identifier in verified:
+                return
+            if identifier in visiting or len(visiting) >= 64 or identifier not in calculations:
+                raise ValueError("Saved variation lineage is missing, cyclic or too deep")
+            visiting.add(identifier)
+            calculation = calculations[identifier]
+            lineage = calculation.get("variation_provenance")
+            if lineage is None:
+                actual = tools["value_scenarios"].invoke(calculation["inputs"])
+            else:
+                verify(lineage["parent_calculation_id"])
+                patches = [
+                    {key: patch[key] for key in ("path", "after", "rationale", "evidence_ids")}
+                    for patch in lineage["patches"]
+                ]
+                request = {
+                    "calculation_id": lineage["parent_calculation_id"],
+                    "variants": [
+                        {
+                            "label": lineage["label"],
+                            "patches": [
+                                {
+                                    "path": patch["path"],
+                                    "value": patch["after"],
+                                    "rationale": patch["rationale"],
+                                    "evidence_ids": patch["evidence_ids"],
+                                }
+                                for patch in patches
+                            ],
+                        }
+                    ],
+                }
+                response = tools["evaluate_valuation_variants"].invoke(request)
+                if isinstance(response, str):
+                    response = json.loads(response)
+                children = response.get("variants", [])
+                if len(children) != 1 or children[0]["calculation_id"] != identifier:
+                    raise ValueError("Saved variation lineage differs from explicit replay")
+                actual = self.calculations[identifier]
+            if actual != calculation or actual["calculation_id"] != identifier:
+                raise ValueError("Saved calculation provenance or values differ")
+            visiting.remove(identifier)
+            verified.add(identifier)
+
+        with self.lock:
+            # Never let replay's preservation of existing IDs turn a saved record into its own oracle.
+            calculations = copy.deepcopy(calculations)
+            previous = self.calculations
+            self.calculations = {}
+            success = False
+            try:
+                for identifier in calculations:
+                    verify(identifier)
+                success = True
+            finally:
+                if not success:
+                    self.calculations = previous
+
     def finalize(self, audit, report_times):
         if set(audit["reports"]) != set(ROLES):
             raise ValueError("Finalization requires all four completed reports")
@@ -2827,11 +3101,7 @@ class ResearchDesk:
             for stamp in report_times.values()
         ):
             raise ValueError("Finalization requires fresh, nonfuture report timestamps")
-        for identifier, calculation in audit.get("calculations", {}).items():
-            calculator = next(tool for tool in self.tools() if tool.name == "value_scenarios")
-            actual = calculator.invoke(calculation["inputs"])
-            if actual != calculation or actual["calculation_id"] != identifier:
-                raise ValueError("Saved calculation provenance or values differ")
+        self.verify_calculations(audit.get("calculations", {}))
         self.restore_arithmetic(audit.get("arithmetic_records", []))
         self.reports = {
             role: self.validate(ROLES[role][0], report) for role, report in audit["reports"].items()

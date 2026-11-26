@@ -6293,3 +6293,32 @@ The full $20 remains protected. Existing configuration restoration also refuses
 unresolved charges; temporary limits stay bound to the canceled attempt, with
 trading paused and no new paid retry authorized by this accounting state.
 Original manifests, requests and evidence remain intact.
+
+
+### November 25: compact annual sensitivity batch validated offline
+
+The timeout repair `13de0f9` passed CI and built successfully; it remains
+undeployed while run5 accounting is reconciled. A further reviewed repair adds
+`evaluate_valuation_variants`: up to six explicit variants, bounded numeric
+changes, current source citations and unchanged annual valuation validation.
+Each child retains its immutable parent, exact before/after changes and canonical
+calculation identity. Historical inputs and source identities cannot be edited.
+Shared-row policy edits must agree; inherited citation support remains required.
+Recovery reconstructs the entire calculation lineage in a clean registry,
+rejecting altered values, missing parents, cycles and tampered audit metadata.
+
+The actual saved AAPL exercise reproduces four material alternatives against the
+independent arithmetic oracle and tests an explicitly hypothetical recurring-tax
+stress. Five variants use 6,302 input bytes and return 1,581 bytes. Original
+calculations remain unchanged. This is offline arithmetic/provenance validation,
+not investment acceptance. Independent code review approved the final repair;
+1,828 offline tests passed, seven skipped and one deselected.
+
+Run5 is confirmed canceled and closed as UNKNOWN with its full $20 protected
+and $4.480640 known estimated usage. Fresh authenticated provider exports now
+cover 132 saved responses plus one additional Sol call in the 02:54 UTC bucket.
+The earlier diagnostic inference that the pending call used Terra was wrong;
+the saved wire request establishes Sol. Complete usage/category and dollar-line
+checks support a proposed $2.26130865 as-of-export reconciliation, including the
+late call. The append-only application is separately reviewed before execution;
+no original pending request is erased or authorized for resubmission.
