@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from deepagents import create_deep_agent
 from deepagents.backends import StateBackend
+from deepagents.middleware.filesystem import FilesystemMiddleware
 from deepagents.middleware.subagents import SubAgentMiddleware
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, TodoListMiddleware
@@ -2545,6 +2546,9 @@ class ResearchDesk:
             response_format=ProviderStrategy(schema, strict=True),
             middleware=[
                 delegation,
+                # Guard pools and bounds the full request. Hidden human eviction can strand
+                # correction instructions inside an unpageable single-line JSON file.
+                FilesystemMiddleware(backend=backend, human_message_token_limit_before_evict=None),
                 NoHiddenSummaries(),
                 TodoListMiddleware(),
                 Guard(

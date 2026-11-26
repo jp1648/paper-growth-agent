@@ -6375,3 +6375,35 @@ Additional calls remain subject to the hard cap; this is not research acceptance
 or permission to migrate the canceled workflow. Full offline checks passed:
 1,834 tests, seven skipped and one deselected; Ruff and format checks passed.
 The repair remains undeployed pending independent review and guarded release.
+
+
+### November 25: lossless pooling deployed; correction-context truncation found
+
+Revision `69071045` (image `06f49414…`) passed both CI checks and was deployed
+with independent protected-state and shutdown verification. All 1,834 offline
+tests passed, with seven skipped and one deselected. Run6 was confirmed canceled
+and closed at $11.2525125 estimated usage; ordinary configuration was restored
+before release. Original evidence and reservation history remain intact.
+
+Fresh run `held-aapl-annual-20261125-7` admitted the correction cycle within its
+$20 cap, but stopped during fresh critique at 60 model calls. All dispatched
+calls have saved results; known local estimated usage is $16.1576275. Independent
+review reproduces all 20 calculations but withholds acceptance: the corrected
+valuation repeated earlier work and omitted the requested asset/reinvestment,
+award, financing and held-share analyses. No final decision or order resulted.
+Cancellation was requested; accounting closure remains gated by confirmed
+cancellation and the original reservation expiry.
+
+Exact saved provider requests identify the cause: Deep Agents evicted the large
+specialist Human message before Trader's lossless projection. Its filesystem
+read returned only the first 79,558 characters of a 491,647-character single-line
+context. None of the 17 valuation-correction requests included the lead's repair
+instructions or the $355.58 historical reference. The model instead retained an
+illustrative $200 comparison. Original context and wire artifacts are preserved.
+The narrow repair disables Human-message eviction while retaining tool-result
+handling and Trader's deterministic lossless projection, byte/cost admission and
+audit. The actual-agent regression confirms the repair instructions and reference reach
+the provider request; oversized unpoolable input still fails before any dispatch.
+Independent code review passed, along with 1,836 offline tests (seven skipped,
+one deselected), Ruff and formatting. This repair is not yet deployed.
+Trading remains paused; no full investment acceptance has been issued.

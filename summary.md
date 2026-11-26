@@ -147,3 +147,12 @@ Run6 then stopped at the lead cost guard after all four reports: $11.2525125
 local estimated usage, no pending provider operation, but no final decision or
 accepted correction. Material research gaps remain. Exact repeated calculation
 content in lead context is under offline repair; trading remains paused.
+
+
+Latest verified follow-up: lossless calculation pooling is deployed as
+`69071045` / `06f49414…`, with 1,834 offline tests and shutdown verification
+passing. Run6 is canceled/accounted. Run7 entered correction but hit 60 model
+calls at $16.1576275 estimated usage; independent review still requires changes.
+Saved wire requests prove framework file truncation hid the correction reason
+and historical reference price from the model. The narrow eviction repair passed independent review and 1,836 offline tests;
+it is not yet deployed. Trading remains paused; full acceptance is pending.
