@@ -17,25 +17,33 @@ observability data for a password-protected, read-only Next.js dashboard.
 
 ## Last recorded status
 
-Latest November 26 check: **paused; investment acceptance incomplete**. Deployed
-`acfd15e` adds a provenance-bound continuation with strict provider-cost
-reconciliation; 1,893 offline tests and CI passed. Reviewed provider exports
-reconciled the two prior runs to $7.1987688 and $7.3460811, preserving their
-original estimates and histories. The single continuation
-`held-aapl-continuation-20261126-1` produced fresh valuation and critique, then
-stopped before any lead request: $5.479825 estimated usage plus an $8.633350
-next-call reserve exceeded its $12.6539189 cap. Cancellation was confirmed and the run settled at that known local estimate
-at 06:56 UTC, preserving its original reservation and history. There is
-no final decision or full economic acceptance. Independent review identifies
-interpretation and policy synthesis work using retained evidence; further blind
-acquisition or repeated calculations is not justified. No orders were submitted. Ordinary limits were restored and verified in both
-containers; the original one-share AAPL position and $99,655.93 cash are unchanged.
+Latest November 26 check: **paused; complete investment-decision acceptance
+still pending**. Deployed `1925d17` fixes replay of imported thesis context;
+1,922 offline tests, both CI runs and clean worker shutdown passed. Strict raw
+portfolio validation remains intact. Two preparation failures made zero model
+calls; their packets and evidence remain preserved.
 
-Independent review now accepts the separate source-cited addendum as complete
-conditional economic analysis. It supports a conditional SELL at the stipulated
-historical reference, not an executable order. A new audited, tool-free durable
-final synthesis and independent review of that result remain pending. The
-original reports and gap flags are preserved.
+`held-aapl-synthesis-20261126-1` completed its durable workflow at 07:56 UTC
+with one model call, zero tools and $2.1741 settled local estimated cost
+(not a provider bill), with no unknown charge. It produced HOLD with zero
+additional shares. The earlier root's provider-confirmed $7.3460811 plus the
+continuation's estimated $5.479825 and synthesis's estimated $2.1741 total
+$15.0000061 for this research lineage; these mixed accounting bases remain explicit.
+
+Independent review accepts the separate source-cited addendum as complete
+conditional economic analysis, but requires changes to the final decision.
+HOLD cites uncertainty without naming a defensible alternative treatment that
+reverses the quantified sell-versus-retain comparison. A reasoned HOLD remains
+permissible; SELL is not a required outcome. The missing work is an explicit
+conditional policy or supported action-changing alternative, not more blind
+source acquisition or invented certainty. Original reports, flags, result and
+reviews remain immutable. No trade is authorized by research completion.
+The cached acceptance record is complete; ordinary configuration was restored
+and verified, with the original one AAPL share, $99,655.93 cash and pause unchanged.
+
+An offline prompt repair now requires an explicit conditional policy and a
+supported action-changing scenario or threshold. It remains a candidate until
+deployed and evaluated; instruction-delivery tests cannot establish investment quality.
 
 Older entries below record the progression, not current authority.
 
@@ -204,3 +212,7 @@ never modify the canceled run's identity or repeat its paid calculations blindly
 
 Ordinary configuration was restored and verified in both running containers on
 image `4511f79c…`; the temporary allowances are no longer installed.
+
+The policy-comparison candidate passed independent review, 1,924 offline tests
+(seven skipped, one deselected), Ruff and formatting checks. This confirms request
+delivery and preserved gates, not independently accepted model reasoning.

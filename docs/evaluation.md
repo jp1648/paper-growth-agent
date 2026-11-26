@@ -467,3 +467,14 @@ the fresh durable lead has no tools or correction/specialist delegation. The
 existing material-gap BUY/ADD veto and all funding/portfolio gates remain active.
 Ordinary continuations still reject chains. Neither mode grants order submission
 or converts an analyst review into a model decision or investment acceptance.
+
+Reviewed synthesis must choose and justify conditional policies and compare selling
+with retaining under the same policy and horizon. Uncertainty that changes an
+estimate is distinct from evidence that reverses an action. A proposed HOLD based
+on reversal should cite a retained crossing scenario or an already-derived
+threshold and its support; otherwise it must identify the precise missing input
+and disclose the unsupported ranking. Generic unresolved-policy lists do not
+establish retention merit. The prompt does not force SELL or authorize invented
+thresholds. Offline request tests verify delivery of this instruction and preserve
+both HOLD and SELL outputs; independent economic review still determines whether
+the actual reasoning is adequate. Current execution quotes remain a separate gate.

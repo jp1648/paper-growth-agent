@@ -6562,3 +6562,32 @@ chain refusal and BUY/ADD gap veto remain. Independent code review passed, inclu
 1,921 offline tests passed (seven skipped, one deselected), with Ruff and format
 checks clean. No new paid attempt has started and full durable-result acceptance
 is still pending.
+
+
+November 26, 07:56 UTC: reviewed replay repair `1925d17` is deployed on image
+`e180df4d…`. Both CI runs and 1,922 offline tests passed; natural SDK client exit
+and worker exit code zero were verified. Strict raw portfolio validation remains
+unchanged. Separate preparation packets failed before any model call or reservation
+(first on projected rather than raw context, second on missing plan revision).
+Their evidence is preserved; a corrected packet passed full supervisor preflight.
+
+Durable `held-aapl-synthesis-20261126-1` completed under manifest `907135b2…`:
+one model call, zero tools, settled estimated $2.1741, no unknown charge. Its
+HOLD/zero-additional-share decision is **changes required**, not accepted complete
+investment reasoning. It recognizes the conditional SELL case but invokes generic
+uncertainty without identifying a defensible policy alternative that changes the
+ranking or explaining the quantified sensitivities. The separate conditional
+analytical addendum remains accepted. Preserve both conclusions; neither a
+forced SELL nor another blind paid retry resolves this distinction. No order
+submission, thesis promotion or automatic unpause is authorized.
+
+The completed result was attached without another model call. Mechanical acceptance
+is recorded complete, while the independent economic verdict remains changes
+required. Ordinary config `fada4d29…` and pause `89c5c783…` were verified after
+restoration; original cash $99,655.93 and one AAPL share are unchanged. A narrow
+offline prompt repair requires an explicit policy comparison and supported reversal
+case; it is not yet deployed or validated by another real synthesis.
+
+The policy-comparison candidate passed independent review, 1,924 offline tests
+(seven skipped, one deselected), Ruff and formatting checks. This confirms request
+delivery and preserved gates, not independently accepted model reasoning.

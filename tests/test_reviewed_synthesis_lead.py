@@ -1,4 +1,5 @@
 import copy
+from decimal import Decimal
 
 import pytest
 from test_research_team import Evidence, team
@@ -177,3 +178,52 @@ def test_single_dispatch_guard_replays_completed_journal_but_refuses_new_operati
             guard.admit_model(100)
         assert desk.budget.models == 1
         adapter.close()
+
+
+@pytest.mark.parametrize("action", ["HOLD", "SELL"])
+def test_actual_synthesis_request_requires_supported_policy_comparison_without_forced_action(
+    env, decision, monkeypatch, action
+):
+    from test_research_team import TeamModel
+
+    original_lead = ResearchDesk.run_lead
+    original_generate = TeamModel._generate
+    captured = []
+
+    def synthesis(desk):
+        desk.continuation["reviewed_synthesis"] = reviewed()
+        desk.budget = Budget(desk.cfg)
+        desk.reports["adversarial"]["unresolved_material_gaps"] = True
+        before = copy.deepcopy(desk.reports)
+        result = original_lead(desk)
+        assert result["decision"]["action"] == action
+        assert desk.reports == before
+        return result
+
+    def generate(model, messages, *args, **kwargs):
+        if kwargs["response_format"]["json_schema"]["name"] == "Decision":
+            captured.append(messages[0].content)
+            assert kwargs["tools"] == []
+        return original_generate(model, messages, *args, **kwargs)
+
+    monkeypatch.setattr(ResearchDesk, "run_lead", synthesis)
+    monkeypatch.setattr(TeamModel, "_generate", generate)
+    proposal = decision.model_copy(
+        update={"action": action, "quantity": Decimal(0) if action == "HOLD" else Decimal(1)}
+    )
+    research, model = team(env, proposal)
+    build_graph(env[0], research).invoke({"symbol": "ACME", "run_key": "conditional-synthesis"})
+    assert model.calls.count("Decision") == len(captured) == 1
+    prompt = captured[0]
+    for requirement in (
+        "adopt or reject a named financing, reinvestment, tax and award policy",
+        "Compare incremental sale proceeds with retaining",
+        "supported retained scenario crossing the reference price",
+        "already-derived quantitative reversal threshold",
+        "exact missing decision-material input",
+        "Do not invent a threshold",
+        "or force SELL",
+        "historical reference",
+        "Original material gaps still block BUY/ADD",
+    ):
+        assert requirement in prompt
