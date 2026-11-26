@@ -98,8 +98,14 @@ independent arithmetic replay. Offline Apple analysis removes exceptional tax-fl
 perpetuation and reconciles intangible replacement/growth spending. The complete
 source-cited tool payload exceeds 8,000 tokens, so configuration permits an explicit
 12,000-token supervised allowance while keeping the default unchanged. Offline
-checks pass; deployment and a new independently accepted durable result remain
-separate gates. Trading remains paused.
+checks passed and the annual-path image was deployed. The subsequent durable run
+`held-aapl-annual-20261125-3` failed before final decision: the lead repeatedly
+submitted an overlong correction, while prompt compaction discarded the tool
+rejection. All 39 model calls were reconciled to $16.600585 estimated usage;
+confirmed cancellation and audited accounting closure preserved its history.
+Ordinary limits were restored in both containers. A bounded correction-feedback
+repair and source-verified evaluation of the supplied forecast are in progress;
+full investment acceptance remains unproved. Trading remains paused.
 
 ## Start here
 

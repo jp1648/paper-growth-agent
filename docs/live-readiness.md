@@ -6173,3 +6173,57 @@ The user authorized a justified testing increase. Configuration now permits up t
 explicit future supervised override only, not a runtime configuration change or
 new spending authority. Every call still reserves the entire configured output
 allowance at its role's rates against the unchanged actual run-cost ceiling.
+
+
+### November 25: annual-path run and correction feedback failure
+
+Commit `cb649e3` and image `49d95528…` deployed successfully, with CI green,
+worker shutdown exit zero and protected state unchanged. The independently
+reviewed offline annual forecast reproduced $90.15/$142.77/$200.90, but those
+values were not an accepted durable investment result.
+
+Fresh run `held-aapl-annual-20261125-3` completed four specialist reports but
+failed before final decision. It used 39 model calls and 76 budgeted tools.
+The lead attempted twelve overlong correction requests; compact final context
+discarded the tool's length rejection, causing repeated requests. Lead usage
+was $10.815700 of $16.600585 total estimated model cost. The next reservation
+would have exceeded the unchanged $20 run ceiling and was not dispatched.
+The specialists used legacy calculations and retained material valuation gaps;
+no accepted annual-path result or trade was produced.
+
+Independent review verified all 39 saved exchanges and the absence of pending
+operations. The exact workflow was canceled and cancellation confirmed. After
+its original 1,200-second expiry, the existing audited accounting closure settled
+$16.600585 estimated usage, preserving the immutable journal and original run.
+This is usage reconciliation, not provider-invoice certification. Ordinary
+configuration was restored in both containers; trading remains paused.
+Evidence: `state/annual-path-close-20261125/`, with original diagnosis and
+checkpoint under `state/annual-path-acceptance-20261125/`.
+
+The offline repair now preserves complete tool-call/rejection bundles during
+lead compaction, bounds invalid correction requests, and reserves output by role.
+A supplied-forecast evaluation helper must use the existing provenance and
+valuation validators against freshly registered exact source content; it cannot
+inject evidence, approve assumptions or clear material gaps automatically.
+A later fresh run requires verified funding/limits, reviewed deployment and
+independent economic review of its actual durable output.
+
+The correction refusal count and last error survive checkpoints; two invalid
+requests disable further correction requests without clearing report gaps.
+Large output capacity is confined to valuation (up to 12,000); other roles cap
+at 5,000, with the unchanged 3,000 default. Reservation, provider wire payload,
+durable identity and accounting verification use the same role limit. Tests
+exercise actual SDK serialization, not just an intended configuration value.
+
+`evaluate_supplied_forecast` explicitly evaluates the frozen, untrusted hypothesis
+only after every required original passage is registered with matching URL,
+content length and SHA-256. The existing issuer, cutoff and annual-calculation
+validators still apply. Missing originals return navigation; no source is fetched
+or injected by this helper. The actual frozen AAPL proposal reproduced all three
+values after eight source IDs were remapped in an offline fixture, returning
+1,047 bytes rather than asking the model to regenerate 8,351 tokens of vectors.
+This verifies mechanics, not the economic assumptions or investment acceptance.
+
+Full offline validation passed: 1,788 tests, seven skipped and one deselected.
+Independent focused review passed 51 tests; lint, formatting and diff checks
+passed. New production use still requires deployment and a fresh bounded run.

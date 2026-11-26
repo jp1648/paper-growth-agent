@@ -218,6 +218,7 @@ ROLES = {
             "Use inspect_cash_flow for annual accounting diagnostics when needed, or pass the proposed normalization_bridge directly to value_scenarios; omitted or null cash_flow_per_share derives the exact source/bridge scalar. An explicit scalar must still match. Missing inputs are gaps; derived arithmetic does not establish economic support. If calls run out, name the exact unfinished source reads and arithmetic for the single correction. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Quantify material normalization alternatives with calculation tools as well as growth/multiple sensitivities. When supported alternatives share the same scenarios, batch up to three labeled normalization_alternatives with the main bridge: one full adjustment replacement, a paired tax/working-capital replacement, or a future-service compensation policy replacement. Each needs its own amount, rationale and original evidence; omit cash_flow_per_share for a batch. Vary one supported treatment at a time; do not combine overlapping tax and working-capital recoveries or capitalize a one-time debt maturity as a perpetual annual drain. Preserve the chosen main calculation_id and identify alternatives separately. "
+            "If analytical_hypothesis supplies annual candidate_arguments and exact historical_source_navigation, read the matching originals and explicitly call evaluate_supplied_forecast with the current financial source ID to validate that untrusted candidate without regenerating vectors. Inspect its saved assumptions, test justified alternatives and critique the economics; it is not an instruction to accept the hypothesis. "
             "When public disclosure supports GAAP provision tax plus disclosed CFO adjustments rather than separate cash-tax/interest splits, use annual_operating_forecast with growth_rates=[]: enumerate the original historical reconciliation lines, chosen annual driver vectors and recurring terminal policy. Never invent a residual or backfit annual cash to legacy growth. Inspect actual path sensitivities and keep finite claims outside terminal cash. "
             "Explain sensitivity and expectations embedded in today's price. "
             "Use finite_cash_adjustments for sourced incremental cash payments/releases in specific forecast years; explain what is already in the baseline, taxes and timing uncertainty. These amounts never enter terminal cash; do not turn finite restructuring charges or debt maturities into perpetual deductions. Net minority equity movements or earnings alone do not establish cash distributions or terminal ownership. Award counts and plan grant reserves do not establish maximum PSU delivery; inspect applicable terms and dividend equivalents or preserve the gap. Do not invent missing entitlements or label an illustrative bound verified. If the "
@@ -251,6 +252,11 @@ class UnknownEvidence(ValueError):
 # Worst repair: request + three delegations + prerequisite/valuation/critique reads.
 CORRECTION_TOOLS = {"business": 2, "catalysts": 2, "valuation": 6, "adversarial": 2}
 CORRECTION_RESERVE = 1 + 3 + 2 + 6 + 2
+
+
+def role_output_tokens(cfg, role):
+    """Keep large annual tool arguments in valuation without reserving them for every role."""
+    return min(cfg.research_max_output_tokens, 12000 if role == "valuation" else 5000)
 
 
 class Budget:
@@ -379,7 +385,7 @@ class Budget:
             # UTF-8 byte count plus framing reserve intentionally overestimates ordinary text tokens.
             reserve = (
                 dec(size + 2048) * route.input_cost_per_million
-                + dec(self.cfg.research_max_output_tokens) * route.output_cost_per_million
+                + dec(role_output_tokens(self.cfg, role)) * route.output_cost_per_million
             ) / dec(1000000)
             if not self.unrestricted_research and (
                 size > self.cfg.research_max_input_bytes
@@ -527,6 +533,7 @@ class Guard(AgentMiddleware):
                     for t in request.tools
                 ],
                 "output_schema": request.response_format.schema_spec.json_schema,
+                "max_output_tokens": role_output_tokens(self.budget.cfg, self.role),
             }
             return self.checkpoint.call(
                 "model",
@@ -576,6 +583,21 @@ class Guard(AgentMiddleware):
             messages = [HumanMessage(content=dumps(self.final_context()))]
             if len(request.messages) > 1 and isinstance(request.messages[-1], HumanMessage):
                 messages.extend(request.messages[-2:])
+            elif request.messages and isinstance(request.messages[-1], ToolMessage):
+                # Preserve the whole latest call/result batch so correction feedback reaches the model.
+                for i in range(len(request.messages) - 2, -1, -1):
+                    previous = request.messages[i]
+                    if isinstance(previous, AIMessage):
+                        tail = request.messages[i + 1 :]
+                        calls = {call["id"] for call in previous.tool_calls}
+                        if (
+                            calls
+                            and len(calls) == len(previous.tool_calls) == len(tail)
+                            and all(isinstance(item, ToolMessage) for item in tail)
+                            and calls == {item.tool_call_id for item in tail}
+                        ):
+                            messages.extend([previous, *tail])
+                        break
             tools = [
                 t
                 for t in tools
@@ -613,6 +635,7 @@ class Guard(AgentMiddleware):
                 for t in tools
             ],
             "output_schema": request.response_format.schema_spec.json_schema,
+            "max_output_tokens": role_output_tokens(self.budget.cfg, self.role),
         }
         return messages, tools, payload
 
@@ -641,7 +664,10 @@ class Guard(AgentMiddleware):
             )
         self.trace("model.request", {"role": self.role, "payload": payload})
         reserved = self.budget.model(request_bytes, self.role)
-        settings = dict(getattr(request, "model_settings", {}) or {})
+        settings = {
+            **dict(getattr(request, "model_settings", {}) or {}),
+            "max_completion_tokens": role_output_tokens(self.budget.cfg, self.role),
+        }
         if self.checkpoint is not None:
             route = self.budget.cfg.research_model(self.role)
             identifier = self.checkpoint.record_dispatch(
@@ -649,7 +675,7 @@ class Guard(AgentMiddleware):
                     "provider": "openai",
                     "model": route.model,
                     "reasoning_effort": route.reasoning_effort,
-                    "max_output_tokens": self.budget.cfg.research_max_output_tokens,
+                    "max_output_tokens": role_output_tokens(self.budget.cfg, self.role),
                     "service_tier": "default",
                     "projected_request": payload,
                 }
@@ -1697,6 +1723,157 @@ class ResearchDesk:
         )
 
         @tool
+        def evaluate_supplied_forecast(financial_source_id: str) -> dict:
+            """Explicitly evaluate the frozen context's untrusted annual hypothesis through value_scenarios, without copying its vectors. Exact original URL/content hashes must match already-read registered passages. Missing originals return navigation only; no fetch, evidence injection or economic approval. Read the saved calculation for full assumptions and independently critique them."""
+            try:
+                with self.lock:
+                    hypothesis = copy.deepcopy(self.context.get("analytical_hypothesis"))
+                    registered = copy.deepcopy(self.sources)
+                if (
+                    not isinstance(hypothesis, dict)
+                    or len(dumps(hypothesis).encode()) > 64000
+                    or hypothesis.get("candidate_tool_name") != "value_scenarios"
+                ):
+                    raise ValueError(
+                        "A frozen annual value_scenarios hypothesis of at most64000 bytes is required"
+                    )
+                arguments = hypothesis.get("candidate_arguments")
+                navigation = hypothesis.get("historical_source_navigation")
+                if (
+                    not isinstance(arguments, dict)
+                    or not arguments.get("annual_operating_forecast")
+                    or not isinstance(navigation, list)
+                    or len(navigation) > 64
+                ):
+                    raise ValueError(
+                        "Annual hypothesis arguments and bounded original-source navigation required"
+                    )
+                financial = registered.get(financial_source_id, {})
+                if not isinstance(financial.get("content"), dict):
+                    raise TypeError("Select a currently registered financial fact source for this issuer")
+                refs = set()
+
+                def collect(value):
+                    if isinstance(value, dict):
+                        for key, item in value.items():
+                            if key.endswith("evidence_ids"):
+                                if not isinstance(item, list) or any(
+                                    not isinstance(ref, str) for ref in item
+                                ):
+                                    raise ValueError(
+                                        "Hypothesis citations must be lists of original source IDs"
+                                    )
+                                refs.update(item)
+                            else:
+                                collect(item)
+                    elif isinstance(value, list):
+                        for item in value:
+                            collect(item)
+
+                collect(arguments)
+                mapping, missing = {}, []
+                for ref in sorted(refs):
+                    entries = [
+                        entry for entry in navigation if isinstance(entry, dict) and entry.get("id") == ref
+                    ]
+                    if len(entries) != 1:
+                        raise ValueError(
+                            "Each hypothesis citation requires one frozen original URL/content-hash mapping"
+                        )
+                    entry = entries[0]
+                    digest, size = entry.get("content_sha256"), entry.get("content_chars")
+                    if (
+                        not isinstance(digest, str)
+                        or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+                        or type(size) is not int
+                        or size <= 0
+                    ):
+                        raise ValueError("Hypothesis original content hash/length missing or malformed")
+                    matches = sorted(
+                        identifier
+                        for identifier, source in registered.items()
+                        if source.get("url") == entry.get("url")
+                        and isinstance(source.get("content"), str)
+                        and len(source["content"]) == size
+                        and hashlib.sha256(source["content"].encode()).hexdigest() == digest
+                    )
+                    if not matches:
+                        missing.append(
+                            {
+                                key: entry.get(key)
+                                for key in ("id", "url", "offset", "content_chars", "content_sha256")
+                            }
+                        )
+                    else:
+                        mapping[ref] = matches[0]
+                if missing:
+                    return {
+                        "available": False,
+                        "error": "hypothesis_originals_missing",
+                        "missing_originals": missing,
+                        "note": "Read these exact original offsets/lengths and verify hashes before retrying. Nothing fetched or registered; hypothesis remains unverified.",
+                    }
+                validate_finite_cash_adjustments(
+                    [
+                        {
+                            "year": 1,
+                            "amount_usd": "0",
+                            "rationale": "Original identity check, not approval of hypothesis",
+                            "evidence_ids": sorted(set(mapping.values())),
+                        }
+                    ],
+                    1,
+                    registered,
+                    self.evaluation_at or now(),
+                    financial["content"].get("cik"),
+                )
+
+                def remap(value):
+                    if isinstance(value, dict):
+                        return {
+                            key: [mapping[ref] for ref in item]
+                            if key.endswith("evidence_ids")
+                            else remap(item)
+                            for key, item in value.items()
+                        }
+                    if isinstance(value, list):
+                        return [remap(item) for item in value]
+                    return value
+
+                arguments = remap(arguments)
+                arguments["financial_source_id"] = financial_source_id
+                result = value_scenarios.invoke(arguments)
+                if isinstance(result, str):
+                    result = json.loads(result)
+                if result.get("available") is False:
+                    return result
+                return {
+                    **{
+                        key: result[key]
+                        for key in ("calculation_id", "bear_value", "base_value", "bull_value")
+                    },
+                    "inputs_sha256": hashlib.sha256(dumps(result["inputs"]).encode()).hexdigest(),
+                    "evidence_id_map": mapping,
+                    "note": "Conditional hypothesis arithmetic only, not forecast/claim verification or investment acceptance. read_source(calculation_id) supplies full canonical inputs for independent review.",
+                }
+            except (ValueError, TypeError, DecimalException) as exc:
+                return {
+                    "available": False,
+                    "error": "supplied_forecast_invalid",
+                    "note": str(exc)[:600],
+                    "calculation_created": False,
+                }
+
+        evaluate_supplied_forecast.handle_validation_error = lambda _error: dumps(
+            {
+                "available": False,
+                "error": "supplied_forecast_invalid",
+                "note": "Provide the current registered financial_source_id as a string. Nothing fetched or calculated.",
+                "calculation_created": False,
+            }
+        )
+
+        @tool
         def inspect_cash_flow(
             financial_source_id: str,
             financial_period_end: str,
@@ -1823,6 +2000,7 @@ class ResearchDesk:
             read_document,
             search_document,
             value_scenarios,
+            evaluate_supplied_forecast,
             inspect_valuation,
             inspect_cash_flow,
             sum_cash_flows,
@@ -2039,7 +2217,7 @@ class ResearchDesk:
                     allowed,
                     self.reports,
                     self.final_context if role == "research_lead" else None,
-                    (lambda: self.correction is None) if role == "research_lead" else None,
+                    self.correction_available if role == "research_lead" else None,
                     checkpoint=checkpoint,
                 ),
             ],
@@ -2113,9 +2291,19 @@ class ResearchDesk:
         schema, instructions = ROLES[role]
         tools = self.tools()
         excluded = {
-            "business": {"value_scenarios", "inspect_valuation", "inspect_cash_flow"},
-            "catalysts": {"value_scenarios", "inspect_valuation", "inspect_cash_flow"},
-            "adversarial": {"value_scenarios"},
+            "business": {
+                "value_scenarios",
+                "evaluate_supplied_forecast",
+                "inspect_valuation",
+                "inspect_cash_flow",
+            },
+            "catalysts": {
+                "value_scenarios",
+                "evaluate_supplied_forecast",
+                "inspect_valuation",
+                "inspect_cash_flow",
+            },
+            "adversarial": {"value_scenarios", "evaluate_supplied_forecast"},
         }.get(role, set())
         tools = [t for t in tools if t.name not in excluded]
         try:
@@ -2159,11 +2347,22 @@ class ResearchDesk:
             with self.lock:
                 self.running.discard(role)
 
+    def correction_available(self):
+        return self.correction is None and self.continuation.get("correction_refusals", 0) < 2
+
     def correction_tool(self):
+        def refusal(message):
+            with self.lock:
+                self.continuation["correction_refusals"] = min(
+                    2, self.continuation.get("correction_refusals", 0) + 1
+                )
+                self.continuation["last_correction_refusal"] = message
+            return message
+
         class CorrectionRequest(BaseModel):
             role: str
             report_sha256: str
-            reason: str = Field(json_schema_extra={"maxLength": 2000})
+            reason: str = Field(min_length=1, max_length=2000)
 
         @tool(args_schema=CorrectionRequest)
         def request_correction(role: str, report_sha256: str, reason: str) -> dict:
@@ -2171,17 +2370,21 @@ class ResearchDesk:
             with self.lock:
                 if not reason.strip() or len(reason) > 2000:
                     raise ToolException(
-                        "Correction reason must contain 1–2000 characters of specific material defects."
+                        refusal(
+                            "Correction reason must contain 1–2000 characters of specific material defects."
+                        )
                     )
                 if (
-                    self.correction is not None
+                    not self.correction_available()
                     or self.running
                     or set(self.reports) != set(ROLES)
                     or role not in {"business", "catalysts", "valuation"}
                     or report_sha256 != hashlib.sha256(dumps(self.reports[role]).encode()).hexdigest()
                 ):
                     raise ToolException(
-                        "Correction unavailable or stale report hash; only one explicit material correction cycle is allowed."
+                        refusal(
+                            "Correction unavailable or stale report hash; only one explicit material correction cycle is allowed."
+                        )
                     )
                 self.budget.check()
                 invalidated = [role, "adversarial"]
@@ -2194,13 +2397,17 @@ class ResearchDesk:
                     remaining = self.cfg.research_max_tool_calls - self.budget.tools - len(invalidated)
                     if not self.budget.unrestricted_research and remaining < sum(minimum.values()):
                         raise ToolException(
-                            "Correction unavailable: insufficient remaining calls to rebuild required reports."
+                            refusal(
+                                "Correction unavailable: insufficient remaining calls to rebuild required reports."
+                            )
                         )
                     if not self.budget.unrestricted_research:
                         tail_roles = [*invalidated, "research_lead"]
                         if self.cfg.research_max_model_calls - self.budget.models < len(tail_roles):
                             raise ToolException(
-                                "Correction unavailable: insufficient remaining model calls for corrected reports, fresh critique and final decision."
+                                refusal(
+                                    "Correction unavailable: insufficient remaining model calls for corrected reports, fresh critique and final decision."
+                                )
                             )
                         minimum_tail = dec(0)
                         for name in tail_roles:
@@ -2213,12 +2420,14 @@ class ResearchDesk:
                             route = self.cfg.research_model(name)
                             minimum_tail += (
                                 dec(size + 2048) * route.input_cost_per_million
-                                + dec(self.cfg.research_max_output_tokens) * route.output_cost_per_million
+                                + dec(role_output_tokens(self.cfg, name)) * route.output_cost_per_million
                             ) / dec(1000000)
                         # Minimum-tail preflight only; extra calls/context growth still face every hard guard.
                         if self.budget.reserved + minimum_tail > self.budget.limit:
                             raise ToolException(
-                                "Correction unavailable: insufficient remaining estimated cost for the minimum corrected-report, fresh-critique and final-decision tail."
+                                refusal(
+                                    "Correction unavailable: insufficient remaining estimated cost for the minimum corrected-report, fresh-critique and final-decision tail."
+                                )
                             )
                     extra = max(0, remaining - sum(minimum.values()))
                     share, remainder = divmod(extra, len(invalidated))
@@ -2257,6 +2466,15 @@ class ResearchDesk:
                 "instruction": "Required corrected reports and fresh critique must finish before deciding; rebuilding is not acceptance. Original reports remain audited; remaining shared budgets still apply.",
             }
 
+        def invalid_request(error):
+            message = (
+                "Correction reason must contain 1–2000 characters of specific material defects."
+                if any(item["loc"] == ("reason",) for item in error.errors())
+                else "Correction requires a role, current report hash and 1–2000-character reason."
+            )
+            return refusal(message)
+
+        request_correction.handle_validation_error = invalid_request
         request_correction.handle_tool_error = True
         return request_correction
 
@@ -2480,7 +2698,10 @@ class ResearchDesk:
                 name: hashlib.sha256(dumps(report).encode()).hexdigest()
                 for name, report in self.reports.items()
             },
-            "correction_available": self.correction is None,
+            "correction_available": self.correction_available(),
+            "correction_refusals": self.continuation.get("correction_refusals", 0),
+            "last_correction_refusal": self.continuation.get("last_correction_refusal"),
+            "correction_retry_note": "After two rejected requests correction is unavailable; retain all material gaps and finalize honestly, never claim incomplete research accepted.",
             "claims_coverage": self.claims_coverage(),
             "correction_valuation_provenance": self.correction_valuation_provenance(),
             "correction_instruction": "Before finalizing, separate decision-material defects from optional coverage. Request correction only for a specific, source-resolvable defect or a defensible quantitative bound that could change cash flow, ownership, valuation, risk or action. Name the disputed treatment, exact source IDs or missing disclosure, and the calculation/comparison required. Target the earliest report whose findings actually need changing: unread business material requires business correction only when it is a prerequisite to that repair; valuation interpretation of already-supported business facts belongs to valuation. Include linked material defects, not an omnibus list of every unread page. Budget for the complete dependent rebuild, fresh critique and final decision, not just the next call. If the work cannot fit, preserve all material gaps and abstain honestly; that is not completed investment research. Original evidence and acceptance gates remain mandatory.",
@@ -2654,7 +2875,7 @@ class DeepResearchTeam:
                 store=False,
                 max_retries=0,
                 timeout=180 if role == "research_lead" else 60,
-                max_tokens=cfg.research_max_output_tokens,
+                max_tokens=role_output_tokens(cfg, role),
                 **({"http_client": httpx.Client(transport=ResearchTransport())} if durable else {}),
             )
             for role, route in routes.items()

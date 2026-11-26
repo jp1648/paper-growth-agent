@@ -10,7 +10,7 @@ from .models import dec, dt, dumps, now
 from .paper_dispatch import fingerprint
 from .research_journal import Journal
 from .research_manifest import load_manifest, run_directory
-from .research_team import ROLES
+from .research_team import ROLES, role_output_tokens
 from .store import Store
 
 
@@ -108,7 +108,7 @@ def _current_usage(evidence, cfg, role):
         or projected.get("provider") != "openai"
         or projected.get("model") != route.model
         or projected.get("reasoning_effort") != route.reasoning_effort
-        or projected.get("max_output_tokens") != cfg.research_max_output_tokens
+        or projected.get("max_output_tokens") != role_output_tokens(cfg, role)
         or projected.get("service_tier") != "default"
     ):
         raise AccountingEvidenceError("Projected provider route differs from frozen configuration")
@@ -133,7 +133,7 @@ def _current_usage(evidence, cfg, role):
         raise AccountingEvidenceError("Saved provider request body is invalid") from exc
     if (
         body.get("model") != route.model
-        or body.get("max_output_tokens") != cfg.research_max_output_tokens
+        or body.get("max_output_tokens") != role_output_tokens(cfg, role)
         or body.get("service_tier") != "default"
         or body.get("reasoning", {}).get("effort") != route.reasoning_effort
         or body.get("store") is not False
