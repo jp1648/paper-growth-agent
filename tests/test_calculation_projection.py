@@ -118,3 +118,56 @@ def test_final_lead_pool_survives_serialization_and_preserves_entire_refusal_bun
     assert expand(result) == original["calculations"] and result["reports"] == original["reports"]
     assert projected[1:] == [ai, *feedback] and messages == saved
     assert Guard.bounded_messages(projected) == projected
+
+
+def test_full_human_pool_shares_cross_section_objects_without_changing_originals():
+    shared = {"rationale": "Exact conditional policy. " * 80, "evidence_ids": ["source-original"]}
+    original = {
+        "calculations": {"one": {"inputs": shared}},
+        "reports": {"valuation": {"policy": copy.deepcopy(shared)}},
+        "correction": {
+            "reason": "Keep the actual reference and all material gaps",
+            "policy": copy.deepcopy(shared),
+        },
+        "research_reference": {"price": "355.58", "executable": False},
+        "evidence": [{"content": "Original text", "policy": copy.deepcopy(shared)}],
+    }
+    before = copy.deepcopy(original)
+    pooled = compact_calculation_context(original)
+    envelope = {
+        "calculations": {
+            k: v
+            for k, v in pooled.items()
+            if k not in {"calculation_context_pool", "calculation_context_projection"}
+        },
+        "calculation_context_pool": pooled["calculation_context_pool"],
+    }
+    assert expand(envelope) == original
+    assert len(dumps(pooled).encode()) < len(dumps(original).encode())
+    assert original == before and compact_calculation_context(pooled) is pooled
+    assert pooled == compact_calculation_context(json.loads(dumps(original)))
+    assert pooled["correction"]["reason"] == original["correction"]["reason"]
+    assert pooled["research_reference"] == original["research_reference"]
+
+
+def test_reserved_reference_outside_calculations_prevents_ambiguous_projection():
+    _, original = context()
+    original["reports"]["external"] = {"calculation_context_ref": "existing-user-value"}
+    before = copy.deepcopy(original)
+    assert compact_calculation_context(original) is original
+    assert original == before
+
+
+def test_full_human_projection_never_rewrites_assistant_tool_arguments():
+    _, original = context()
+    original["correction"] = {"saved": copy.deepcopy(original["calculations"])}
+    ai = AIMessage(
+        content="Exact argument history",
+        tool_calls=[{"name": "value_scenarios", "args": original, "id": "call", "type": "tool_call"}],
+    )
+    feedback = ToolMessage(content="Original result", tool_call_id="call")
+    messages = [HumanMessage(content=dumps(original)), ai, feedback]
+    before = copy.deepcopy(messages)
+    projected = Guard.bounded_messages(messages)
+    assert projected[0].content != messages[0].content
+    assert projected[1:] == messages[1:] and messages == before

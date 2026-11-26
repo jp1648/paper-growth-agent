@@ -31,7 +31,8 @@ def context():
             "reason": "Compute the missing ROU exclusion and intangible replacement repairs; never repeat the original work."
         },
         "research_reference": {"price": "355.58", "executable": False},
-        "reports": {"business": {"gap": "preserve"}},
+        "reports": {"business": {"gap": "preserve", "policy": copy.deepcopy(shared)}},
+        "shared_policy_text": shared["rationale"],
         "z_original_source": "Retained original source text. " * 4000,
     }
 
@@ -104,6 +105,47 @@ def test_actual_deepagent_keeps_full_correction_and_reference_before_guard_admis
         assert original["correction"]["reason"] in text and "355.58" in text
         assert "Message content too large and was saved" not in text
         assert "calculation_context_pool" in text
+        contexts = []
+
+        def inspect_context(value):
+            if isinstance(value, dict):
+                for child in value.values():
+                    inspect_context(child)
+            elif isinstance(value, list):
+                for child in value:
+                    inspect_context(child)
+            elif isinstance(value, str):
+                try:
+                    decoded = json.loads(value)
+                except ValueError:
+                    return
+                if isinstance(decoded, dict) and "calculation_context_pool" in decoded:
+                    contexts.append(decoded)
+
+        inspect_context(wire)
+        assert len(contexts) == 1
+        projected = contexts[0]
+        pool = projected["calculation_context_pool"]
+
+        def expand(value):
+            if isinstance(value, dict):
+                if set(value) == {"calculation_context_ref"}:
+                    return expand(pool[value["calculation_context_ref"]])
+                return {k: expand(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [expand(v) for v in value]
+            return value
+
+        assert (
+            expand(
+                {
+                    k: v
+                    for k, v in projected.items()
+                    if k not in {"calculation_context_pool", "calculation_context_projection"}
+                }
+            )
+            == original
+        )
         assert wire["store"] is False and wire["text"]["format"]["strict"] is True
         return response()
 

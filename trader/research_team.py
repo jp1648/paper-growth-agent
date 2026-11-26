@@ -336,7 +336,7 @@ def role_output_tokens(cfg, role):
 
 
 def compact_calculation_context(context):
-    """Losslessly share exact repeated calculation subtrees inside the same model message."""
+    """Losslessly share exact repeated subtrees across the same human context."""
     if not isinstance(context, dict) or not isinstance(context.get("calculations"), dict):
         return context
     if "calculation_context_pool" in context or "calculation_context_projection" in context:
@@ -345,42 +345,43 @@ def compact_calculation_context(context):
 
     def collect(value):
         nonlocal collision
-        if isinstance(value, (dict, list)):
+        if isinstance(value, (dict, list, str)):
             if isinstance(value, dict) and "calculation_context_ref" in value:
                 collision = True
             encoded = dumps(value)
-            if len(encoded.encode()) >= 512:
+            if len(encoded.encode()) >= 128:
                 counts[encoded] = counts.get(encoded, 0) + 1
-            for item in value.values() if isinstance(value, dict) else value:
-                collect(item)
+            if isinstance(value, (dict, list)):
+                for item in value.values() if isinstance(value, dict) else value:
+                    collect(item)
 
-    collect(context["calculations"])
+    collect(context)
     repeated = sorted(key for key, count in counts.items() if count > 1)
     if collision or not repeated:
         return context
     identities = {key: "c" + str(index) for index, key in enumerate(repeated, 1)}
 
     def encode(value, skip=None):
-        if isinstance(value, (dict, list)):
+        if isinstance(value, (dict, list, str)):
             key = dumps(value)
             if key in identities and key != skip:
                 return {"calculation_context_ref": identities[key]}
             if isinstance(value, dict):
                 return {name: encode(item) for name, item in value.items()}
-            return [encode(item) for item in value]
+            if isinstance(value, list):
+                return [encode(item) for item in value]
         return copy.deepcopy(value)
 
-    projected = copy.deepcopy(context)
-    projected["calculations"] = encode(context["calculations"])
+    projected = encode(context)
     projected["calculation_context_pool"] = {
         identities[key]: encode(json.loads(key), skip=key) for key in repeated
     }
     projected["calculation_context_projection"] = (
-        "Each calculation_context_ref resolves the exact original object/list in the same-message "
+        "Each calculation_context_ref resolves the exact original object/list/string in the same-message "
         "calculation_context_pool; nested references resolve recursively. Every amount, rationale, "
         "citation, case, result and variant lineage is retained. These are lossless model-context "
-        "aliases, not evidence IDs or directly executable tool arguments. All four reports remain "
-        "unchanged. Original saved calculations are unchanged; this projection does not validate "
+        "aliases, not evidence IDs or directly executable tool arguments. Reports, correction instructions "
+        "and evidence resolve losslessly too. Original saved artifacts are unchanged; this projection does not validate "
         "source interpretation, economic assumptions or investment acceptance."
     )
     return projected if len(dumps(projected).encode()) < len(dumps(context).encode()) else context

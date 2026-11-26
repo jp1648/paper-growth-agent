@@ -6440,3 +6440,36 @@ valuation output tokens and 5,000 for other roles. Original reports were not
 imported, and no previous run was resumed. Trading stays paused. Research and
 independent acceptance remain pending; the first observation confirms acquisition
 complete and business analysis running.
+
+
+### November 26: correction calculations verified; synthesis context blocked
+
+`held-aapl-full-context-20261126-1` reached valuation correction with the actual
+repair instructions and $355.58 historical nonexecutable reference intact. An
+independent reviewer reproduced all 33 saved calculations, including the missing
+asset/ROU, intangible replacement, coherent terminal growth/return and combined
+sensitivity cases. This verifies arithmetic, not full investment acceptance.
+Corrected valuation prose, fresh adversarial review and a final held-share decision
+were not produced. Initial inline citation mismatches remain part of the review.
+
+The next request failed locally at 518,014 bytes against the 500,000-byte ceiling,
+after 45 model calls and 105 counted tools. No provider operation remained pending;
+known local usage is $15.756205, not a provider invoice. The next-call conservative
+reserve would have brought usage to $18.476515 within the $20 cap. Cancellation
+was requested and subsequently confirmed; original artifacts and history remain.
+
+Offline diagnosis found distinct source excerpts and accumulated calculation
+arguments, not a recurrence of framework human-message eviction. A small candidate
+extends lossless sharing across the full human context, including repeated strings.
+On the last saved admitted request it reduces 498,890 to 476,550 bytes with exact
+round-trip reconstruction and unchanged assistant/tool history. That is not proof
+the blocked request or complete remaining sequence fits. No new paid attempt or
+immutable-run migration is authorized by this measurement. Reusing the completed
+work requires an explicit provenance-bound continuation, not silently importing a
+checkpoint under a different identity. Trading remains paused and full research
+acceptance remains pending.
+
+The broader pooling candidate passed 1,839 offline tests (seven skipped, one
+deselected), targeted provider-wire and reconstruction regressions, Ruff and
+formatting. It is not deployed; production remains on the reviewed `32cde8c`
+image pending a complete continuation plan.
