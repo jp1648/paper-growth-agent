@@ -6609,3 +6609,16 @@ deselected); Ruff and formatting passed. This revision is not yet deployed or
 paid-run accepted. The current lineage charge remains $15.0000061 against $20;
 a proposed full-evidence request requires more than the remaining $4.9999939.
 No further paid call or order occurred.
+
+
+November 26, 08:40 UTC: revision `3635c71` deployed on image `0b5d35e3…`
+after both CI runs and exact release review passed. Both containers retain the
+ordinary configuration and original pause. Natural client exit and worker exit
+zero passed. The complete proposed corrected request measures 245,302 bytes and
+reserves $6.43375; a $7.50 one-call cap needs a combined/day ceiling of
+$22.5000061. User approval is pending; no further model call occurred.
+
+Fresh provider exports support a read-only cost reconciliation proposal, but no
+ancestor charge or reservation was changed. A fresh funding-receipt carry-forward
+can preserve only the existing $13.95885260 unspent allocation and $15 buffer;
+installation still requires exact fresh evidence and independent review.
