@@ -82,7 +82,7 @@ def check_continuation(cfg, store, root, context, *, consume=False):
         or not approval["approved_by"].strip()
         or not dt(approval["approved_at"]) <= now() < dt(approval["expires_at"])
         or not 0 < cfg.research_max_cost_usd <= dec(approval["max_cost_usd"])
-        or dec(bundle["receipt"]["settlement_usd"]) + dec(approval["max_cost_usd"])
+        or dec(bundle["spend"]["body"]["usd"]) + dec(approval["max_cost_usd"])
         > dec(approval["max_combined_cost_usd"])
     ):
         raise ValueError("Continuation lacks matching unexpired bounded authority")

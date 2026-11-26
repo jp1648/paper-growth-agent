@@ -442,3 +442,14 @@ terminal economics or investment acceptance. Calls omitting this optional input
 retain their original calculation identity and replay behavior; model-facing
 context explicitly labels their operating forecast unverified. Neither this
 feature nor a successful replay clears material-gap flags or authorizes trading.
+
+A research continuation may use a provider-reconciled parent cost only when its
+current spending projection matches an independently reviewed append-only
+`charge_reconciliation` record and the identical audit journal entry. The audit
+must retain `proof_json` containing the exact original proof-file bytes as UTF-8
+text, alongside the parsed `proof`; the review's proof hash must match those
+bytes. Older audits without this byte binding are not eligible for continuation.
+The original accounting receipt, model estimates, run manifest and operation
+journal remain unchanged. Child combined-cost authority uses the verified
+current accounted cost, while lineage retains both the historical estimate and
+accounted cost. Reconciliation alone grants no retry, trade or acceptance authority.

@@ -296,3 +296,125 @@ def test_rehashed_bundle_cannot_evade_semantic_checks(parent, mutation):
     child["continuation"]["bundle_sha256"] = fingerprint(bundle)
     with pytest.raises(ValueError):
         validate_bundle(bundle, child, fingerprint(bundle), experiment_id=store.scope, cfg=cfg)
+
+
+def reconciled_case(case):
+    import hashlib
+    import json
+
+    _cfg, store, _root, bundle, _child = case
+    before = copy.deepcopy(bundle["spend"]["body"])
+    at = now().isoformat()
+    proof = {
+        "run_key": "parent",
+        "spend_key": "spend",
+        "known_usd": "0.01",
+        "manifest_hash": bundle["parent"]["manifest_hash"],
+        "source_sha256": {
+            name: "a" * 64
+            for name in (
+                "original-ledger.json",
+                "accounting-close.json",
+                "verified-proof.json",
+                "provider-usage.csv",
+                "provider-cost.csv",
+                "local-provider-day-usage.json",
+                "independent-provider-proof-review.json",
+            )
+        },
+    }
+    review = {
+        "verdict": "approved_provider_export_reconciliation",
+        "reviewed_by": "independent",
+        "reviewed_at": at,
+        "retry_authorized": False,
+        "run_key": "parent",
+        "approved_projection_usd": "0.01",
+        "helper_sha256": "b" * 64,
+        "provider_review_sha256": "a" * 64,
+        "proof_sha256": hashlib.sha256((json.dumps(proof, indent=2) + "\n").encode()).hexdigest(),
+    }
+    after = {
+        **before,
+        "usd": "0.01",
+        "reconciliation_id": "audit-one",
+        "reconciled_at": at,
+        "cost_basis": "provider_export_reconciled",
+    }
+    audit = {
+        "id": "audit-one",
+        "run_key": "parent",
+        "before": before,
+        "after": after,
+        "proof": proof,
+        "review": review,
+        "retry_authorized": False,
+        "provider_bill_verified": True,
+        "proof_json": json.dumps(proof, indent=2) + "\n",
+    }
+    store.put("spend", after, "research_spend", scope="global")
+    store.put("audit-one", audit, "charge_reconciliation", scope="global")
+    store.log("provider_charge_reconciled", audit)
+    return audit
+
+
+def test_provider_reconciliation_preserves_original_estimate_and_journal(parent):
+    _, store, root, original, _ = parent
+    audit = reconciled_case(parent)
+    bundle = export_parent_bundle(root, original["parent"], store)
+    assert bundle["receipt"] == original["receipt"]
+    assert bundle["snapshot"] == original["snapshot"]
+    assert bundle["journal_tables_sha256"] == original["journal_tables_sha256"]
+    assert bundle["reconciliation"] == audit
+    assert bundle["spend"]["body"]["usd"] == "0.01"
+    validate_parent_state(store, root, bundle)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "missing_audit",
+        "missing_journal",
+        "lowered_projection",
+        "wrong_manifest",
+        "wrong_review_hash",
+        "missing_provider_hash",
+        "unknown",
+        "stale_after",
+        "wrong_before",
+        "missing_proof_bytes",
+        "changed_proof_bytes",
+    ],
+)
+def test_reconciled_parent_requires_exact_append_only_review(parent, change):
+    _, store, root, original, _ = parent
+    audit = reconciled_case(parent)
+    if change == "missing_audit":
+        store.db.execute("DELETE FROM documents WHERE kind='charge_reconciliation'")
+    elif change == "missing_journal":
+        store.db.execute("DELETE FROM journal WHERE kind='provider_charge_reconciled'")
+    elif change in ("lowered_projection", "unknown"):
+        spend = copy.deepcopy(audit["after"])
+        spend["usd" if change == "lowered_projection" else "unknown_total"] = (
+            "0" if change == "lowered_projection" else True
+        )
+        store.put("spend", spend, "research_spend", scope="global")
+    else:
+        if change == "wrong_manifest":
+            audit["proof"]["manifest_hash"] = "f" * 64
+        elif change == "wrong_review_hash":
+            audit["review"]["proof_sha256"] = "f" * 64
+        elif change == "missing_provider_hash":
+            del audit["proof"]["source_sha256"]["provider-cost.csv"]
+        elif change == "stale_after":
+            audit["after"]["reconciled_at"] = "2000-01-01T00:00:00+00:00"
+        elif change == "missing_proof_bytes":
+            del audit["proof_json"]
+        elif change == "changed_proof_bytes":
+            audit["proof_json"] += " "
+        elif change == "wrong_before":
+            audit["before"]["usd"] = "1"
+        store.put("audit-one", audit, "charge_reconciliation", scope="global")
+    store.db.commit()
+    with pytest.raises(ValueError):
+        export_parent_bundle(root, original["parent"], store)

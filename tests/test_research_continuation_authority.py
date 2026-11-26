@@ -20,7 +20,7 @@ def setup(tmp_path, monkeypatch, child="child-one"):
     store.put("active", {"id": "experiment"}, scope="global")
     store.experiment = store.get("active", scope="global")
     store.put("snapshot", {"account": {}, "positions": []})
-    bundle = {"receipt": {"settlement_usd": "1"}}
+    bundle = {"receipt": {"settlement_usd": "5"}, "spend": {"body": {"usd": "1"}}}
     root = tmp_path / "runs"
     directory = run_directory(root, child)
     directory.mkdir(parents=True, mode=0o700)

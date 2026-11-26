@@ -41,6 +41,97 @@ def _hash_bytes(value):
     return hashlib.sha256(value).hexdigest()
 
 
+def _reconciled_parent(store, reference, key, spend, receipt):
+    """Accept only the existing reviewed append-only provider projection schema."""
+    audit_id = spend.get("reconciliation_id")
+    if not audit_id:
+        _require(dec(spend["usd"]) == dec(receipt["settlement_usd"]), "Parent cost differs")
+        return None
+    audit = store.get(audit_id, "charge_reconciliation", scope="global")
+    _require(isinstance(audit, dict), "Parent reconciliation audit missing")
+    before, proof, review = audit.get("before", {}), audit.get("proof", {}), audit.get("review", {})
+    amount = dec(spend["usd"])
+    _require(amount.is_finite() and amount >= 0, "Invalid reconciled parent cost")
+    expected = {
+        **before,
+        "usd": spend["usd"],
+        "status": "settled",
+        "unknown_total": False,
+        "reconciliation_id": audit_id,
+        "reconciled_at": spend.get("reconciled_at"),
+        "cost_basis": "provider_export_reconciled",
+    }
+    _require(
+        audit.get("id") == audit_id
+        and audit.get("run_key") == reference["run_key"]
+        and audit.get("after") == spend == expected
+        and not before.get("reconciliation_id")
+        and before.get("run_key") == reference["run_key"]
+        and before.get("experiment_id") == store.scope
+        and before.get("status") == "settled"
+        and before.get("unknown_total") is False
+        and dec(before["usd"]) == dec(receipt["settlement_usd"])
+        and before.get("accounting_receipt_sha256") == fingerprint(receipt)
+        and audit.get("retry_authorized") is False
+        and audit.get("provider_bill_verified") is True,
+        "Parent reconciliation projection differs",
+    )
+    sources = proof.get("source_sha256", {})
+    required = {
+        "original-ledger.json",
+        "accounting-close.json",
+        "verified-proof.json",
+        "provider-usage.csv",
+        "provider-cost.csv",
+        "local-provider-day-usage.json",
+    }
+    review_sources = {
+        "independent-provider-proof-review.json",
+        "independent-provider-review.json",
+    } & sources.keys()
+    _require(len(review_sources) == 1, "Provider review evidence is ambiguous or missing")
+    provider_review_hash = sources[next(iter(review_sources))]
+    _require(
+        required <= sources.keys()
+        and all(
+            isinstance(name, str)
+            and "/" not in name
+            and isinstance(value, str)
+            and re.fullmatch("[0-9a-f]{64}", value)
+            for name, value in sources.items()
+        ),
+        "Provider proof evidence hashes missing",
+    )
+    _require(
+        proof.get("run_key") == reference["run_key"]
+        and proof.get("spend_key") == key
+        and proof.get("manifest_hash") == reference["manifest_hash"]
+        and dec(proof["known_usd"]) == amount
+        and review.get("verdict") == "approved_provider_export_reconciliation"
+        and isinstance(review.get("reviewed_by"), str)
+        and review["reviewed_by"].strip()
+        and review.get("run_key") == reference["run_key"]
+        and dec(review["approved_projection_usd"]) == amount
+        and review.get("retry_authorized") is False
+        and isinstance(audit.get("proof_json"), str)
+        and len(audit["proof_json"].encode()) <= 65536
+        and review.get("proof_sha256") == _hash_bytes(audit["proof_json"].encode())
+        and json.loads(audit["proof_json"]) == proof
+        and review.get("provider_review_sha256") == provider_review_hash
+        and isinstance(review.get("helper_sha256"), str)
+        and re.fullmatch("[0-9a-f]{64}", review["helper_sha256"])
+        and dt(review["reviewed_at"]) <= dt(spend["reconciled_at"]) <= now(),
+        "Parent provider reconciliation lacks exact review",
+    )
+    rows = store.db.execute(
+        "SELECT body FROM journal WHERE scope=? AND kind='provider_charge_reconciled'",
+        (store.scope,),
+    ).fetchall()
+    matches = [json.loads(row[0]) for row in rows if json.loads(row[0]).get("id") == audit_id]
+    _require(matches == [audit], "Parent reconciliation journal differs")
+    return copy.deepcopy(audit)
+
+
 def export_parent_bundle(root, reference, store):
     """Read a terminal parent's original binding, journal and authoritative accounting.
 
@@ -135,24 +226,24 @@ def export_parent_bundle(root, reference, store):
             and receipt.get("run_key") == reference["run_key"]
             and receipt.get("spend_key") == key
             and spend.get("accounting_receipt_sha256") == fingerprint(receipt)
-            and dec(spend["usd"]) == dec(receipt["settlement_usd"]) == dec(receipt["known_usd"])
-            and receipt.get("operation_key") is None
-            and not spend.get("reconciliation_id"),
-            "Parent accounting is not an unchanged known settlement",
+            and dec(receipt["settlement_usd"]) == dec(receipt["known_usd"])
+            and receipt.get("operation_key") is None,
+            "Parent accounting is not a known settlement",
         )
         _require(
             not store.get(reference["run_key"], "research_result"),
             "Completed parent result cannot be imported",
         )
+        reconciliation = _reconciled_parent(store, reference, key, spend, receipt)
         budget = snapshot["budget"]
-        _require(dec(budget["reserved"]) == dec(spend["usd"]), "Parent snapshot cost differs")
+        _require(dec(budget["reserved"]) == dec(receipt["known_usd"]), "Parent snapshot cost differs")
         costs = [v for k, v in budget["events"] if k == "model_cost"]
         _require(
             len(costs) == budget["models"] and all(v.get("estimated_usd") is not None for v in costs),
             "Parent usage incomplete",
         )
         _require(
-            sum((dec(v["estimated_usd"]) for v in costs), dec(0)) == dec(spend["usd"]),
+            sum((dec(v["estimated_usd"]) for v in costs), dec(0)) == dec(receipt["known_usd"]),
             "Parent usage total differs",
         )
         bundle = {
@@ -165,9 +256,19 @@ def export_parent_bundle(root, reference, store):
             "terminal": terminal,
             "journal_tables_sha256": tables,
         }
+        if reconciliation is not None:
+            bundle["reconciliation"] = reconciliation
         bundle["artifact_sha256"] = {
             k: fingerprint(bundle[k])
-            for k in ("manifest", "snapshot", "receipt", "spend", "terminal", "journal_tables_sha256")
+            for k in (
+                "manifest",
+                "snapshot",
+                "receipt",
+                "spend",
+                "terminal",
+                "journal_tables_sha256",
+                *(("reconciliation",) if "reconciliation" in bundle else ()),
+            )
         }
         return bundle
     finally:
@@ -196,7 +297,15 @@ def validate_bundle(
         bundle["artifact_sha256"]
         == {
             k: fingerprint(bundle[k])
-            for k in ("manifest", "snapshot", "receipt", "spend", "terminal", "journal_tables_sha256")
+            for k in (
+                "manifest",
+                "snapshot",
+                "receipt",
+                "spend",
+                "terminal",
+                "journal_tables_sha256",
+                *(("reconciliation",) if "reconciliation" in bundle else ()),
+            )
         },
         "Continuation artifact hash differs",
     )
@@ -341,6 +450,9 @@ def import_into_desk(desk, bundle):
                 "reference": copy.deepcopy(bundle["parent"]),
                 "bundle_sha256": fingerprint(bundle),
                 "estimated_usd": budget["reserved"],
+                "accounted_usd": bundle["spend"]["body"]["usd"],
+                "cost_basis": bundle["spend"]["body"].get("cost_basis", "local_estimate"),
+                "reconciliation_id": bundle["spend"]["body"].get("reconciliation_id"),
                 "model_calls": budget["models"],
                 "tool_calls": budget["tools"],
                 "reused_roles": list(REUSED),
