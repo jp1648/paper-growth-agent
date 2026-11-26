@@ -92,6 +92,15 @@ offline tests passed. A real result using this explicit forecast reconciliation
 and independent economic acceptance remain outstanding. Trading remains paused.
 Preserve original runs and history.
 
+The annual-path follow-up now discounts explicit yearly cash flows and a separately
+derived forward terminal year, with source-bound historical reconciliation and
+independent arithmetic replay. Offline Apple analysis removes exceptional tax-flow
+perpetuation and reconciles intangible replacement/growth spending. The complete
+source-cited tool payload exceeds 8,000 tokens, so configuration permits an explicit
+12,000-token supervised allowance while keeping the default unchanged. Offline
+checks pass; deployment and a new independently accepted durable result remain
+separate gates. Trading remains paused.
+
 ## Start here
 
 - [README](README.md): setup and command behavior.

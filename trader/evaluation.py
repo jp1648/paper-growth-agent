@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .financials import (
     annual_cash_flow,
+    annual_forecast_bridge,
     capital_expenditure_selection,
     normalization_supported,
     normalized_cash_flow,
@@ -85,10 +86,90 @@ def scenario_values(inputs):
         or not Decimal(".01") <= rate <= 1
         or type(years) is not int
         or not 1 <= years <= 10
-        or len(inputs["growth_rates"]) != 3
+        or len(inputs["growth_rates"]) != (0 if inputs.get("annual_operating_forecast") else 3)
         or len(inputs["terminal_multiples"]) != 3
     ):
         raise ValueError("Invalid calculation inputs")
+    path = inputs.get("annual_operating_forecast")
+    if path:
+        if inputs.get("operating_forecast") or [c["scenario"] for c in path["cases"]] != [
+            "bear",
+            "base",
+            "bull",
+        ]:
+            raise ValueError("Conflicting or unordered annual forecast")
+        shares = Decimal(inputs["normalization_bridge"]["valuation_shares"])
+        if not shares.is_finite() or shares <= 0:
+            raise ValueError("Invalid annual share denominator")
+        results = []
+        signs = {
+            "net_other_income": 1,
+            "tax_provision": -1,
+            "depreciation_amortization": 1,
+            "sbc_addback": 1,
+            "future_service_cash_compensation": -1,
+            "capital_expenditure": -1,
+            "finance_lease_principal": -1,
+            "net_borrowing": 1,
+            "noncommon_equity_cash_flows": 1,
+            "other_investing_cash_flow": 1,
+        }
+        for case, multiple in zip(path["cases"], inputs["terminal_multiples"], strict=True):
+            multiple = Decimal(multiple)
+            if not multiple.is_finite() or not 0 <= multiple <= 100:
+                raise ValueError("Invalid annual terminal multiple")
+            vectors = [
+                case["operating_expense"]["amounts_usd"],
+                *[r["amounts_usd"] for r in case["cash_rows"]],
+                *[r["amounts_usd"] for r in case["reconciliation_lines"]],
+                *[r["revenues_usd"] for r in case["segments"]],
+                *[r["gross_margins"] for r in case["segments"]],
+            ]
+            if any(
+                len(vector) != years + 1 or any(not Decimal(value).is_finite() for value in vector)
+                for vector in vectors
+            ):
+                raise ValueError("Invalid annual vectors")
+            amounts = []
+            for i in range(years + 1):
+                gross = sum(
+                    (
+                        Decimal(segment["revenues_usd"][i]) * Decimal(segment["gross_margins"][i])
+                        for segment in case["segments"]
+                    ),
+                    Decimal(0),
+                )
+                adjustments = sum(
+                    (Decimal(row["amounts_usd"][i]) * signs[row["category"]] for row in case["cash_rows"]),
+                    Decimal(0),
+                )
+                reconciliation = sum(
+                    (Decimal(row["amounts_usd"][i]) for row in case["reconciliation_lines"]), Decimal(0)
+                )
+                amounts.append(
+                    (
+                        gross
+                        - Decimal(case["operating_expense"]["amounts_usd"][i])
+                        + adjustments
+                        + reconciliation
+                    )
+                    / shares
+                )
+            value = (
+                sum((amount / (1 + rate) ** year for year, amount in enumerate(amounts[:-1], 1)), Decimal(0))
+                + amounts[-1] * multiple / (1 + rate) ** years
+            )
+            value += sum(
+                (
+                    Decimal(row["amount_usd"]) / shares / (1 + rate) ** row["year"]
+                    for row in inputs.get("finite_cash_adjustments", [])
+                ),
+                Decimal(0),
+            )
+            results.append(str(value.quantize(Decimal(".01"))))
+        if list(map(Decimal, results)) != sorted(map(Decimal, results)):
+            raise ValueError("Scenario values must be ordered bear/base/bull")
+        return results
     results = []
     for growth, multiple in zip(inputs["growth_rates"], inputs["terminal_multiples"], strict=True):
         growth, multiple = Decimal(growth), Decimal(multiple)
@@ -213,6 +294,27 @@ def score(case, candidate, review=None):
                     )
                     if not set(bridge["evidence_ids"]).issubset(valuation["evidence_ids"]):
                         failures.append("unverified_normalization_evidence")
+                annual_path = inputs.get("annual_operating_forecast")
+                if annual_path:
+                    if bridge is None or inputs["growth_rates"] or inputs.get("operating_forecast"):
+                        raise ValueError(
+                            "Annual path requires its own normalized share treatment and no compounded growth"
+                        )
+                    checked_path = annual_forecast_bridge(
+                        annual_path,
+                        period_end=inputs["financial_period_end"],
+                        years=inputs["years"],
+                        provenance=provenance,
+                        sources=verified_sources,
+                        cutoff=timestamp(case["cutoff"]),
+                        issuer_cik=originals[source_id]["content"].get("cik"),
+                        discount_rate=inputs["discount_rate"],
+                        terminal_multiples=inputs["terminal_multiples"],
+                    )
+                    if checked_path != calc.get("annual_operating_forecast") or not set(
+                        checked_path["evidence_ids"]
+                    ).issubset(valuation["evidence_ids"]):
+                        failures.append("unverified_annual_operating_forecast")
                 finite_rows = inputs.get("finite_cash_adjustments", [])
                 if finite_rows:
                     if bridge is None or len(finite_rows) > 20:

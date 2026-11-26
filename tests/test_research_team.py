@@ -3423,3 +3423,23 @@ def test_unlisted_accession_error_completes_durable_call_and_replays_without_dis
                     provider.documents.assert_called_once()
             finally:
                 checkpoint.close()
+
+
+def test_supervised_annual_path_output_allowance_remains_bounded_and_reserved():
+    from pydantic import ValidationError
+
+    assert Settings().research_max_output_tokens == 3000
+    cfg = Settings(
+        research_max_output_tokens=12000,
+        input_cost_per_million="5",
+        output_cost_per_million="10",
+        research_max_cost_usd="20",
+    )
+    reserve = (dec(10000 + 2048) * 5 + dec(12000) * 10) / dec(1000000)
+    budget = Budget(cfg, limit=reserve - dec(".000001"))
+    with pytest.raises(ResearchLimit, match="estimated cost"):
+        budget.model(10000, "valuation")
+    assert budget.models == 0
+    assert Budget(cfg, limit=reserve).model(10000, "valuation") == reserve
+    with pytest.raises(ValidationError):
+        Settings(research_max_output_tokens=12001)

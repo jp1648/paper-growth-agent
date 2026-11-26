@@ -36,6 +36,7 @@ from .alpaca import safe_error
 from .claims import ClaimEvidenceError, ClaimsCoverage, claim_gaps, validate_claim_coverage
 from .evidence import SEC_MAX_RESPONSE_BYTES, EvidenceTooLarge
 from .financials import (
+    AnnualOperatingForecast,
     CapitalExpenditureSource,
     CashFlowAdjustment,
     CompensationPolicy,
@@ -45,6 +46,7 @@ from .financials import (
     NormalizationBridge,
     OperatingForecastBridge,
     annual_cash_flow,
+    annual_forecast_bridge,
     capital_expenditure_selection,
     cash_flow_diagnostics,
     normalization_supported,
@@ -216,6 +218,7 @@ ROLES = {
             "Use inspect_cash_flow for annual accounting diagnostics when needed, or pass the proposed normalization_bridge directly to value_scenarios; omitted or null cash_flow_per_share derives the exact source/bridge scalar. An explicit scalar must still match. Missing inputs are gaps; derived arithmetic does not establish economic support. If calls run out, name the exact unfinished source reads and arithmetic for the single correction. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
             "Quantify material normalization alternatives with calculation tools as well as growth/multiple sensitivities. When supported alternatives share the same scenarios, batch up to three labeled normalization_alternatives with the main bridge: one full adjustment replacement, a paired tax/working-capital replacement, or a future-service compensation policy replacement. Each needs its own amount, rationale and original evidence; omit cash_flow_per_share for a batch. Vary one supported treatment at a time; do not combine overlapping tax and working-capital recoveries or capitalize a one-time debt maturity as a perpetual annual drain. Preserve the chosen main calculation_id and identify alternatives separately. "
+            "When public disclosure supports GAAP provision tax plus disclosed CFO adjustments rather than separate cash-tax/interest splits, use annual_operating_forecast with growth_rates=[]: enumerate the original historical reconciliation lines, chosen annual driver vectors and recurring terminal policy. Never invent a residual or backfit annual cash to legacy growth. Inspect actual path sensitivities and keep finite claims outside terminal cash. "
             "Explain sensitivity and expectations embedded in today's price. "
             "Use finite_cash_adjustments for sourced incremental cash payments/releases in specific forecast years; explain what is already in the baseline, taxes and timing uncertainty. These amounts never enter terminal cash; do not turn finite restructuring charges or debt maturities into perpetual deductions. Net minority equity movements or earnings alone do not establish cash distributions or terminal ownership. Award counts and plan grant reserves do not establish maximum PSU delivery; inspect applicable terms and dividend equivalents or preserve the gap. Do not invent missing entitlements or label an illustrative bound verified. If the "
             "cash-flow model is inappropriate or inputs are insufficient, return null for calculation_id "
@@ -1334,8 +1337,21 @@ class ResearchDesk:
             normalization_alternatives: list[NormalizationAlternative] | None = None,
             finite_cash_adjustments: list[FiniteCashAdjustment] | None = None,
             operating_forecast: OperatingForecastBridge | None = None,
+            annual_operating_forecast: AnnualOperatingForecast | None = None,
         ) -> dict:
-            """Decimal DCF: ordered bear/base/bull cases with fractions as rates. Omit cash_flow_per_share for source/bridge arithmetic. With a main bridge, optionally batch up to three sourced normalization replacements. Finite cash adjustments are signed incremental USD amounts in forecast years 1..years, shared across scenarios and alternatives, discounted once and excluded from terminal cash. Require a bridge; explain baseline overlap and timing/tax uncertainty. At most 20 entries. Each calculation retains standalone replay inputs. Optional operating_forecast checks three recurring horizon endpoints against growth: GAAP segment/opex costs include SBC and depreciation; cash taxes and interest are deducted once. It excludes finite adjustments and cannot accompany batched normalization alternatives. Without it forecasts remain unverified and conditional. Endpoint equality does not validate interim paths or economic assumptions. Conditional arithmetic never resolves unsupported claims."""
+            """Decimal DCF: ordered bear/base/bull cases with fractions as rates. Omit cash_flow_per_share for source/bridge arithmetic. With a main bridge, optionally batch up to three sourced normalization replacements. Finite cash adjustments are signed incremental USD amounts in forecast years 1..years, shared across scenarios and alternatives, discounted once and excluded from terminal cash. Require a bridge; explain baseline overlap and timing/tax uncertainty. At most 20 entries. Each calculation retains standalone replay inputs. Optional operating_forecast checks three recurring horizon endpoints against growth: GAAP segment/opex costs include SBC and depreciation; cash taxes and interest are deducted once. It excludes finite adjustments and cannot accompany batched normalization alternatives. Without it forecasts remain unverified and conditional. Endpoint equality does not validate interim paths or economic assumptions. Optional annual_operating_forecast consumes source-anchored GAAP annual driver vectors directly with growth_rates=[]; no separate cash-tax/interest split or residual. Final explicit forward-year driver vector supplies terminal cash at horizon discount with multiple=1/(return-terminal_growth), no extra growth factor; finite rows remain outside it. Cannot mix endpoint or batched bridges. Historical reconciliation and policies require independent review. Conditional arithmetic never resolves unsupported claims."""
+            if annual_operating_forecast is not None and (
+                normalization_bridge is None
+                or normalization_alternatives
+                or operating_forecast is not None
+                or growth_rates
+            ):
+                return {
+                    "available": False,
+                    "error": "annual_forecast_configuration",
+                    "note": "Annual path requires a normalized share bridge, growth_rates=[], no endpoint forecast or normalization batch. No calculation created.",
+                    "calculation_created": False,
+                }
             if operating_forecast is not None and (
                 normalization_bridge is None or normalization_alternatives
             ):
@@ -1424,19 +1440,34 @@ class ResearchDesk:
                     "required_cash_flow_per_share": required_cash,
                     "note": "No calculation created and no input substituted. Use the exact source-derived proxy or explicit bridge value in a new request; this arithmetic requirement does not establish economic normalization.",
                 }
-            cash_flow_per_share = required_cash if cash_flow_per_share is None else cash_flow_per_share
-            cash, discount = dec(cash_flow_per_share), dec(discount_rate)
-            growth, multiples = list(map(dec, growth_rates)), list(map(dec, terminal_multiples))
-            if (
-                not 1 <= years <= 10
-                or not 0 < cash <= 100000
-                or not dec(".01") <= discount <= 1
-                or len(growth) != 3
-                or len(multiples) != 3
-                or any(not dec("-.9") <= g <= 1 for g in growth)
-                or any(not 0 <= m <= 100 for m in multiples)
-            ):
-                raise ValueError("Invalid valuation assumptions")
+            try:
+                cash_flow_per_share = required_cash if cash_flow_per_share is None else cash_flow_per_share
+                cash, discount = dec(cash_flow_per_share), dec(discount_rate)
+                growth = (
+                    ["bear", "base", "bull"]
+                    if annual_operating_forecast is not None
+                    else list(map(dec, growth_rates))
+                )
+                multiples = list(map(dec, terminal_multiples))
+                if (
+                    not 1 <= years <= 10
+                    or not 0 < cash <= 100000
+                    or not dec(".01") <= discount <= 1
+                    or len(growth) != 3
+                    or len(multiples) != 3
+                    or (annual_operating_forecast is None and any(not dec("-.9") <= g <= 1 for g in growth))
+                    or any(not 0 <= m <= 100 for m in multiples)
+                ):
+                    raise ValueError("Invalid valuation assumptions")
+            except (ValueError, DecimalException) as exc:
+                if annual_operating_forecast is None:
+                    raise
+                return {
+                    "available": False,
+                    "error": "annual_forecast_invalid",
+                    "note": str(exc)[:600],
+                    "calculation_created": False,
+                }
 
             def scenario_values(scalar):
                 if not 0 < scalar <= 100000:
@@ -1453,6 +1484,11 @@ class ResearchDesk:
                             finite_cash_adjustments=finite_rows,
                             normalization_bridge=bridge_result["assumptions"],
                         )
+                    if annual_forecast_result is not None:
+                        inputs.update(
+                            annual_operating_forecast=annual_forecast_result["assumptions"],
+                            normalization_bridge=bridge_result["assumptions"],
+                        )
                     annual, terminal_unit = valuation_components(inputs, g)
                     total = annual + terminal_unit * multiple
                     computed.append(str(total.quantize(dec(".01"))))
@@ -1460,6 +1496,27 @@ class ResearchDesk:
                     raise ValueError("Scenarios must be ordered bear <= base <= bull")
                 return computed
 
+            annual_forecast_result = None
+            if annual_operating_forecast is not None:
+                try:
+                    annual_forecast_result = annual_forecast_bridge(
+                        annual_operating_forecast,
+                        period_end=financial_period_end,
+                        years=years,
+                        provenance=provenance,
+                        sources=financial_sources,
+                        cutoff=cutoff,
+                        issuer_cik=source["content"]["cik"],
+                        discount_rate=discount_rate,
+                        terminal_multiples=terminal_multiples,
+                    )
+                except (ValueError, DecimalException) as exc:
+                    return {
+                        "available": False,
+                        "error": "annual_forecast_invalid",
+                        "note": str(exc)[:600],
+                        "calculation_created": False,
+                    }
             forecast_result = None
             if operating_forecast is not None:
                 try:
@@ -1480,7 +1537,17 @@ class ResearchDesk:
                         "note": str(exc)[:600],
                         "calculation_created": False,
                     }
-            values = scenario_values(cash)
+            try:
+                values = scenario_values(cash)
+            except (ValueError, DecimalException) as exc:
+                if annual_operating_forecast is None:
+                    raise
+                return {
+                    "available": False,
+                    "error": "annual_forecast_invalid",
+                    "note": str(exc)[:600],
+                    "calculation_created": False,
+                }
             result = {
                 "financial_provenance": provenance,
                 "bear_value": values[0],
@@ -1503,6 +1570,9 @@ class ResearchDesk:
                 result["inputs"]["normalization_bridge"] = bridge_result["assumptions"]
             if finite_rows:
                 result["inputs"]["finite_cash_adjustments"] = finite_rows
+            if annual_forecast_result is not None:
+                result["annual_operating_forecast"] = annual_forecast_result
+                result["inputs"]["annual_operating_forecast"] = annual_forecast_result["assumptions"]
             if forecast_result is not None:
                 result["operating_forecast"] = forecast_result
                 result["inputs"]["operating_forecast"] = forecast_result["assumptions"]
@@ -1719,17 +1789,33 @@ class ResearchDesk:
             return result
 
         @tool
-        def inspect_valuation(calculation_id: str, target_price: str) -> dict:
-            """Compute sensitivity and implied terminal multiples from a saved validated calculation."""
+        def inspect_valuation(
+            calculation_id: str, target_price: str, discount_rates: list[str] | None = None
+        ) -> dict:
+            """Compute implied terminal multiples and, with one to five explicit discount_rates, a return/multiple grid holding the saved annual cash path fixed. No forecast is fitted to the price."""
             with self.lock:
                 calculation = copy.deepcopy(self.calculations.get(calculation_id))
             if calculation is None:
                 raise ValueError("Unknown valuation calculation")
-            return {
-                "calculation_id": calculation_id,
-                **valuation_diagnostics(calculation["inputs"], target_price),
-            }
+            try:
+                diagnostics = valuation_diagnostics(calculation["inputs"], target_price, discount_rates)
+            except (ValueError, DecimalException) as exc:
+                return {
+                    "available": False,
+                    "error": "valuation_diagnostics_invalid",
+                    "note": str(exc)[:600],
+                    "calculation_created": False,
+                }
+            return {"calculation_id": calculation_id, **diagnostics}
 
+        inspect_valuation.handle_validation_error = lambda _error: dumps(
+            {
+                "available": False,
+                "error": "valuation_diagnostics_invalid",
+                "note": "Use a saved calculation ID, scalar target_price and one to five scalar discount_rates. No calculation created.",
+                "calculation_created": False,
+            }
+        )
         research_data.handle_tool_error = True
         return ([research_data_catalog, research_data] if self.cfg.robinhood_enabled else []) + [
             company_evidence,
@@ -1817,6 +1903,9 @@ class ResearchDesk:
             ):
                 raise ValueError("Valuation must cite all normalization bridge evidence")
             forecast_refs = set((calculation or {}).get("operating_forecast", {}).get("evidence_ids", []))
+            forecast_refs.update(
+                (calculation or {}).get("annual_operating_forecast", {}).get("evidence_ids", [])
+            )
             if not forecast_refs.issubset(result["evidence_ids"]):
                 raise ValueError("Valuation must cite all operating forecast evidence")
             finite_refs = {
@@ -2331,6 +2420,19 @@ class ResearchDesk:
         """Project exact duplicates only; original calculations remain readable and audited."""
         calculations = copy.deepcopy(self.calculations)
         for identifier, calculation in calculations.items():
+            annual_forecast = calculation.get("annual_operating_forecast")
+            if annual_forecast:
+                calculation["annual_operating_forecast_context"] = {
+                    "status": annual_forecast["status"],
+                    "note": "Actual annual driver path; historical transcription, forward/terminal assumptions and claims still require independent review.",
+                }
+                if calculation.get("inputs", {}).get("annual_operating_forecast") == annual_forecast.get(
+                    "assumptions"
+                ):
+                    calculation["inputs"]["annual_operating_forecast"] = {
+                        "same_as": "annual_operating_forecast.assumptions",
+                        "note": f"Context projection only; read_source({identifier}) returns full replay inputs.",
+                    }
             forecast = calculation.get("operating_forecast")
             calculation["operating_forecast_context"] = {
                 "status": "conditional_endpoint_reconciled"

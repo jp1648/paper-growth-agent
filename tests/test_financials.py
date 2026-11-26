@@ -323,10 +323,11 @@ def test_valuation_inspection_requires_saved_calculation():
     assert result["rows"][0]["terminal_value_fraction"] == "0"
     assert desk.calculations == original
     for target in ["0", "-1", "NaN", "Infinity"]:
-        with pytest.raises(ValueError):
-            tools["inspect_valuation"].invoke(
-                {"calculation_id": calculation["calculation_id"], "target_price": target}
-            )
+        feedback = tools["inspect_valuation"].invoke(
+            {"calculation_id": calculation["calculation_id"], "target_price": target}
+        )
+        assert feedback["available"] is False and feedback["error"] == "valuation_diagnostics_invalid"
+        assert desk.calculations == original
 
 
 def test_accounting_diagnostics_keep_cash_tax_and_sbc_distinctions():

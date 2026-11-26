@@ -65,15 +65,27 @@ def validate_finite_cash_adjustments(rows, years, sources, cutoff, issuer_cik):
 
 def valuation_components(inputs, growth):
     cash, discount = dec(inputs["cash_flow_per_share"]), dec(inputs["discount_rate"])
-    g, years = dec(growth), inputs["years"]
-    annual = sum((cash * (1 + g) ** y / (1 + discount) ** y for y in range(1, years + 1)), dec(0))
+    years = inputs["years"]
+    path = inputs.get("annual_operating_forecast")
+    if path:
+        case = next(case for case in path["cases"] if case["scenario"] == growth)
+        shares = dec(inputs["normalization_bridge"]["valuation_shares"])
+        amounts = annual_cash_values(case)
+        annual = sum(
+            (amount / shares / (1 + discount) ** y for y, amount in enumerate(amounts[:-1], 1)), dec(0)
+        )
+        terminal_unit = amounts[-1] / shares / (1 + discount) ** years
+    else:
+        g = dec(growth)
+        annual = sum((cash * (1 + g) ** y / (1 + discount) ** y for y in range(1, years + 1)), dec(0))
+        terminal_unit = cash * (1 + g) ** years / (1 + discount) ** years
     rows = inputs.get("finite_cash_adjustments", [])
     if rows:
         shares = dec(inputs["normalization_bridge"]["valuation_shares"])
         annual += sum(
             (dec(row["amount_usd"]) / shares / (1 + discount) ** row["year"] for row in rows), dec(0)
         )
-    return annual, cash * (1 + g) ** years / (1 + discount) ** years
+    return annual, terminal_unit
 
 
 class CashFlowAdjustment(Model):
@@ -477,18 +489,27 @@ def normalization_supported(valuation):
     )
 
 
-def valuation_diagnostics(inputs, target_price):
+def valuation_diagnostics(inputs, target_price, discount_rates=None):
     """Sensitivity of already validated scenario inputs; no normalized-value claim."""
     target = dec(target_price)
     if target <= 0:
         raise ValueError("Target price must be positive")
     rows = []
-    for growth, multiple in zip(inputs["growth_rates"], inputs["terminal_multiples"], strict=True):
+    axes = (
+        [case["scenario"] for case in inputs["annual_operating_forecast"]["cases"]]
+        if inputs.get("annual_operating_forecast")
+        else inputs["growth_rates"]
+    )
+    for growth, multiple in zip(axes, inputs["terminal_multiples"], strict=True):
         annual, terminal_unit = valuation_components(inputs, growth)
         terminal = terminal_unit * dec(multiple)
         rows.append(
             {
-                "growth_rate": growth,
+                **(
+                    {"scenario": growth}
+                    if inputs.get("annual_operating_forecast")
+                    else {"growth_rate": growth}
+                ),
                 "annual_cash_flows_pv": str(annual),
                 "terminal_value_fraction": str(terminal / (annual + terminal)) if annual + terminal else None,
                 "required_terminal_multiple": str((target - annual) / terminal_unit),
@@ -498,7 +519,28 @@ def valuation_diagnostics(inputs, target_price):
                 },
             }
         )
+    grid = []
+    if discount_rates is not None:
+        if not 1 <= len(discount_rates) <= 5 or any(
+            not dec(".01") <= dec(rate) <= 1 for rate in discount_rates
+        ):
+            raise ValueError("Provide one to five discount sensitivity rates in [.01,1]")
+        for rate in discount_rates:
+            rate_inputs = {**inputs, "discount_rate": rate}
+            for axis in axes:
+                annual, terminal_unit = valuation_components(rate_inputs, axis)
+                grid.append(
+                    {
+                        "scenario": axis,
+                        "discount_rate": rate,
+                        "values_by_terminal_multiple": {
+                            multiple: str((annual + terminal_unit * dec(multiple)).quantize(dec(".01")))
+                            for multiple in inputs["terminal_multiples"]
+                        },
+                    }
+                )
     return {
+        **({"discount_rate_terminal_multiple_grid": grid} if discount_rates is not None else {}),
         "target_price": str(target),
         "rows": rows,
         "required_multiple_formula": "(target price - PV of annual cash flows) / discounted final-year cash flow",
@@ -674,5 +716,274 @@ def operating_forecast_bridge(raw, *, period_end, years, growth_rates, bridge, s
             "Finite cash adjustments are excluded from this recurring bridge and remain discounted once outside terminal cash.",
             "GAAP segment costs and operating expense include SBC and depreciation, added back once; future-service cash is deducted once. Legacy claims remain in the normalized share treatment.",
             "Working-capital cash excludes tax/interest already captured in separate cash rows. Capex and net borrowing exclude the separately deducted finance-lease principal. Legacy cash claims remain subject to independent normalization/claims review, not assumed zero. Interest is outside operating profit; only the cash-tax row deducts taxes. No generic other-income/noncash/residual category is supported; material omitted items must remain gaps.",
+        ],
+    }
+
+
+class AnnualForecastAmount(Model):
+    amounts_usd: list[str] = Field(min_length=1, max_length=11)
+    rationale: str = Field(min_length=1, max_length=240)
+    evidence_ids: list[str] = Field(min_length=1, max_length=4)
+
+
+class AnnualForecastSegment(Model):
+    name: str = Field(min_length=1, max_length=40)
+    revenues_usd: list[str] = Field(min_length=1, max_length=11)
+    gross_margins: list[str] = Field(min_length=1, max_length=11)
+    rationale: str = Field(min_length=1, max_length=240)
+    evidence_ids: list[str] = Field(min_length=1, max_length=4)
+
+
+class GAAPReconciliationLine(ForecastAmount):
+    caption: str = Field(min_length=1, max_length=100)
+    kind: Literal["disclosed_noncash_reconciliation", "disclosed_operating_asset_liability_change"]
+
+
+class AnnualReconciliationLine(AnnualForecastAmount):
+    caption: str = Field(min_length=1, max_length=100)
+    kind: Literal["disclosed_noncash_reconciliation", "disclosed_operating_asset_liability_change"]
+
+
+class GAAPHistoricalReconciliation(Model):
+    operating_profit: ForecastAmount
+    net_other_income: ForecastAmount
+    tax_provision: ForecastAmount
+    depreciation_amortization: ForecastAmount
+    sbc_addback: ForecastAmount
+    reconciliation_lines: list[GAAPReconciliationLine] = Field(min_length=1, max_length=20)
+
+
+class AnnualCashRow(AnnualForecastAmount):
+    category: Literal[
+        "net_other_income",
+        "tax_provision",
+        "depreciation_amortization",
+        "sbc_addback",
+        "future_service_cash_compensation",
+        "capital_expenditure",
+        "finance_lease_principal",
+        "net_borrowing",
+        "noncommon_equity_cash_flows",
+        "other_investing_cash_flow",
+    ]
+
+
+class AnnualOperatingCase(Model):
+    scenario: Literal["bear", "base", "bull"]
+    segments: list[AnnualForecastSegment] = Field(min_length=1, max_length=10)
+    operating_expense: AnnualForecastAmount
+    cash_rows: list[AnnualCashRow] = Field(min_length=10, max_length=10)
+    reconciliation_lines: list[AnnualReconciliationLine] = Field(min_length=1, max_length=20)
+    compensation_policy: Literal[
+        "retain_gaap_sbc_no_cash_replacement",
+        "gaap_sbc_added_back_then_future_service_cash_deducted_once",
+    ]
+    terminal_growth_rate: str = Field(max_length=64)
+    terminal_rationale: str = Field(min_length=1, max_length=400)
+    terminal_evidence_ids: list[str] = Field(min_length=1, max_length=4)
+
+
+class AnnualOperatingForecast(Model):
+    terminal_cash_convention: Literal["forward_year_cash_no_extra_growth"]
+    historical_period_end: str
+    historical_reconciliation: GAAPHistoricalReconciliation
+    cash_classification_policy: Literal[
+        "gaap_provision_tax_and_disclosed_cfo_reconciliation_no_second_cash_tax_or_interest_deduction"
+    ]
+    cases: list[AnnualOperatingCase] = Field(min_length=3, max_length=3)
+
+
+def annual_cash_values(case):
+    signs = {
+        "net_other_income": 1,
+        "tax_provision": -1,
+        "depreciation_amortization": 1,
+        "sbc_addback": 1,
+        "future_service_cash_compensation": -1,
+        "capital_expenditure": -1,
+        "finance_lease_principal": -1,
+        "net_borrowing": 1,
+        "noncommon_equity_cash_flows": 1,
+        "other_investing_cash_flow": 1,
+    }
+    rows = {row["category"]: row["amounts_usd"] for row in case["cash_rows"]}
+    return [
+        sum(
+            (
+                dec(segment["revenues_usd"][i]) * dec(segment["gross_margins"][i])
+                for segment in case["segments"]
+            ),
+            dec(0),
+        )
+        - dec(opex)
+        + sum((dec(rows[name][i]) * sign for name, sign in signs.items()), dec(0))
+        + sum((dec(row["amounts_usd"][i]) for row in case["reconciliation_lines"]), dec(0))
+        for i, opex in enumerate(case["operating_expense"]["amounts_usd"])
+    ]
+
+
+def annual_forecast_bridge(
+    raw, *, period_end, years, provenance, sources, cutoff, issuer_cik, discount_rate, terminal_multiples
+):
+    """Source-anchored GAAP-to-CFO arithmetic and chosen annual policies, never economic approval."""
+    data = AnnualOperatingForecast.model_validate(raw).model_dump(mode="json")
+    if len(dumps(data).encode()) > 48000:
+        raise ValueError("Annual operating forecast exceeds 48000 bytes; use shared concise policies")
+    if data["historical_period_end"] != period_end or not 1 <= years <= 10:
+        raise ValueError("Annual forecast must match the historical period and bounded horizon")
+    if [case["scenario"] for case in data["cases"]] != ["bear", "base", "bull"]:
+        raise ValueError("Require ordered distinct bear/base/bull annual forecasts")
+    refs = set()
+
+    def anchored(row):
+        validate_finite_cash_adjustments(
+            [
+                {
+                    "year": 1,
+                    "amount_usd": "0",
+                    "rationale": row["rationale"],
+                    "evidence_ids": row["evidence_ids"],
+                }
+            ],
+            1,
+            sources,
+            cutoff,
+            issuer_cik,
+        )
+        if not any(
+            sources[ref].get("published_at")
+            and dt(sources[ref]["published_at"]).date() >= date.fromisoformat(period_end)
+            for ref in row["evidence_ids"]
+        ):
+            raise ValueError("Annual forecast requires current-period original passage anchors")
+        refs.update(row["evidence_ids"])
+
+    history = data["historical_reconciliation"]
+    historical_values = {}
+    for name, row in history.items():
+        if name == "reconciliation_lines":
+            continue
+        anchored(row)
+        value = dec(row["amount_usd"])
+        if name in {"tax_provision", "depreciation_amortization", "sbc_addback"} and value < 0:
+            raise ValueError("Historical costs and noncash addbacks must be nonnegative")
+        historical_values[name] = value
+    identities = [(row["caption"].strip().casefold(), row["kind"]) for row in history["reconciliation_lines"]]
+    if any(not name for name, _ in identities) or len(set(identities)) != len(identities):
+        raise ValueError("Require distinct disclosed historical reconciliation captions")
+    for row in history["reconciliation_lines"]:
+        anchored(row)
+    historical_cfo = (
+        historical_values["operating_profit"]
+        + historical_values["net_other_income"]
+        - historical_values["tax_provision"]
+        + historical_values["depreciation_amortization"]
+        + historical_values["sbc_addback"]
+        + sum((dec(row["amount_usd"]) for row in history["reconciliation_lines"]), dec(0))
+    )
+    if historical_cfo != dec(provenance["facts"]["NetCashProvidedByUsedInOperatingActivities"]["val"]):
+        raise ValueError(
+            "Disclosed historical GAAP reconciliation does not equal original CFO; no residual substituted"
+        )
+    signs = {
+        "net_other_income": 1,
+        "tax_provision": -1,
+        "depreciation_amortization": 1,
+        "sbc_addback": 1,
+        "future_service_cash_compensation": -1,
+        "capital_expenditure": -1,
+        "finance_lease_principal": -1,
+        "net_borrowing": 1,
+        "noncommon_equity_cash_flows": 1,
+        "other_investing_cash_flow": 1,
+    }
+    results = []
+    for case, multiple in zip(data["cases"], terminal_multiples, strict=True):
+        names = [segment["name"].strip().casefold() for segment in case["segments"]]
+        if not all(names) or len(set(names)) != len(names):
+            raise ValueError("Annual operating segments must have distinct names")
+        gross = [dec(0)] * (years + 1)
+        operating_costs = [dec(0)] * (years + 1)
+        for segment in case["segments"]:
+            anchored(segment)
+            if len(segment["revenues_usd"]) != years + 1 or len(segment["gross_margins"]) != years + 1:
+                raise ValueError(
+                    "Every operating driver requires one amount per forecast year plus the explicit forward terminal year"
+                )
+            for i, (revenue, margin) in enumerate(
+                zip(segment["revenues_usd"], segment["gross_margins"], strict=True)
+            ):
+                revenue, margin = dec(revenue), dec(margin)
+                if revenue < 0 or not 0 <= margin <= 1:
+                    raise ValueError("Require nonnegative annual revenue and gross margin in [0,1]")
+                gross[i] += revenue * margin
+                operating_costs[i] += revenue * (1 - margin)
+        rows = case["cash_rows"]
+        if {row["category"] for row in rows} != set(signs):
+            raise ValueError("Require all annual GAAP cash categories exactly once")
+        if [
+            (row["caption"].strip().casefold(), row["kind"]) for row in case["reconciliation_lines"]
+        ] != identities:
+            raise ValueError(
+                "Annual reconciliation must retain each disclosed historical line in order; no residual category"
+            )
+        values = {}
+        for row in [case["operating_expense"], *rows, *case["reconciliation_lines"]]:
+            anchored(row)
+            if len(row["amounts_usd"]) != years + 1:
+                raise ValueError(
+                    "Every cash policy requires one amount per forecast year plus the explicit forward terminal year"
+                )
+            amounts = list(map(dec, row["amounts_usd"]))
+            category = row.get("category", "operating_expense" if row is case["operating_expense"] else None)
+            if category is not None:
+                if category not in {
+                    "net_other_income",
+                    "net_borrowing",
+                    "noncommon_equity_cash_flows",
+                    "other_investing_cash_flow",
+                } and any(value < 0 for value in amounts):
+                    raise ValueError("Annual costs and noncash addbacks must be nonnegative")
+                values[category] = amounts
+        anchored({"rationale": case["terminal_rationale"], "evidence_ids": case["terminal_evidence_ids"]})
+        terminal_growth, required_return = dec(case["terminal_growth_rate"]), dec(discount_rate)
+        if not dec("-.9") <= terminal_growth < required_return:
+            raise ValueError("Terminal growth must be below the required return and at least -.9")
+        expected_multiple = dec(1) / (required_return - terminal_growth)
+        if abs(dec(multiple) - expected_multiple) > dec(".00000001"):
+            raise ValueError(
+                "Forward terminal cash requires multiple=1/(return-growth), no extra growth factor; 8 decimal places suffice (absolute tolerance 1e-8)"
+            )
+        for i in range(years + 1):
+            sbc, compensation = values["sbc_addback"][i], values["future_service_cash_compensation"][i]
+            if case["compensation_policy"] == "retain_gaap_sbc_no_cash_replacement" and (sbc or compensation):
+                raise ValueError("Retained GAAP compensation forbids SBC addback or second cash replacement")
+            if (
+                sbc + values["depreciation_amortization"][i]
+                > operating_costs[i] + values["operating_expense"][i]
+            ):
+                raise ValueError("Annual SBC/depreciation addbacks exceed operating costs")
+        cash = list(map(str, annual_cash_values(case)))
+        if dec(cash[-1]) <= 0:
+            raise ValueError(
+                "Terminal recurring cash must be positive; retain unsupported valuation otherwise"
+            )
+        results.append(
+            {
+                "scenario": case["scenario"],
+                "annual_equity_cash_usd": cash[:-1],
+                "terminal_forward_cash_usd": cash[-1],
+            }
+        )
+    return {
+        "assumptions": data,
+        "historical_cfo_usd": str(historical_cfo),
+        "cases": results,
+        "evidence_ids": sorted(refs),
+        "status": "conditional_annual_path_reconciled",
+        "limitations": [
+            "Source transcription, disclosed-line completeness and chosen forecast/terminal policies require independent review; arithmetic is not economic acceptance.",
+            "Provision tax and original GAAP CFO reconciliation retain aggregated tax/interest timing. No undisclosed cash split, second cash-tax deduction or residual is substituted.",
+            "Normalization supplies dated shares and claim evidence only; its recurring cash adjustments are not added again to the annual operating path. Finite adjustments remain separately discounted once and excluded from terminal cash.",
         ],
     }

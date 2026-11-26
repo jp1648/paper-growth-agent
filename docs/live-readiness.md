@@ -6130,3 +6130,46 @@ real research result. Remaining acceptance requires a new, explicitly reconciled
 forecast and independent assessment of its economic assumptions, interim cash
 path and terminal treatment. Neither the offline supplement nor this deployment
 rewrites the original result or clears its material-gap flags.
+
+### November 25: offline annual GAAP cash-path calculator
+
+An optional `annual_operating_forecast` now models explicit operating-driver and
+GAAP reconciliation vectors rather than forcing an endpoint onto compounded cash
+growth. It requires `growth_rates=[]`, a dated normalized share/claim bridge,
+three ordered scenarios and original issuer passages. The historical operating
+profit, net other income, provision tax, D&A, actual SBC and individually named
+cash-reconciliation lines must reproduce original CFO. Forecast policies retain
+those disclosed line identities; aggregated tax-bearing movements are not recast
+as a tax-exclusive residual or an undisclosed cash-interest split. Source existence
+and equality do not certify transcription, completeness or economic assumptions.
+
+Each vector contains years 1 through N plus an explicit forward terminal year.
+Only years 1 through N are discounted as interim payments. The forward terminal
+cash is discounted at N and multiplied by `1/(required return - terminal growth)`;
+no additional growth factor or extra year of discount is applied. Eight decimal
+places suffice for the declared multiple (absolute tolerance `1e-8`). Terminal
+operating costs, PPE, leases, reconciliation and funding policies remain in that
+forward driver vector, with separate source-backed persistence rationale. Finite
+claims remain separately discounted once and excluded from the terminal stream.
+GAAP compensation retained as expense and SBC addback/cash-replacement policies
+are explicit alternatives; historical actual SBC is not silently replaced by a
+forward policy. Normalization deltas are not added again to the annual path.
+
+Saved calculations, inspection, canonical replay and independent evaluation
+arithmetic retain the actual path. Explicit discount-rate/multiple sensitivity
+holds that path fixed; it must not be labeled a fixed-terminal-growth grid unless
+multiples are recomputed for each return/growth pair. Expected invalid annual
+inputs, ordering and new inspection-rate errors return bounded feedback that
+can complete and replay a durable tool operation. Omitted annual inputs preserve
+legacy calculations. This is an offline code candidate: no paid run, deployment,
+funding change or investment-research acceptance is established by it. The actual
+frozen AAPL adapter still needs representation-size and independent economic review.
+
+The final annual-path adapter with exact citations measured 26,124 serialized
+bytes and 8,210 o200k argument tokens. That exceeds both a 5,000-token allowance
+and the previous 8,000 maximum before framing, reasoning or other response content.
+The user authorized a justified testing increase. Configuration now permits up to
+12,000 output tokens while retaining the 3,000 default. This is capacity for an
+explicit future supervised override only, not a runtime configuration change or
+new spending authority. Every call still reserves the entire configured output
+allowance at its role's rates against the unchanged actual run-cost ceiling.
