@@ -6391,8 +6391,9 @@ calls have saved results; known local estimated usage is $16.1576275. Independen
 review reproduces all 20 calculations but withholds acceptance: the corrected
 valuation repeated earlier work and omitted the requested asset/reinvestment,
 award, financing and held-share analyses. No final decision or order resulted.
-Cancellation was requested; accounting closure remains gated by confirmed
-cancellation and the original reservation expiry.
+Cancellation was confirmed and the original expired reservation was closed at
+05:04:38 UTC November 26 for $16.1576275 estimated usage. Ordinary configuration
+was restored in both containers, preserving pause, history and the original image.
 
 Exact saved provider requests identify the cause: Deep Agents evicted the large
 specialist Human message before Trader's lossless projection. Its filesystem
@@ -6407,3 +6408,35 @@ the provider request; oversized unpoolable input still fails before any dispatch
 Independent code review passed, along with 1,836 offline tests (seven skipped,
 one deselected), Ruff and formatting. This repair is not yet deployed.
 Trading remains paused; no full investment acceptance has been issued.
+
+
+The correction-delivery repair is now deployed as `32cde8c`, image `4511f79c…`.
+Both CI runs passed. Independent release and operational review verified exact
+source hashes, successful worker shutdown and service restart, preserved pause,
+ordinary limits, original journal prefix and protected portfolio records. Only
+expected operational timestamps and reconciliation/stream-connection events
+changed. This establishes deployment correctness, not investment acceptance.
+
+
+Authenticated provider exports subsequently supported run6's $5.23393885
+as-of-export cost. Independent token/category/tier and dollar checks covered all
+38 calls; the reviewed append-only reconciliation replaced its $11.2525125
+estimate while preserving the original receipt and run journal. Run7's export
+still omitted 13 known calls, so its $16.1576275 estimate remains unchanged.
+Fresh authenticated available credit was $123 at 05:09:31 UTC November 26.
+An independently reviewed funding update preserves the original allocation ID
+and baseline, allocating $105.26342 cumulatively: $85.26342 consumed and $20
+remaining. The $15 buffer and a conservative lag reserve covering all consumed
+allocation are retained. Ordinary daily and per-run limits remain $20. No new
+research was started by the accounting or funding update.
+
+
+Fresh `held-aapl-full-context-20261126-1` started once at
+2026-11-26T05:17:22.120397Z; manifest
+`362c741b4b72f16f76fa4448ca1468da8bca053d1fd57fafcf01a99c9f03bab9`.
+Its $20/day and $20/run limits are unchanged. Reviewed supervised allowances
+are 80 model calls, 128 tools, 500,000 input bytes and 1,200 seconds, with 12,000
+valuation output tokens and 5,000 for other roles. Original reports were not
+imported, and no previous run was resumed. Trading stays paused. Research and
+independent acceptance remain pending; the first observation confirms acquisition
+complete and business analysis running.

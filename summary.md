@@ -156,3 +156,16 @@ calls at $16.1576275 estimated usage; independent review still requires changes.
 Saved wire requests prove framework file truncation hid the correction reason
 and historical reference price from the model. The narrow eviction repair passed independent review and 1,836 offline tests;
 it is not yet deployed. Trading remains paused; full acceptance is pending.
+
+Run7 is now canceled and accounted at $16.1576275 estimated usage; ordinary
+configuration is restored in both containers. Correction-delivery repair
+`32cde8c` passed both CI checks and built image `4511f79c…`; deployment remains
+pending a fresh reviewed release. No further paid attempt has started.
+
+The `32cde8c` / `4511f79c…` correction-delivery repair is now deployed and
+independently verified in both containers; pause and portfolio are unchanged.
+Full investment acceptance still awaits a fresh, complete reviewed result.
+
+Fresh research `held-aapl-full-context-20261126-1` started once at 05:17:22 UTC
+November 26 after reviewed deployment, accounting and funding. It is capped at
+$20 with 80 model calls; trading remains paused. Research acceptance is pending.
