@@ -115,3 +115,11 @@ full investment acceptance remains unproved. Trading remains paused.
 - [Evaluation](docs/evaluation.md): isolated research benchmarks.
 - [Observability](docs/observability.md) and [Google Cloud](docs/google-cloud.md): infrastructure.
 - [Agent instructions](AGENTS.md): development and operational boundaries.
+
+The correction-feedback fix is now deployed (`35008be`, image `ebfb6fe9…`),
+with 1,788 offline tests and CI passing. A subsequent fresh run produced the
+correct annual valuation and verified source mappings, but its valuation request
+exceeded the 320 KB context cap by 752 bytes. It remains incomplete and canceled;
+$4.600570 estimated usage awaits audited closure after its original expiry.
+Lossless policy pooling and a justified larger supervised context/tool allowance
+are under validation. Trading remains paused; full research acceptance is pending.

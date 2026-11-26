@@ -254,6 +254,69 @@ CORRECTION_TOOLS = {"business": 2, "catalysts": 2, "valuation": 6, "adversarial"
 CORRECTION_RESERVE = 1 + 3 + 2 + 6 + 2
 
 
+def compact_hypothesis(hypothesis):
+    """Losslessly share repeated policy metadata in model context, never in executable inputs."""
+    if (
+        not isinstance(hypothesis, dict)
+        or not isinstance(hypothesis.get("candidate_arguments"), dict)
+        or "policy_catalog" in hypothesis
+        or "projection_note" in hypothesis
+    ):
+        return hypothesis
+    counts = {}
+    collision = False
+
+    def count(value):
+        nonlocal collision
+        if isinstance(value, dict):
+            collision = collision or "policy_ref" in value
+            if "rationale" in value and "evidence_ids" in value:
+                key = dumps({"rationale": value["rationale"], "evidence_ids": value["evidence_ids"]})
+                counts[key] = counts.get(key, 0) + 1
+            for item in value.values():
+                count(item)
+        elif isinstance(value, list):
+            for item in value:
+                count(item)
+
+    count(hypothesis["candidate_arguments"])
+    keys = {
+        key: "p" + str(i)
+        for i, key in enumerate(sorted(key for key, count in counts.items() if count > 1), 1)
+    }
+    if not keys or collision:
+        return hypothesis
+
+    def project(value):
+        if isinstance(value, dict):
+            key = (
+                dumps({"rationale": value["rationale"], "evidence_ids": value["evidence_ids"]})
+                if "rationale" in value and "evidence_ids" in value
+                else None
+            )
+            if key in keys and "policy_ref" not in value:
+                return {
+                    **{
+                        name: project(item)
+                        for name, item in value.items()
+                        if name not in {"rationale", "evidence_ids"}
+                    },
+                    "policy_ref": keys[key],
+                }
+            return {name: project(item) for name, item in value.items()}
+        if isinstance(value, list):
+            return [project(item) for item in value]
+        return value
+
+    result = {
+        **copy.deepcopy(hypothesis),
+        "candidate_arguments": project(hypothesis["candidate_arguments"]),
+        "policy_catalog": {ref: json.loads(key) for key, ref in keys.items()},
+        "projection_note": "Each policy_ref resolves the exact original rationale/evidence_ids in policy_catalog; every amount/margin vector remains intact. Aliases are not citations. This lossless model projection is NOT executable tool arguments: evaluate_supplied_forecast uses the unchanged frozen original; read_source supplies canonical calculation inputs for variants. Hypotheses remain unverified.",
+    }
+    return result if len(dumps(result).encode()) < len(dumps(hypothesis).encode()) else hypothesis
+
+
 def role_output_tokens(cfg, role):
     """Keep large annual tool arguments in valuation without reserving them for every role."""
     return min(cfg.research_max_output_tokens, 12000 if role == "valuation" else 5000)
@@ -465,6 +528,17 @@ class Guard(AgentMiddleware):
         last_assistant = max((i for i, m in enumerate(messages) if isinstance(m, AIMessage)), default=-1)
         result = []
         for i, message in enumerate(messages):
+            if isinstance(message, HumanMessage) and isinstance(message.content, str):
+                try:
+                    context = json.loads(message.content)
+                except ValueError:
+                    context = None
+                if isinstance(context, dict) and "analytical_hypothesis" in context:
+                    hypothesis = compact_hypothesis(context["analytical_hypothesis"])
+                    if hypothesis is not context["analytical_hypothesis"]:
+                        message = message.model_copy(
+                            update={"content": dumps({**context, "analytical_hypothesis": hypothesis})}
+                        )
             if (
                 i < last_assistant
                 and isinstance(message, ToolMessage)
@@ -580,7 +654,7 @@ class Guard(AgentMiddleware):
         ]
         if self.final_context and set(self.reports) == set(ROLES):
             # Completed reports replace orchestration history only in the provider request.
-            messages = [HumanMessage(content=dumps(self.final_context()))]
+            messages = self.bounded_messages([HumanMessage(content=dumps(self.final_context()))])
             if len(request.messages) > 1 and isinstance(request.messages[-1], HumanMessage):
                 messages.extend(request.messages[-2:])
             elif request.messages and isinstance(request.messages[-1], ToolMessage):

@@ -6227,3 +6227,35 @@ This verifies mechanics, not the economic assumptions or investment acceptance.
 Full offline validation passed: 1,788 tests, seven skipped and one deselected.
 Independent focused review passed 51 tests; lint, formatting and diff checks
 passed. New production use still requires deployment and a fresh bounded run.
+
+
+### November 25: actual annual calculation, context admission failure
+
+The correction-feedback release `35008be` passed CI and deployed as image
+`ebfb6fe9…`. Protected state and pause were preserved, with worker stop exit zero.
+Fresh run `held-aapl-annual-20261125-4` completed business and catalyst reports
+and produced a real annual-path calculation, `calculation-1803a3d81f258677998f`.
+Independent review reproduced $90.15/$142.77/$200.90 and verified all eight
+original passage URL/hash/length matches. This was not a legacy scalar fallback.
+
+Valuation then hit the 320,000-byte context ceiling at 320,752 bytes, before its
+next model dispatch. Recorded usage is $4.600570 from 22 completed model calls,
+with no pending provider operation. Valuation commentary, critique and final
+decision were not completed. The workflow is confirmed canceled; the original
+reservation remains protected until its accounting expiry. No acceptance or
+order resulted.
+
+Offline reconstruction reproduced the failed request exactly. Repeated policy
+metadata can be pooled without losing vectors, rationale or citations, reducing
+it to 313,379 bytes. That alone leaves too little room for a substantive annual
+sensitivity roundtrip. Independent review supports a temporary 500,000-byte and
+128-tool supervised allowance, retaining the $20 cost, 60-model-call and
+1,200-second limits. Ordinary production limits remain unchanged. Proposed
+sensitivity recipes contain no imported outputs or approval and require actual
+source-checked computation. A fresh run remains subject to accounting closure,
+reviewed implementation/deployment, verified funding and new stable identity.
+
+The lossless projection patch passed independent review and 1,791 offline tests
+(seven skipped, one deselected), plus lint, format and diff checks. It applies
+to specialist prompts and reconstructed lead context, preserving paired tool
+feedback and all original canonical inputs.
