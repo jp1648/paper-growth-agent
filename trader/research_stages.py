@@ -209,20 +209,20 @@ class ResearchStages:
 
         synthesis = self.context.get("continuation", {}).get("mode") == "reviewed_synthesis"
         saved = journal.load_state()
+        evidence = copy.deepcopy(bundle["snapshot"]["desk"]["companies"][self.context["symbol"]])
+        desk = self.desk_factory(
+            self.cfg,
+            provider,
+            self.context,
+            evidence,
+            Budget(self.cfg, reservation.allowance),
+            self.models,
+            defer_correction=True,
+        )
         if saved is None:
-            evidence = copy.deepcopy(bundle["snapshot"]["desk"]["companies"][self.context["symbol"]])
-            desk = self.desk_factory(
-                self.cfg,
-                provider,
-                self.context,
-                evidence,
-                Budget(self.cfg, reservation.allowance),
-                self.models,
-                defer_correction=True,
-            )
             journal.save_state(import_into_desk(desk, bundle))
         elif (
-            saved.get("context") != self.context
+            saved.get("context") != desk.context
             or saved.get("budget", {}).get("models") != 0
             or saved.get("budget", {}).get("tools") != 0
             or set(saved.get("desk", {}).get("reports", {}))

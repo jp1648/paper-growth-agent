@@ -262,3 +262,50 @@ def test_real_synthesis_stage_only_calls_lead_and_keeps_original_reports(synthes
         == bundle["snapshot"]["desk"]["reports"]
     )
     validate_parent_state(store, root, bundle)
+
+
+def test_import_retry_uses_desk_projection_and_preserves_raw_manifest(synthesis, tmp_path):
+    """Crash after journal checkpoint, before receipt: retry is local and idempotent."""
+    from types import SimpleNamespace
+
+    _store, _root, original_engine, bundle, context = synthesis
+    context = copy.deepcopy(context)
+    context["portfolio"]["prior_thesis"] = {
+        "decision": {"action": "HOLD"},
+        "research_sources": [{"id": "historical", "text": "Original retained evidence"}],
+        "team_reports": {"business": {"summary": "Historical report"}},
+        "execution": {"status": "filled", "decision": {"quantity": "1"}, "evidence": ["old"]},
+    }
+    raw = copy.deepcopy(context)
+    binding = {
+        **original_engine.binding,
+        "run_key": context["run_key"],
+        "context_sha256": fingerprint(context),
+    }
+    engine = ResearchStages(
+        original_engine.cfg,
+        original_engine.cfg.database,
+        lambda _: Evidence(),
+        context,
+        None,
+        tmp_path,
+        binding,
+    )
+    journal = Journal(tmp_path / "operations.sqlite", binding)
+    reservation = SimpleNamespace(allowance=original_engine.cfg.research_max_cost_usd)
+    with journal.lease():
+        first = engine._import_parent(journal, reservation, Evidence(), bundle)
+        saved = journal.load_state()
+        assert saved["context"] != raw
+        assert "research_sources" not in saved["context"]["portfolio"]["prior_thesis"]
+        assert "decision" not in saved["context"]["portfolio"]["prior_thesis"]["execution"]
+        before = (tmp_path / "operations.sqlite").read_bytes()
+        assert engine._import_parent(journal, reservation, Evidence(), bundle) == first
+        assert journal.load_state() == saved
+        assert (tmp_path / "operations.sqlite").read_bytes() == before
+        assert engine.context == raw and binding["context_sha256"] == fingerprint(raw)
+        assert saved["budget"]["models"] == saved["budget"]["tools"] == 0
+        saved["context"]["portfolio"]["prior_thesis"]["decision"]["action"] = "BUY"
+        journal.save_state(saved)
+        with pytest.raises(StageConfigurationError, match="checkpoint conflicts"):
+            engine._import_parent(journal, reservation, Evidence(), bundle)
