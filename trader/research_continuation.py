@@ -138,7 +138,7 @@ def export_parent_bundle(root, reference, store):
     return _export_parent_bundle(root, reference, store, allow_continuation=False)
 
 
-def _export_parent_bundle(root, reference, store, *, allow_continuation):
+def _export_parent_bundle(root, reference, store, *, allow_continuation, allow_completed=False):
     """Read a terminal parent's original binding, journal and authoritative accounting.
 
     No comparison against the child's new runtime/config fingerprint is appropriate.
@@ -194,10 +194,10 @@ def _export_parent_bundle(root, reference, store, *, allow_continuation):
             )
             raw = db.execute("SELECT type,payload FROM snapshot WHERE id=1").fetchone()
             receipt_row = db.execute("SELECT receipt FROM accounting_close WHERE id=1").fetchone()
-            _require(raw and receipt_row, "Parent snapshot/accounting receipt missing")
+            _require(raw and (receipt_row or allow_completed), "Parent snapshot/accounting receipt missing")
             serde = JsonPlusSerializer(pickle_fallback=False)
             snapshot = _json(serde.loads_typed(tuple(raw)))
-            receipt = json.loads(receipt_row[0])
+            receipt = json.loads(receipt_row[0]) if receipt_row else None
             tables = {}
             for (table,) in db.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -209,10 +209,11 @@ def _export_parent_bundle(root, reference, store, *, allow_continuation):
                 ]
                 tables[table] = fingerprint(normalized)
         terminal = store.get(reference["run_key"], "research_workflow_terminal")
-        _require(
-            terminal == {"reference": reference, "status": "canceled"},
-            "Parent is not authoritatively canceled",
-        )
+        if not allow_completed:
+            _require(
+                terminal == {"reference": reference, "status": "canceled"},
+                "Parent is not authoritatively canceled",
+            )
         for kind in ("research_workflow", "research_workflow_submission"):
             _require(store.get(reference["run_key"], kind) == reference, "Parent submission identity differs")
         records = store.db.execute(
@@ -222,25 +223,36 @@ def _export_parent_bundle(root, reference, store, *, allow_continuation):
         _require(len(records) == 1, "Parent spending is not unique")
         key, body = records[0]
         spend = json.loads(body)
-        _require(
-            spend.get("status") == receipt.get("status") == "settled"
-            and spend.get("unknown_total") is False
-            and receipt.get("unknown_total") is False
-            and spend.get("outcome") == receipt.get("outcome") == "aborted_accounted"
-            and spend.get("config_sha256") == binding["config_sha256"]
-            and receipt.get("manifest_hash") == reference["manifest_hash"]
-            and receipt.get("run_key") == reference["run_key"]
-            and receipt.get("spend_key") == key
-            and spend.get("accounting_receipt_sha256") == fingerprint(receipt)
-            and dec(receipt["settlement_usd"]) == dec(receipt["known_usd"])
-            and receipt.get("operation_key") is None,
-            "Parent accounting is not a known settlement",
-        )
-        _require(
-            not store.get(reference["run_key"], "research_result"),
-            "Completed parent result cannot be imported",
-        )
-        reconciliation = _reconciled_parent(store, reference, key, spend, receipt)
+        completion = None
+        if allow_completed:
+            from .research_synthesis_revision import completed_accounting
+
+            _require(receipt is None, "Completed parent has abort-accounting receipt")
+            receipt, completion = completed_accounting(
+                store, reference, manifest, snapshot, key, spend, terminal
+            )
+            terminal = {"reference": reference, "status": "complete", "proof": "bound_commit_receipt"}
+            reconciliation = None
+        else:
+            _require(
+                spend.get("status") == receipt.get("status") == "settled"
+                and spend.get("unknown_total") is False
+                and receipt.get("unknown_total") is False
+                and spend.get("outcome") == receipt.get("outcome") == "aborted_accounted"
+                and spend.get("config_sha256") == binding["config_sha256"]
+                and receipt.get("manifest_hash") == reference["manifest_hash"]
+                and receipt.get("run_key") == reference["run_key"]
+                and receipt.get("spend_key") == key
+                and spend.get("accounting_receipt_sha256") == fingerprint(receipt)
+                and dec(receipt["settlement_usd"]) == dec(receipt["known_usd"])
+                and receipt.get("operation_key") is None,
+                "Parent accounting is not a known settlement",
+            )
+            _require(
+                not store.get(reference["run_key"], "research_result"),
+                "Completed parent result cannot be imported",
+            )
+            reconciliation = _reconciled_parent(store, reference, key, spend, receipt)
         budget = snapshot["budget"]
         _require(dec(budget["reserved"]) == dec(receipt["known_usd"]), "Parent snapshot cost differs")
         costs = [v for k, v in budget["events"] if k == "model_cost"]
@@ -264,6 +276,8 @@ def _export_parent_bundle(root, reference, store, *, allow_continuation):
         }
         if reconciliation is not None:
             bundle["reconciliation"] = reconciliation
+        if completion is not None:
+            bundle["completion"] = completion
         bundle["artifact_sha256"] = {
             k: fingerprint(bundle[k])
             for k in (
@@ -274,6 +288,8 @@ def _export_parent_bundle(root, reference, store, *, allow_continuation):
                 "terminal",
                 "journal_tables_sha256",
                 *(("reconciliation",) if "reconciliation" in bundle else ()),
+                *(("completion",) if "completion" in bundle else ()),
+                *(("revision",) if "revision" in bundle else ()),
                 *(
                     (
                         "ancestor_bundle",
@@ -294,6 +310,12 @@ def _export_parent_bundle(root, reference, store, *, allow_continuation):
 
 def validate_parent_state(store, root, bundle):
     """Revalidate authoritative originals, including every journal table, without mutation."""
+    if "revision" in bundle:
+        from .research_synthesis_revision import export_revision_bundle
+
+        actual = export_revision_bundle(root, bundle["parent"], store, bundle["revision"])
+        _require(fingerprint(actual) == fingerprint(bundle), "Parent artifacts changed")
+        return
     _require(
         fingerprint(
             export_synthesis_bundle(
@@ -330,6 +352,8 @@ def validate_bundle(
                 "terminal",
                 "journal_tables_sha256",
                 *(("reconciliation",) if "reconciliation" in bundle else ()),
+                *(("completion",) if "completion" in bundle else ()),
+                *(("revision",) if "revision" in bundle else ()),
                 *(
                     (
                         "ancestor_bundle",
@@ -356,6 +380,7 @@ def validate_bundle(
             "parent": bundle["parent"],
             "bundle_sha256": expected_sha256,
             **({"mode": "reviewed_synthesis"} if synthesis else {}),
+            **({"revision_of": bundle["parent"]} if "revision" in bundle else {}),
         },
         "Continuation descriptor differs",
     )
@@ -439,6 +464,13 @@ def validate_bundle(
                 _require(dt(source[field]) <= dt(bundle["receipt"]["closed_at"]), "Future inherited source")
     if synthesis:
         _validate_synthesis_artifacts(bundle, current)
+        if "revision" in bundle:
+            from .research_synthesis_revision import lineage
+
+            _require(
+                child_context["run_key"] not in {node["parent"]["run_key"] for node in lineage(bundle)},
+                "Revision child repeats ancestor identity",
+            )
     for role in ALL_REPORTS if synthesis else REUSED:
         _require(role in data["reports"] and role in data["report_times"], "Reusable prerequisite missing")
         _require(
@@ -519,6 +551,12 @@ def import_into_desk(desk, bundle):
                 "review": copy.deepcopy(bundle["independent_review"]),
                 "status": "original_reports_unaccepted_reviewed_addendum_separate",
             }
+            if "revision" in bundle:
+                desk.continuation["reviewed_synthesis"]["revision"] = {
+                    **copy.deepcopy(bundle["revision"]),
+                    "previous_decision": copy.deepcopy(bundle["completion"]["result"]["decision"]),
+                    "status": "previous_completed_decision_unaccepted",
+                }
             desk.continuation["parent_lineage"]["ancestor"] = {
                 "reference": copy.deepcopy(bundle["ancestor_bundle"]["parent"]),
                 "bundle_sha256": fingerprint(bundle["ancestor_bundle"]),
@@ -542,11 +580,16 @@ def accounted_ancestry_cost(bundle):
     """Call only after complete bundle and authoritative parent validation."""
     cost = dec(bundle["spend"]["body"]["usd"])
     if bundle.get("schema") == SYNTHESIS_SCHEMA:
-        cost += dec(bundle["ancestor_bundle"]["spend"]["body"]["usd"])
+        cost += accounted_ancestry_cost(bundle["ancestor_bundle"])
     return cost
 
 
 def _validate_synthesis_artifacts(bundle, current):
+    if "revision" in bundle:
+        from .research_synthesis_revision import validate_revision_artifacts
+
+        validate_revision_artifacts(bundle, current)
+        return
     ancestor = bundle["ancestor_bundle"]
     descriptor = bundle["manifest"]["context"].get("continuation")
     _require(
@@ -632,6 +675,23 @@ def export_synthesis_bundle(root, reference, store, addendum, review):
     _require(fingerprint(ancestor) == descriptor["bundle_sha256"], "Original ancestor changed")
     frozen = json.loads(_read(run_directory(root, reference["run_key"]) / "continuation.json"))
     _require(frozen == ancestor, "Original imported ancestor differs")
+    authorization, claim = _verify_ancestor_claim(store, reference, bundle, ancestor)
+    bundle.update(
+        schema=SYNTHESIS_SCHEMA,
+        ancestor_bundle=ancestor,
+        ancestor_claim=claim,
+        ancestor_authorization=authorization,
+        analytical_addendum=copy.deepcopy(addendum),
+        independent_review=copy.deepcopy(review),
+    )
+    _validate_synthesis_artifacts(bundle, now())
+    bundle["artifact_sha256"] = {
+        k: fingerprint(v) for k, v in bundle.items() if k not in {"schema", "parent", "artifact_sha256"}
+    }
+    return bundle
+
+
+def _verify_ancestor_claim(store, reference, bundle, ancestor):
     authorization = store.get(reference["run_key"], "research_continuation_authorization")
     claim = store.get(ancestor["parent"]["run_key"], "research_continuation_consumed")
     expected_claim = {
@@ -669,16 +729,4 @@ def export_synthesis_bundle(root, reference, store, addendum, review):
         if json.loads(row[0]).get("claim", {}).get("parent") == ancestor["parent"]
     ]
     _require(matches == [claim], "Ancestor consumed claim journal differs")
-    bundle.update(
-        schema=SYNTHESIS_SCHEMA,
-        ancestor_bundle=ancestor,
-        ancestor_claim=claim,
-        ancestor_authorization=authorization,
-        analytical_addendum=copy.deepcopy(addendum),
-        independent_review=copy.deepcopy(review),
-    )
-    _validate_synthesis_artifacts(bundle, now())
-    bundle["artifact_sha256"] = {
-        k: fingerprint(v) for k, v in bundle.items() if k not in {"schema", "parent", "artifact_sha256"}
-    }
-    return bundle
+    return authorization, claim

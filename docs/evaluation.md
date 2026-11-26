@@ -478,3 +478,22 @@ establish retention merit. The prompt does not force SELL or authorize invented
 thresholds. Offline request tests verify delivery of this instruction and preserve
 both HOLD and SELL outputs; independent economic review still determines whether
 the actual reasoning is adequate. Current execution quotes remain a separate gate.
+
+A reviewed-synthesis revision may instead reference a completed reviewed-synthesis
+parent through an explicit `revision_of` descriptor. It requires the exact durable
+commit, result/audit hashes, known settled cost, an independent changes-required
+review, and independent approval of a genuinely different effective prompt. The
+actual prompt is checked before dispatch. A successful run has no abort-accounting
+receipt: its derived accounting view is explicitly labeled and bound to the real
+commit/result/audit, not written as a fictitious accounting-close row. Reconciled
+completed-parent costs currently fail closed; existing verified canceled-ancestor
+reconciliations remain supported.
+
+Revision ancestry is recursively revalidated, limited to four unique ancestors,
+and charged cumulatively once per run. Original ordinary-continuation chain
+restrictions stay intact. Each immediate parent still admits one new child through
+atomic authority consumption. The previous completed decision and rejection review
+are separate unaccepted evidence; original reports, calculations, timestamps and
+gap flags do not change. New revisions start a fresh bounded budget and make one
+tool-free lead call. This mechanism grants neither additional budget nor a retry;
+exact new authorization and independent output review are still required.

@@ -6591,3 +6591,21 @@ case; it is not yet deployed or validated by another real synthesis.
 The policy-comparison candidate passed independent review, 1,924 offline tests
 (seven skipped, one deselected), Ruff and formatting checks. This confirms request
 delivery and preserved gates, not independently accepted model reasoning.
+
+
+November 26, 08:20 UTC: policy-comparison release `562628e` deployed on image
+`1eba8dc9…`. Both CI runs, release verification and independent mechanical review
+passed. Natural worker shutdown completed with exit zero. Busy maintenance/tick
+checks refused before mutation; the later idle check succeeded. Original
+configuration, pause, experiment, cash, holding and protected ledger rows remain.
+
+A subsequent offline revision path binds the completed rejected result, its
+independent changes-required review and the exact changed effective prompt. It
+retains all four reports and 41 full calculations, while explicitly omitting only
+four superseded historical fields from the model view; original artifacts remain.
+Unique bounded ancestry and all ancestor costs are checked before fresh one-call
+authority. Independent review and 1,947 offline tests passed (seven skipped, one
+deselected); Ruff and formatting passed. This revision is not yet deployed or
+paid-run accepted. The current lineage charge remains $15.0000061 against $20;
+a proposed full-evidence request requires more than the remaining $4.9999939.
+No further paid call or order occurred.

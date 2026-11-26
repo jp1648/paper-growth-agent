@@ -18,8 +18,9 @@ observability data for a password-protected, read-only Next.js dashboard.
 ## Last recorded status
 
 Latest November 26 check: **paused; complete investment-decision acceptance
-still pending**. Deployed `1925d17` fixes replay of imported thesis context;
-1,922 offline tests, both CI runs and clean worker shutdown passed. Strict raw
+still pending**. Deployed `562628e` adds explicit conditional policy comparison
+to the synthesis prompt; 1,924 offline tests, both CI runs and clean worker
+shutdown passed. The earlier imported-context replay fix remains. Strict raw
 portfolio validation remains intact. Two preparation failures made zero model
 calls; their packets and evidence remain preserved.
 
@@ -41,9 +42,12 @@ reviews remain immutable. No trade is authorized by research completion.
 The cached acceptance record is complete; ordinary configuration was restored
 and verified, with the original one AAPL share, $99,655.93 cash and pause unchanged.
 
-An offline prompt repair now requires an explicit conditional policy and a
-supported action-changing scenario or threshold. It remains a candidate until
-deployed and evaluated; instruction-delivery tests cannot establish investment quality.
+The deployed prompt requires an explicit conditional policy and a supported
+action-changing scenario or threshold. A separately reviewed offline revision
+path preserves the rejected decision, binds the changed effective prompt, and
+counts every ancestor cost once. Its full suite passed 1,947 tests (seven skipped,
+one deselected); it is not yet deployed or evaluated by another paid synthesis.
+Instruction-delivery tests cannot establish investment quality.
 
 Older entries below record the progression, not current authority.
 

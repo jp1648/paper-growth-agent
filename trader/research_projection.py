@@ -77,3 +77,48 @@ def share_context_fields(context):
         "aliases, not evidence IDs or executable tool arguments. Original artifacts are unchanged."
     )
     return projected if len(dumps(projected).encode()) < len(dumps(context).encode()) else context
+
+
+def project_revision_history(context):
+    """Omit only superseded audit history from a reviewed revision's model view.
+
+    This selection is deliberately not lossless: omitted values remain solely in
+    the immutable audit. Current reports, calculations and all evidence stay in
+    the request. The caller must construct the evidence index before selection.
+    """
+    import hashlib
+
+    synthesis = context.get("reviewed_synthesis", {})
+    if not isinstance(synthesis, dict) or "revision" not in synthesis:
+        return context
+    if "historical_context_projection" in context:
+        raise ValueError("Historical context projection marker already present")
+    projected = copy.deepcopy(context)
+    omitted = []
+    for path in (
+        ("analytical_hypothesis",),
+        ("portfolio", "prior_thesis"),
+        ("supplement_navigation",),
+        ("review_focus",),
+    ):
+        parent = projected
+        for key in path[:-1]:
+            parent = parent.get(key, {})
+        if path[-1] in parent:
+            value = parent.pop(path[-1])
+            omitted.append(
+                {"path": ".".join(path), "value_sha256": hashlib.sha256(dumps(value).encode()).hexdigest()}
+            )
+    projected["historical_context_projection"] = {
+        "omitted_fields": omitted,
+        "preprojection_model_context_sha256": hashlib.sha256(dumps(context).encode()).hexdigest(),
+        "note": (
+            "Model-view selection, not lossless compression: the superseded unverified acquisition "
+            "hypothesis, older portfolio thesis and obsolete tool-navigation/review checklist are "
+            "omitted and remain available only in the immutable audit. Their absence is not evidence "
+            "of acceptance or resolution. Current holdings/cash/reference, every full calculation, "
+            "all four reports, complete analytical addendum, previous rejected decision and review, "
+            "arithmetic and the complete pre-selection evidence index remain unchanged."
+        ),
+    }
+    return projected

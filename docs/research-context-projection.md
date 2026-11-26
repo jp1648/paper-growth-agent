@@ -27,3 +27,14 @@ result. They neither replace inherited reports nor clear their material-gap flag
 The original BUY/ADD veto remains enforced; any new decision still requires its
 own economic review. Measure the complete new request, including addendum and
 provenance, before admission; a smaller old request is not sufficient proof.
+
+A reviewed revision additionally selects its model view: superseded acquisition
+hypothesis, older portfolio thesis and obsolete navigation/checklist fields stay
+in the immutable audit but are omitted from the new prompt. This is explicitly
+not lossless compression; the prompt discloses each omitted path and exact value
+hash. Current portfolio/reference, every full calculation, all reports/addendum,
+previous rejected decision/review, arithmetic and the pre-selection evidence index
+remain intact. Ordinary synthesis is unchanged. Before revision dispatch the
+actual effective system prompt must match the independently approved new hash
+and differ from the prior prompt. Tool-free synthesis does not append instructions
+to use unavailable Robinhood research tools.

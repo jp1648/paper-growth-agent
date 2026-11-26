@@ -14,8 +14,17 @@ from .research_workflow import valid_reference
 def validate_descriptor(value):
     if (
         not isinstance(value, dict)
-        or set(value) not in ({"parent", "bundle_sha256"}, {"parent", "bundle_sha256", "mode"})
+        or set(value)
+        not in (
+            {"parent", "bundle_sha256"},
+            {"parent", "bundle_sha256", "mode"},
+            {"parent", "bundle_sha256", "mode", "revision_of"},
+        )
         or ("mode" in value and value["mode"] != "reviewed_synthesis")
+        or (
+            "revision_of" in value
+            and (value.get("mode") != "reviewed_synthesis" or value["revision_of"] != value["parent"])
+        )
         or not valid_reference(value["parent"])
         or not isinstance(value["bundle_sha256"], str)
         or len(value["bundle_sha256"]) != 64
