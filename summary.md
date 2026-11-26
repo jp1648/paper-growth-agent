@@ -133,3 +133,17 @@ research acceptance is incomplete. The independently reviewed 180-second
 valuation timeout fix passes 1,794 offline tests but is not yet deployed. Provider
 exports still omit known successful calls, so no charge release is justified.
 Trading remains paused; see the latest live-readiness entry.
+
+
+Latest verified update: run5 provider-export reconciliation was applied at
+$2.26130865, preserving the original UNKNOWN receipt and pending request.
+Compact valuation variants and the valuation timeout repair are deployed as
+`1e356a5` / image `caae8044…`; 1,828 offline tests and both CI checks passed.
+Worker shutdown/restart and protected-state verification passed. Fresh annual
+run6 started once with a $20 cap; its research and independent acceptance are
+pending. Trading remains paused. See the latest live-readiness entry.
+
+Run6 then stopped at the lead cost guard after all four reports: $11.2525125
+local estimated usage, no pending provider operation, but no final decision or
+accepted correction. Material research gaps remain. Exact repeated calculation
+content in lead context is under offline repair; trading remains paused.

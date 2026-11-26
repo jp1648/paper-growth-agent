@@ -6322,3 +6322,56 @@ the saved wire request establishes Sol. Complete usage/category and dollar-line
 checks support a proposed $2.26130865 as-of-export reconciliation, including the
 late call. The append-only application is separately reviewed before execution;
 no original pending request is erased or authorized for resubmission.
+
+
+### November 25: provider reconciliation and sensitivity release verified
+
+Later authenticated provider exports account for all 133 requests on the UTC
+November 26 export, including the one Sol request without a saved response.
+Independent category-level usage and dollar checks supported run5's
+$2.26130865 as-of-export cost. The reviewed compare-and-swap reconciliation
+was applied with an appended audit entry; the original UNKNOWN closure receipt,
+pending operation and wire request remain preserved. This is provider-export
+evidence, not a final invoice or recovery of the missing response. Ordinary
+configuration was restored before the next release.
+
+Revision `1e356a5` (image `caae8044…`) is now verified in both production
+containers. It includes the 180-second valuation timeout and compact,
+source-bound valuation variants. Both CI checks passed; the full offline suite
+passed 1,828 tests, with seven skipped and one deselected. Independent operational
+review confirmed unchanged protected state, cash, holdings and orders. Natural
+SDK client exit and controlled worker shutdown/restart passed with worker exit
+0. Routine maintenance caused preflight deferrals before any shutdown; those
+attempts were retained and no idle guard was relaxed.
+
+Fresh research `held-aapl-annual-20261125-6` started once at
+2026-11-26T03:34:17Z, under the standing $20-per-run testing authority. Its
+manifest is `746938f1346390c46d8e78fca10299fe05363bea5a8ce7d7e820f75db4a496df`.
+The temporary daily ceiling is $83.87185365, including $63.87185365 already
+settled for the New York day. Funding was independently reviewed against
+confirmed available credit, conservative lag allowance and the retained buffer.
+This run remains pending; launch and engineering checks do not establish
+investment acceptance. Trading remains paused, and no trade is authorized by
+this research launch.
+
+Run6 subsequently stopped at the lead cost gate after 38 model calls and all
+four specialist reports. All dispatched operations have saved results; known
+local estimated usage is $11.2525125. The valid valuation correction request
+was refused because the minimum dependent rebuild would not fit the remaining
+budget. A subsequent lead call was rejected before dispatch: projected total
+$22.4369625 against $20, with 435,330 context bytes. No correction cycle or
+final investment decision completed. The valuation and critique still identify
+material unfinished reinvestment and claims work, so research is not accepted.
+The reserved amount stays protected pending reviewed cancellation and expiry
+closure; no pending provider operation is being treated as free.
+
+The next offline repair pools only exact repeated calculation subtrees into a
+shared catalog in the same model message. Expansion reproduces every original
+field; reports, source artifacts, citations, variant labels and values remain
+intact. The exact saved peak lead request falls from 425,041 to 184,094 bytes.
+Under unchanged conservative pricing and reserve rules, the hypothetical
+minimum correction tail plus prior estimated usage becomes $19.2361275.
+Additional calls remain subject to the hard cap; this is not research acceptance
+or permission to migrate the canceled workflow. Full offline checks passed:
+1,834 tests, seven skipped and one deselected; Ruff and format checks passed.
+The repair remains undeployed pending independent review and guarded release.

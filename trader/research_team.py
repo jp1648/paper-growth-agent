@@ -334,6 +334,57 @@ def role_output_tokens(cfg, role):
     return min(cfg.research_max_output_tokens, 12000 if role == "valuation" else 5000)
 
 
+def compact_calculation_context(context):
+    """Losslessly share exact repeated calculation subtrees inside the same model message."""
+    if not isinstance(context, dict) or not isinstance(context.get("calculations"), dict):
+        return context
+    if "calculation_context_pool" in context or "calculation_context_projection" in context:
+        return context
+    counts, collision = {}, False
+
+    def collect(value):
+        nonlocal collision
+        if isinstance(value, (dict, list)):
+            if isinstance(value, dict) and "calculation_context_ref" in value:
+                collision = True
+            encoded = dumps(value)
+            if len(encoded.encode()) >= 512:
+                counts[encoded] = counts.get(encoded, 0) + 1
+            for item in value.values() if isinstance(value, dict) else value:
+                collect(item)
+
+    collect(context["calculations"])
+    repeated = sorted(key for key, count in counts.items() if count > 1)
+    if collision or not repeated:
+        return context
+    identities = {key: "c" + str(index) for index, key in enumerate(repeated, 1)}
+
+    def encode(value, skip=None):
+        if isinstance(value, (dict, list)):
+            key = dumps(value)
+            if key in identities and key != skip:
+                return {"calculation_context_ref": identities[key]}
+            if isinstance(value, dict):
+                return {name: encode(item) for name, item in value.items()}
+            return [encode(item) for item in value]
+        return copy.deepcopy(value)
+
+    projected = copy.deepcopy(context)
+    projected["calculations"] = encode(context["calculations"])
+    projected["calculation_context_pool"] = {
+        identities[key]: encode(json.loads(key), skip=key) for key in repeated
+    }
+    projected["calculation_context_projection"] = (
+        "Each calculation_context_ref resolves the exact original object/list in the same-message "
+        "calculation_context_pool; nested references resolve recursively. Every amount, rationale, "
+        "citation, case, result and variant lineage is retained. These are lossless model-context "
+        "aliases, not evidence IDs or directly executable tool arguments. All four reports remain "
+        "unchanged. Original saved calculations are unchanged; this projection does not validate "
+        "source interpretation, economic assumptions or investment acceptance."
+    )
+    return projected if len(dumps(projected).encode()) < len(dumps(context).encode()) else context
+
+
 class Budget:
     STATE_FIELDS = (
         "models",
@@ -545,12 +596,15 @@ class Guard(AgentMiddleware):
                     context = json.loads(message.content)
                 except ValueError:
                     context = None
-                if isinstance(context, dict) and "analytical_hypothesis" in context:
-                    hypothesis = compact_hypothesis(context["analytical_hypothesis"])
-                    if hypothesis is not context["analytical_hypothesis"]:
-                        message = message.model_copy(
-                            update={"content": dumps({**context, "analytical_hypothesis": hypothesis})}
-                        )
+                if isinstance(context, dict):
+                    original = context
+                    if "analytical_hypothesis" in context:
+                        hypothesis = compact_hypothesis(context["analytical_hypothesis"])
+                        if hypothesis is not context["analytical_hypothesis"]:
+                            context = {**context, "analytical_hypothesis": hypothesis}
+                    context = compact_calculation_context(context)
+                    if context is not original:
+                        message = message.model_copy(update={"content": dumps(context)})
             if (
                 i < last_assistant
                 and isinstance(message, ToolMessage)
