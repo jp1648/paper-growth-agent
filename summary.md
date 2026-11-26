@@ -169,3 +169,16 @@ Full investment acceptance still awaits a fresh, complete reviewed result.
 Fresh research `held-aapl-full-context-20261126-1` started once at 05:17:22 UTC
 November 26 after reviewed deployment, accounting and funding. It is capped at
 $20 with 80 model calls; trading remains paused. Research acceptance is pending.
+
+
+November 26 follow-up: that run is canceled and accounted at $15.756205 estimated
+usage, with no unknown charge. All 33 calculations reproduce independently, but
+a 518,014-byte request exceeded its 500,000-byte ceiling before corrected valuation,
+fresh critique and final decision were produced. Full acceptance remains pending.
+Offline context pooling now preserves exact content while reducing the last saved
+request by 22,340 bytes; 1,839 offline tests pass. Candidate `6376e94` is pushed,
+not deployed. Reusing the saved work needs an explicit provenance-bound continuation;
+never modify the canceled run's identity or repeat its paid calculations blindly.
+
+Ordinary configuration was restored and verified in both running containers on
+image `4511f79c…`; the temporary allowances are no longer installed.

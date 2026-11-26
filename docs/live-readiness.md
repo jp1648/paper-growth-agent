@@ -6473,3 +6473,13 @@ The broader pooling candidate passed 1,839 offline tests (seven skipped, one
 deselected), targeted provider-wire and reconstruction regressions, Ruff and
 formatting. It is not deployed; production remains on the reviewed `32cde8c`
 image pending a complete continuation plan.
+
+
+The original reservation was closed at 05:37:42 UTC with confirmed cancellation,
+no active activities or pending operations, and $15.756205 estimated settled cost.
+The immutable receipt is `aborted_accounted`, with no retry authority or unknown
+charge. Original artifacts, experiment and pause are preserved. Candidate
+`6376e94` is pushed; no subsequent paid research has run.
+
+Ordinary configuration was restored and verified in both running containers on
+image `4511f79c…`; the temporary allowances are no longer installed.
