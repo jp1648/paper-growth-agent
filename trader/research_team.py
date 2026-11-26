@@ -2948,7 +2948,7 @@ class DeepResearchTeam:
                 use_responses_api=True,
                 store=False,
                 max_retries=0,
-                timeout=180 if role == "research_lead" else 60,
+                timeout=180 if role in {"research_lead", "valuation"} else 60,
                 max_tokens=role_output_tokens(cfg, role),
                 **({"http_client": httpx.Client(transport=ResearchTransport())} if durable else {}),
             )

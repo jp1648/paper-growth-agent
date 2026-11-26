@@ -1562,7 +1562,8 @@ def test_finalization_client_is_lead_only_180_second_timeout_no_retry(env, monke
     models = worker.models()
     clients = dict(zip(models, calls, strict=True))
     assert clients["research_lead"]["timeout"] == 180
-    assert all(client["timeout"] == 60 for role, client in clients.items() if role != "research_lead")
+    assert clients["valuation"]["timeout"] == 180
+    assert all(clients[role]["timeout"] == 60 for role in ("business", "catalysts"))
     assert all(client["max_retries"] == 0 for client in clients.values())
 
 
@@ -3443,3 +3444,37 @@ def test_supervised_annual_path_output_allowance_remains_bounded_and_reserved():
     assert Budget(cfg, limit=reserve).model(10000, "valuation") == reserve
     with pytest.raises(ValidationError):
         Settings(research_max_output_tokens=12001)
+
+
+@pytest.mark.parametrize(
+    "role,expected_timeout", [("valuation", 180), ("research_lead", 180), ("business", 60)]
+)
+def test_role_timeout_reaches_actual_sdk_wire_without_retry(env, monkeypatch, role, expected_timeout):
+    import httpx
+    from langchain_openai import ChatOpenAI
+    from openai import BadRequestError
+
+    service, _, _ = env
+    service.cfg.input_cost_per_million = dec("1")
+    service.cfg.output_cost_per_million = dec("1")
+    monkeypatch.setenv("OPENAI_API_KEY", "fixture-only")
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        assert request.extensions["timeout"]["read"] == expected_timeout
+        return httpx.Response(
+            400, json={"error": {"message": "offline fixture", "type": "invalid_request_error"}}
+        )
+
+    monkeypatch.setattr(
+        "trader.research_team.ChatOpenAI",
+        lambda **kwargs: ChatOpenAI(
+            http_client=httpx.Client(transport=httpx.MockTransport(handler)), **kwargs
+        ),
+    )
+    model = DeepResearchTeam(service.cfg, service.store, Evidence()).models()[role]
+    assert model.max_retries == 0
+    with pytest.raises(BadRequestError, match="offline fixture"):
+        model.invoke("offline timeout fixture")
+    assert len(requests) == 1

@@ -6259,3 +6259,37 @@ The lossless projection patch passed independent review and 1,791 offline tests
 (seven skipped, one deselected), plus lint, format and diff checks. It applies
 to specialist prompts and reconstructed lead context, preserving paired tool
 feedback and all original canonical inputs.
+
+
+### November 25: annual run5 provider timeout and offline repair
+
+Lossless projection release `b9490bc` passed CI and deployed as image
+`98c60770…`. Run4 was closed at its known $4.600570 estimate before that
+deployment. A first run5 configuration-install attempt failed the worker-stop
+validator without saving its exact status; its cause remains unexplained. An
+independently reviewed diagnostic-only retry captured a clean worker stop
+(MainPID 0, success, exit 0, inactive), then installed the bounded configuration.
+
+Fresh `held-aapl-annual-20261125-5` completed business and catalyst reports and
+an actual annual-path calculation, then stopped on a provider HTTP read timeout
+during valuation. It completed 23 model calls with $4.480640 estimated usage.
+The 24th request was dispatched but has no saved response. Temporal's second
+activity attempt correctly refused to send it again. No valuation report,
+fresh critique, final decision or investment acceptance resulted. Trading
+remains paused; no order was submitted by this attempt.
+
+The cause is the valuation client's 60-second response timeout, despite its
+larger structured-output allowance. The reviewed offline fix gives valuation
+180 seconds, matching lead synthesis; other specialists remain at 60 seconds
+and automatic retries remain disabled. Actual SDK wire-timeout regressions and
+the full suite passed: 1,794 tests, seven skipped and one deselected, with Ruff
+and formatting checks clean. This fix is not yet deployed. It cannot recover
+or retroactively reconcile the original interrupted request.
+
+Authenticated provider exports collected around 03:00 UTC November 26 contain
+only 19 requests in the run window, fewer than the 23 known successful calls.
+They cannot establish the missing charge or justify releasing its reservation.
+The full $20 remains protected. Existing configuration restoration also refuses
+unresolved charges; temporary limits stay bound to the canceled attempt, with
+trading paused and no new paid retry authorized by this accounting state.
+Original manifests, requests and evidence remain intact.

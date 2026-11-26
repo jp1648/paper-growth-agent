@@ -123,3 +123,13 @@ exceeded the 320 KB context cap by 752 bytes. It remains incomplete and canceled
 $4.600570 estimated usage awaits audited closure after its original expiry.
 Lossless policy pooling and a justified larger supervised context/tool allowance
 are under validation. Trading remains paused; full research acceptance is pending.
+
+
+Latest November 25 follow-up: deployed lossless forecast-policy projection passed
+1,791 offline tests. Fresh annual run5 then hit a provider read timeout during
+valuation after 23 completed calls ($4.480640 estimated). Its dispatched 24th
+request has no saved response; the full $20 reservation remains protected and
+research acceptance is incomplete. The independently reviewed 180-second
+valuation timeout fix passes 1,794 offline tests but is not yet deployed. Provider
+exports still omit known successful calls, so no charge release is justified.
+Trading remains paused; see the latest live-readiness entry.
