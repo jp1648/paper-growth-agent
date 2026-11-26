@@ -1339,7 +1339,11 @@ def test_adversarial_reads_calculation_and_recovers_unknown_lookup_without_weake
                     if replies:
                         derived = json.loads(replies[0].content)
                         assert derived["kind"] == "derived_calculation" and not derived["original_source"]
-                        assert json.loads(derived["content"]) == context["calculations"][calculation_id]
+                        assert json.loads(derived["content"]) == {
+                            k: v
+                            for k, v in context["calculations"][calculation_id].items()
+                            if k != "operating_forecast_context"
+                        }
                     reference = calculation_id if not replies else "mistyped-evidence-id"
                     message = AIMessage(
                         content="",
@@ -1888,7 +1892,11 @@ def test_final_context_indexes_evidence_without_mutating_reports_or_originals():
         desk.sources[identifier] = {"id": identifier, "content": "prior source"}
     original = copy.deepcopy(desk.sources)
     context = desk.final_context()
-    assert context["reports"] == desk.reports and context["calculations"] == desk.calculations
+    assert context["reports"] == desk.reports
+    assert {
+        key: {k: v for k, v in calc.items() if k != "operating_forecast_context"}
+        for key, calc in context["calculations"].items()
+    } == desk.calculations
     assert context["portfolio"]["prior_thesis"]["evidence_ids"] == [
         "portfolio-only",
         "portfolio-claimed",
@@ -1947,8 +1955,11 @@ def test_final_context_projects_only_identical_calculation_provenance():
     assert equal["normalization_bridge"]["historical_provenance"] == identical
     restored = copy.deepcopy(equal)
     restored["financial_provenance"] = restored["normalization_bridge"]["historical_provenance"]
+    assert restored.pop("operating_forecast_context")["status"] == "unverified_missing_operating_bridge"
     assert restored == original["calculation-equal"]
-    assert unequal == original["calculation-unequal"]
+    assert {k: v for k, v in unequal.items() if k != "operating_forecast_context"} == original[
+        "calculation-unequal"
+    ]
     assert context["reports"]["valuation"]["calculation_id"] == "calculation-equal"
     reader = next(tool for tool in desk.tools() if tool.name == "read_source")
     saved = reader.invoke({"source_id": "calculation-equal"})
@@ -1995,8 +2006,13 @@ def test_final_context_projects_only_identical_bridge_assumptions():
     restored["inputs"]["normalization_bridge"] = copy.deepcopy(
         restored["normalization_bridge"]["assumptions"]
     )
+    assert restored.pop("operating_forecast_context")["status"] == "unverified_missing_operating_bridge"
     assert restored == original["calculation-equal"]
-    assert context["calculations"]["calculation-unequal"] == original["calculation-unequal"]
+    assert {
+        k: v
+        for k, v in context["calculations"]["calculation-unequal"].items()
+        if k != "operating_forecast_context"
+    } == original["calculation-unequal"]
     assert {source["id"] for source in context["evidence"]} == {"fixture-sec"}
     reader = next(tool for tool in desk.tools() if tool.name == "read_source")
     pages = []
@@ -3263,6 +3279,7 @@ def test_specialist_uses_reversible_calculation_projection(correction, monkeypat
     projected = captured["calculations"]["calculation-test"]
     assert projected["inputs"]["normalization_bridge"]["same_as"] == "normalization_bridge.assumptions"
     projected["inputs"]["normalization_bridge"] = projected["normalization_bridge"]["assumptions"]
+    assert projected.pop("operating_forecast_context")["status"] == "unverified_missing_operating_bridge"
     assert captured["calculations"] == original == desk.calculations
     if correction:
         assert desk.correction["calculations"] == original

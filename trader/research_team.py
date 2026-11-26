@@ -8,7 +8,7 @@ import re
 import threading
 import time
 from datetime import date, timedelta
-from decimal import localcontext
+from decimal import DecimalException, localcontext
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
@@ -43,11 +43,13 @@ from .financials import (
     FiniteCashAdjustment,
     MissingAnnualFact,
     NormalizationBridge,
+    OperatingForecastBridge,
     annual_cash_flow,
     capital_expenditure_selection,
     cash_flow_diagnostics,
     normalization_supported,
     normalized_cash_flow,
+    operating_forecast_bridge,
     validate_finite_cash_adjustments,
     valuation_components,
     valuation_diagnostics,
@@ -209,7 +211,7 @@ ROLES = {
             "Complete this workflow before deciding to withhold valuation: (1) Reconcile observed historical cash-flow inputs, including signed operating working-capital components for each available comparison year using sum_cash_flows. Separate cash payments from accounting provisions and identify any unresolved tax/escrow attribution; do not invent a decomposition. "
             "(2) For EVERY bridge adjustment and the share/award treatment, state in assumptions: observed source anchor; classification as observed fact, chosen forward policy, or unresolved historical attribution; explicit proposed amount/formula; economic rationale; and an adverse alternative. Management need not have announced your hypothetical financing, reinvestment or compensation policy. Label analyst choices as conditional assumptions, never observed facts. "
             "(3) Model an economically justified conditional bridge and scenarios with the calculation tools. Unknown future policy alone is not grounds to omit calculations. If historical attribution remains uncertain, assess whether a source-supported combined treatment or bounded sensitivity avoids double counting; do not silently set an unknown item to zero. If even bounded modeling would mislead, identify the exact missing historical input and explain why the uncertainty cannot be bounded, rather than merely listing unanswered forecasts. "
-            "A preferred recovery adjustment needs a forecast of operating funding needs anchored in the filing, not simply a fraction of historical outflow. When that preference cannot be justified, label the alternative cases without claiming a preferred normalized estimate. Explain each cash-flow growth scenario through disclosed business mix, margins and reinvestment; explain terminal multiples through post-horizon growth, maturity and competitive risk. Merely calling numbers analyst choices or a bracket is not an economic rationale. Build a compact numeric operating-driver bridge for the scenario cash-flow growth: starting segment/product revenue, forecast mix and margins, operating expense, tax/cash-conversion and reinvestment assumptions, and resulting cash flow at the forecast horizon. Distinguish source facts from chosen forecasts; do not add cash taxes again when the cash-conversion residual already includes tax timing. Show whether the decision changes across material normalization alternatives, not merely the chosen main case. Use disclosed financing proceeds, maturities and coupons to quantify an incremental-interest range; principal refinancing is not recurring income and unknown floating rates remain explicit. Use multiply_values for derived products such as award quantities times grant-date values, and cite the original inputs separately. "
+            "A preferred recovery adjustment needs a forecast of operating funding needs anchored in the filing, not simply a fraction of historical outflow. When that preference cannot be justified, label the alternative cases without claiming a preferred normalized estimate. Explain each cash-flow growth scenario through disclosed business mix, margins and reinvestment; explain terminal multiples through post-horizon growth, maturity and competitive risk. Merely calling numbers analyst choices or a bracket is not an economic rationale. Keep operating_forecast rationales concise (one short sentence each). Use value_scenarios operating_forecast to reconcile each recurring horizon endpoint; without it the operating forecast remains unverified and conditional. It requires GAAP operating costs including SBC/depreciation, explicit cash-interest/taxes and no residual plug. Evaluate normalization alternatives separately with their own bridges. Build a compact numeric operating-driver bridge for the scenario cash-flow growth: starting segment/product revenue, forecast mix and margins, operating expense, tax/cash-conversion and reinvestment assumptions, and resulting cash flow at the forecast horizon. Distinguish source facts from chosen forecasts; do not add cash taxes again when the cash-conversion residual already includes tax timing. Show whether the decision changes across material normalization alternatives, not merely the chosen main case. Use disclosed financing proceeds, maturities and coupons to quantify an incremental-interest range; principal refinancing is not recurring income and unknown floating rates remain explicit. Use multiply_values for derived products such as award quantities times grant-date values, and cite the original inputs separately. "
             "All bridge evidence must appear in the valuation report. The historical proxy does not establish normalized earnings. Zero deltas require a specific scenario rationale, never a default to satisfy the schema. Explicitly provide normalization_review.claims_coverage with exactly common_shares, preferred_or_convertible, legacy_awards, noncontrolling_interests. Each needs status (supported_conditional_treatment, supported_not_applicable, unread, not_disclosed_in_inspected_sources, unsupported_treatment), evidence_ids, canonical as_of_date or null, and treatment_or_gap explaining quantitative treatment/double counting or exact missing work. Supported closure requires inspected original disclosure, never search absence; common-share treatment requires a supported point date, not an EPS average period. These are runtime diagnostics, not economic approval. Provide normalization_review covering cash-flow basis (FCFE/FCFF/proxy and discount consistency), debt/cash, dilution/SBC and nonrecurring items with original evidence IDs. Preserve unresolved_material_gaps for genuinely unsupported material historical inputs or assumptions; calculating a conditional sensitivity does not resolve such gaps or authorize BUY/ADD. A missing or unresolved normalization review blocks BUY/ADD. Return the calculation_id and exact bear/base/bull values when computed. "
             "Use inspect_cash_flow for annual accounting diagnostics when needed, or pass the proposed normalization_bridge directly to value_scenarios; omitted or null cash_flow_per_share derives the exact source/bridge scalar. An explicit scalar must still match. Missing inputs are gaps; derived arithmetic does not establish economic support. If calls run out, name the exact unfinished source reads and arithmetic for the single correction. "
             "Use inspect_valuation on the saved calculation for terminal-value weight, the separate growth-versus-multiple table and the multiple implied by the reference price; do not estimate those figures mentally. "
@@ -1331,8 +1333,17 @@ class ResearchDesk:
             capital_expenditure_source: CapitalExpenditureSource | None = None,
             normalization_alternatives: list[NormalizationAlternative] | None = None,
             finite_cash_adjustments: list[FiniteCashAdjustment] | None = None,
+            operating_forecast: OperatingForecastBridge | None = None,
         ) -> dict:
-            """Decimal DCF: ordered bear/base/bull cases with fractions as rates. Omit cash_flow_per_share for source/bridge arithmetic. With a main bridge, optionally batch up to three sourced normalization replacements. Finite cash adjustments are signed incremental USD amounts in forecast years 1..years, shared across scenarios and alternatives, discounted once and excluded from terminal cash. Require a bridge; explain baseline overlap and timing/tax uncertainty. At most 20 entries. Each calculation retains standalone replay inputs. Conditional arithmetic never resolves unsupported claims."""
+            """Decimal DCF: ordered bear/base/bull cases with fractions as rates. Omit cash_flow_per_share for source/bridge arithmetic. With a main bridge, optionally batch up to three sourced normalization replacements. Finite cash adjustments are signed incremental USD amounts in forecast years 1..years, shared across scenarios and alternatives, discounted once and excluded from terminal cash. Require a bridge; explain baseline overlap and timing/tax uncertainty. At most 20 entries. Each calculation retains standalone replay inputs. Optional operating_forecast checks three recurring horizon endpoints against growth: GAAP segment/opex costs include SBC and depreciation; cash taxes and interest are deducted once. It excludes finite adjustments and cannot accompany batched normalization alternatives. Without it forecasts remain unverified and conditional. Endpoint equality does not validate interim paths or economic assumptions. Conditional arithmetic never resolves unsupported claims."""
+            if operating_forecast is not None and (
+                normalization_bridge is None or normalization_alternatives
+            ):
+                return {
+                    "available": False,
+                    "error": "operating_forecast_configuration",
+                    "note": "Operating forecast requires one normalized bridge; evaluate normalization alternatives in separate calls with their own operating forecasts. No calculation created.",
+                }
             finite_rows = []
             if finite_cash_adjustments and (
                 normalization_bridge is None or len(finite_cash_adjustments) > 20
@@ -1449,6 +1460,26 @@ class ResearchDesk:
                     raise ValueError("Scenarios must be ordered bear <= base <= bull")
                 return computed
 
+            forecast_result = None
+            if operating_forecast is not None:
+                try:
+                    forecast_result = operating_forecast_bridge(
+                        operating_forecast,
+                        period_end=financial_period_end,
+                        years=years,
+                        growth_rates=growth_rates,
+                        bridge=bridge_result,
+                        sources=financial_sources,
+                        cutoff=cutoff,
+                        issuer_cik=source["content"]["cik"],
+                    )
+                except (ValueError, DecimalException) as exc:
+                    return {
+                        "available": False,
+                        "error": "operating_forecast_invalid",
+                        "note": str(exc)[:600],
+                        "calculation_created": False,
+                    }
             values = scenario_values(cash)
             result = {
                 "financial_provenance": provenance,
@@ -1472,6 +1503,9 @@ class ResearchDesk:
                 result["inputs"]["normalization_bridge"] = bridge_result["assumptions"]
             if finite_rows:
                 result["inputs"]["finite_cash_adjustments"] = finite_rows
+            if forecast_result is not None:
+                result["operating_forecast"] = forecast_result
+                result["inputs"]["operating_forecast"] = forecast_result["assumptions"]
             identifier = "calculation-" + hashlib.sha256(dumps(result).encode()).hexdigest()[:20]
             result["calculation_id"] = identifier
             alternatives = []
@@ -1583,6 +1617,14 @@ class ResearchDesk:
             with self.lock:
                 self.calculations.update(pending)
             return {**result, "alternatives": alternatives} if alternatives else result
+
+        value_scenarios.handle_validation_error = lambda _error: dumps(
+            {
+                "available": False,
+                "error": "valuation_input_schema_invalid",
+                "note": "Arguments do not match the valuation schema. Check required fields, categories, types and policy literals. No calculation created; this feedback is not evidence.",
+            }
+        )
 
         @tool
         def inspect_cash_flow(
@@ -1774,6 +1816,9 @@ class ResearchDesk:
                 )
             ):
                 raise ValueError("Valuation must cite all normalization bridge evidence")
+            forecast_refs = set((calculation or {}).get("operating_forecast", {}).get("evidence_ids", []))
+            if not forecast_refs.issubset(result["evidence_ids"]):
+                raise ValueError("Valuation must cite all operating forecast evidence")
             finite_refs = {
                 ref
                 for row in (calculation or {}).get("inputs", {}).get("finite_cash_adjustments", [])
@@ -2286,6 +2331,20 @@ class ResearchDesk:
         """Project exact duplicates only; original calculations remain readable and audited."""
         calculations = copy.deepcopy(self.calculations)
         for identifier, calculation in calculations.items():
+            forecast = calculation.get("operating_forecast")
+            calculation["operating_forecast_context"] = {
+                "status": "conditional_endpoint_reconciled"
+                if forecast
+                else "unverified_missing_operating_bridge",
+                "note": "Context only; no saved artifact changed. Endpoint arithmetic does not validate interim cash paths, terminal economics, material claims or investment acceptance. Missing bridges remain conditional.",
+            }
+            if forecast and calculation.get("inputs", {}).get("operating_forecast") == forecast.get(
+                "assumptions"
+            ):
+                calculation["inputs"]["operating_forecast"] = {
+                    "same_as": "operating_forecast.assumptions",
+                    "note": f"Context projection only; read_source({identifier}) returns the full saved calculation.",
+                }
             bridge = calculation.get("normalization_bridge")
             inputs = calculation.get("inputs")
             if (

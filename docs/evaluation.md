@@ -393,3 +393,52 @@ their citation IDs exist, calibrate confidence, justify scenario growth/multiple
 or create independent approval. Unsupported choices must retain material gaps;
 mechanical success remains distinct from reviewed acceptance. Apple has not been
 rerun or approved using this bridge. Current deployed code remains unchanged.
+
+### Optional operating forecast endpoint
+
+`value_scenarios.operating_forecast` connects three ordered `bear`/`base`/`bull`
+operating cases to their recurring horizon cash. It requires one
+`normalization_bridge`, the same `historical_period_end`, and `year == years`.
+Each case supplies named segment revenue and gross margin, operating expense,
+and each of these cash categories exactly once (zero requires an explicit policy):
+
+- Add cash investment income, depreciation/amortization and the SBC expense
+  already included in GAAP operating costs.
+- Subtract cash interest expense, cash taxes, future-service cash compensation,
+  capital expenditure and finance-lease principal.
+- Include signed working-capital cash flow and net borrowing.
+
+The calculator starts from **pretax** segment gross profit less operating expense.
+It deducts taxes only through the cash-tax row. Working capital excludes tax and
+interest movements already represented separately; capital expenditure and net
+borrowing exclude the separately deducted lease principal. Required policy
+literals make these conventions explicit. Legacy award claims remain governed
+by the normalized share treatment and independent claims review; they are not
+assumed absent. No generic residual, other-income or other-noncash plug is
+supported. Material items outside this limited bridge remain unresolved.
+
+Every amount is a chosen forecast with a concise rationale and retained original
+SEC passage anchors for the configured issuer. At least one anchor per assumption
+must have a publication date on or after the selected historical period end,
+and none may be future evidence. This checks publication recency, not whether
+an excerpt supports the claimed fiscal-period observation or forecast. Source
+interpretation and economic plausibility still require independent review.
+
+The computed cash must be positive and reconcile to normalized starting equity
+cash compounded by that case's growth rate. Tolerance permits only the existing
+six-decimal per-share rounding propagated to the horizon, plus one cent.
+Finite cash adjustments remain outside this recurring endpoint and are discounted
+once separately, never capitalized in terminal cash. Batched normalization
+alternatives cannot share an operating bridge: evaluate each separately.
+
+Bridge inputs, derived outputs and citations are saved and reconstructed during
+replay; valuation reports must cite all bridge sources. Invalid bridge arguments
+produce bounded correction feedback without publishing a calculation. Rationales
+are capped at 240 characters, citations at four per assumption, and the complete
+bridge at 16,000 UTF-8 bytes. Use short rationales to preserve output capacity.
+
+A matching endpoint does **not** validate the interim compounded cash path,
+terminal economics or investment acceptance. Calls omitting this optional input
+retain their original calculation identity and replay behavior; model-facing
+context explicitly labels their operating forecast unverified. Neither this
+feature nor a successful replay clears material-gap flags or authorizes trading.

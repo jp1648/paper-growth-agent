@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 from pydantic import Field
 
-from .models import Model, dec, dt
+from .models import Model, dec, dt, dumps
 
 
 class CompensationPolicyRequired(ValueError):
@@ -503,4 +503,176 @@ def valuation_diagnostics(inputs, target_price):
         "rows": rows,
         "required_multiple_formula": "(target price - PV of annual cash flows) / discounted final-year cash flow",
         "limitation": "Sensitivity of supplied cash-flow assumptions, not approval of forecasts or normalized fair value. A negative required multiple means interim cash flows alone exceed the target.",
+    }
+
+
+class ForecastAmount(Model):
+    """Chosen horizon assumption; citations anchor it, never certify the forecast."""
+
+    amount_usd: str = Field(max_length=64)
+    rationale: str = Field(min_length=1, max_length=240)
+    evidence_ids: list[str] = Field(min_length=1, max_length=4)
+
+
+class ForecastSegment(Model):
+    name: str = Field(min_length=1, max_length=40)
+    revenue_usd: str = Field(max_length=64)
+    gross_margin: str = Field(max_length=64)
+    rationale: str = Field(min_length=1, max_length=240)
+    evidence_ids: list[str] = Field(min_length=1, max_length=4)
+
+
+class ForecastCashRow(ForecastAmount):
+    category: Literal[
+        "cash_interest_expense",
+        "cash_investment_income",
+        "cash_taxes",
+        "depreciation_amortization",
+        "sbc_addback",
+        "future_service_cash_compensation",
+        "working_capital_cash_flow",
+        "capital_expenditure",
+        "finance_lease_principal",
+        "net_borrowing",
+    ]
+
+
+class OperatingForecastCase(Model):
+    scenario: Literal["bear", "base", "bull"]
+    segments: list[ForecastSegment] = Field(min_length=1, max_length=10)
+    operating_expense: ForecastAmount
+    cash_rows: list[ForecastCashRow] = Field(min_length=10, max_length=10)
+    compensation_policy: Literal["gaap_sbc_added_back_then_future_service_cash_deducted_once"]
+    interest_tax_policy: Literal["interest_outside_operating_profit_cash_taxes_deducted_once"]
+    legacy_award_policy: Literal["legacy_claims_in_normalization_shares_not_future_service_cash"]
+    cash_classification_policy: Literal[
+        "working_capital_excludes_tax_interest_capex_and_borrowing_exclude_lease_principal"
+    ]
+
+
+class OperatingForecastBridge(Model):
+    historical_period_end: str
+    year: int = Field(strict=True, ge=1, le=10)
+    cases: list[OperatingForecastCase] = Field(min_length=3, max_length=3)
+
+
+def operating_forecast_bridge(raw, *, period_end, years, growth_rates, bridge, sources, cutoff, issuer_cik):
+    """Check a recurring horizon endpoint; neither a forecast endorsement nor an annual path."""
+    data = OperatingForecastBridge.model_validate(raw).model_dump(mode="json")
+    if len(dumps(data).encode()) > 16000:
+        raise ValueError("Operating forecast exceeds 16000 bytes; shorten rationales and source lists")
+    if data["historical_period_end"] != period_end or data["year"] != years:
+        raise ValueError(
+            "Operating forecast must match the normalized historical period and valuation horizon"
+        )
+    if [row["scenario"] for row in data["cases"]] != ["bear", "base", "bull"]:
+        raise ValueError("Require ordered distinct bear/base/bull operating forecasts")
+    signs = {
+        "cash_interest_expense": -1,
+        "cash_investment_income": 1,
+        "cash_taxes": -1,
+        "depreciation_amortization": 1,
+        "sbc_addback": 1,
+        "future_service_cash_compensation": -1,
+        "working_capital_cash_flow": 1,
+        "capital_expenditure": -1,
+        "finance_lease_principal": -1,
+        "net_borrowing": 1,
+    }
+    refs = set()
+
+    def anchored(row):
+        if not row["rationale"].strip():
+            raise ValueError("Forecast assumptions require an explicit rationale")
+        # Reuse issuer/host/original passage/cutoff validation, without treating forecasts as historical facts.
+        validate_finite_cash_adjustments(
+            [
+                {
+                    "year": 1,
+                    "amount_usd": "0",
+                    "rationale": row["rationale"],
+                    "evidence_ids": row["evidence_ids"],
+                }
+            ],
+            1,
+            sources,
+            cutoff,
+            issuer_cik,
+        )
+        if not any(
+            sources[ref].get("published_at")
+            and dt(sources[ref]["published_at"]).date() >= date.fromisoformat(period_end)
+            for ref in row["evidence_ids"]
+        ):
+            raise ValueError(
+                "Forecast requires a current-period original passage anchor; older-only citations are stale"
+            )
+        refs.update(row["evidence_ids"])
+
+    starting_cash = dec(bridge["bridged_equity_cash_flow_usd"])
+    shares = dec(bridge["assumptions"]["valuation_shares"])
+    results = []
+    for case, growth in zip(data["cases"], growth_rates, strict=True):
+        names = [s["name"].strip().casefold() for s in case["segments"]]
+        if not all(names) or len(set(names)) != len(names):
+            raise ValueError("Operating segments must have distinct names")
+        gross = dec(0)
+        for segment in case["segments"]:
+            anchored(segment)
+            revenue, margin = dec(segment["revenue_usd"]), dec(segment["gross_margin"])
+            if revenue < 0 or not 0 <= margin <= 1:
+                raise ValueError("Require nonnegative forecast revenue and gross margin in [0,1]")
+            gross += revenue * margin
+        anchored(case["operating_expense"])
+        opex = dec(case["operating_expense"]["amount_usd"])
+        if opex < 0:
+            raise ValueError("Operating expense must be nonnegative")
+        rows = case["cash_rows"]
+        if {r["category"] for r in rows} != set(signs):
+            raise ValueError("Require each operating cash category exactly once; no residual plug")
+        values = {}
+        for row in rows:
+            anchored(row)
+            amount = dec(row["amount_usd"])
+            if row["category"] not in {"working_capital_cash_flow", "net_borrowing"} and amount < 0:
+                raise ValueError("Forecast costs and addbacks must be nonnegative; cash-flow signs are fixed")
+            values[row["category"]] = amount
+        # SBC and depreciation must already be included in the GAAP operating cost stack.
+        if values["sbc_addback"] + values["depreciation_amortization"] > sum(
+            (dec(s["revenue_usd"]) * (1 - dec(s["gross_margin"])) for s in case["segments"]), opex
+        ):
+            raise ValueError("SBC/depreciation addbacks exceed total operating costs")
+        cash = gross - opex + sum((values[k] * sign for k, sign in signs.items()), dec(0))
+        g = dec(growth)
+        expected = starting_cash * (1 + g) ** years
+        # Existing valuation scalar rounds to six decimal dollars/share. Permit only that
+        # known error propagated to the horizon, plus one cent for aggregate rounding.
+        tolerance = shares * dec("0.0000005") * (1 + g) ** years + dec("0.01")
+        if cash <= 0 or abs(cash - expected) > tolerance:
+            raise ValueError(
+                "Operating horizon cash does not reconcile to growth-implied recurring equity cash; no residual substituted"
+            )
+        results.append(
+            {
+                "scenario": case["scenario"],
+                "gross_profit_usd": str(gross),
+                "operating_profit_usd": str(gross - opex),
+                "recurring_equity_cash_usd": str(cash),
+                "growth_implied_cash_usd": str(expected),
+                "difference_usd": str(cash - expected),
+                "rounding_tolerance_usd": str(tolerance),
+            }
+        )
+    return {
+        "assumptions": data,
+        "cases": results,
+        "evidence_ids": sorted(refs),
+        "status": "conditional_endpoint_reconciled",
+        "limitations": [
+            "Chosen forecasts and source transcription require independent economic review; arithmetic is not investment acceptance.",
+            "Only the recurring horizon endpoint is checked, not compounded years 1..N-1 or terminal economics.",
+            "Finite cash adjustments are excluded from this recurring bridge and remain discounted once outside terminal cash.",
+            "GAAP segment costs and operating expense include SBC and depreciation, added back once; future-service cash is deducted once. Legacy claims remain in the normalized share treatment.",
+            "Working-capital cash excludes tax/interest already captured in separate cash rows. Capex and net borrowing exclude the separately deducted finance-lease principal. Legacy cash claims remain subject to independent normalization/claims review, not assumed zero. Interest is outside operating profit; only the cash-tax row deducts taxes. No generic other-income/noncash/residual category is supported; material omitted items must remain gaps.",
+        ],
     }
