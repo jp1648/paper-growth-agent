@@ -77,7 +77,19 @@ receipt and pending operation. The workflow is canceled, not retried. The
 reviewed navigation-error fix is deployed and source-verified in both containers;
 worker shutdown exited 0 and services restarted with pause and history intact. See the latest
 November 25 attempt in docs/live-readiness.md. No orders were submitted.
-Trading remains paused.
+The follow-up SEC-discovery fix now exposes financing/proxy forms and the full
+validated filing index; 1,695 offline tests passed and production checks passed.
+New run `held-aapl-navigation-20261125-2` completed all specialists, correction,
+critique and final durable decision for $11.2011800 estimated model cost. Its
+decision is HOLD the existing paper share with zero added shares. Valuation and
+critique still report material gaps; independent investment review is separate
+from technical completion. Ordinary limits were restored; no unsettled research
+charges remain. Independent review supports temporary HOLD/no action but withholds
+full investment acceptance. An offline supplement closes financing/lease/proxy
+arithmetic omissions. The identified operating-to-cash tool gap is now fixed,
+independently reviewed and deployed as `12c2390` (image `72dac496…`); 1,730
+offline tests passed. A real result using this explicit forecast reconciliation
+and independent economic acceptance remain outstanding. Trading remains paused.
 Preserve original runs and history.
 
 ## Start here

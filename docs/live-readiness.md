@@ -6034,3 +6034,99 @@ AAPL share, $99,655.93 cash and no open orders. No new paid investigation or
 order was initiated. The fixed behavior has offline coverage, but a new
 durable research result and independent investment acceptance remain outstanding.
 Trading stays paused.
+
+
+### SEC discovery repaired; new bounded acceptance attempt
+
+The follow-up discovery fix (`4a7fb11`) admits SEC FWP, 424B2 and DEF 14A
+filings, retains the complete validated filing index, and invalidates schema-7
+caches. Compact eight-item previews and paged source retrieval remain unchanged.
+The old 40-entry cutoff had hidden the 2022 equity-plan filing; the form filter
+had excluded available financing and proxy evidence. This repair adds no arbitrary
+URL access. All 1,695 offline tests passed (seven skipped, one deselected), and
+an independent reviewer passed 116 focused checks.
+
+Cloud Build `7af5b4a8-508b-4cd7-8acf-2f754be398bb` produced image
+`sha256:fb171882892ab80cca0990d69b469f9cc5e4c71991d5ce0b695a2ee7c3f1286a`.
+Both containers were deployed and source-verified. Worker shutdown exited zero;
+protected history, pause and ordinary configuration were preserved. Read-only
+production discovery found all four required financing/proxy/plan accessions
+among 226 validated entries.
+
+Following the user's continuation instruction and standing $20 testing bound,
+`held-aapl-navigation-20261125-2` was admitted once with a $20 run ceiling and
+a temporary $49.20821 November 25 daily ceiling. Authenticated credit-grant
+evidence showed $146.35 available; the internal allocation increased from $40
+to $50 while preserving its original spending baseline and $15 buffer. This is
+allocation of existing credits, not a purchase or billing change. Six funding
+regressions and 71 launch-helper tests passed; exact funding and launch artifacts
+were independently reviewed.
+
+The run subsequently completed acquisition, all four specialist reports, a
+targeted valuation correction, fresh critique, final lead decision and durable
+commit. It used 48 model calls and 90 tool calls, settling **$11.2011800 estimated
+model cost** (not a provider bill). November 25 estimated total is $40.4093900.
+A separately reviewed attach-only invocation imported the same committed result;
+it made no new investigation or trade. The final decision is HOLD, quantity zero,
+for the existing one-share paper position. Both valuation and critique retain
+material-gap flags, so technical completion is not investment acceptance.
+Independent economic review and offline completion of attainable analysis follow.
+Ordinary $20/run and $20/day limits were restored exactly; no unknown or unsettled
+research charges remain. The original pause is intact, cash is $99,655.93, the
+portfolio holds one AAPL share and there are no open orders. Trading remains paused. Private evidence is under
+`state/sec-discovery-release-20261125/`, `state/navigation-funding-20261125/`
+and `state/navigation-acceptance-20261125/`.
+
+
+Independent review of the immutable completed result reproduced all 18 prices
+across six calculations and supports temporary HOLD/no action only. It withholds
+full investment acceptance: the operating-to-cash conversion remains an unexplained
+forecast residual, while some attainable financing/ownership arithmetic was left
+unfinished by the agent. The result's gap flags remain unchanged; it was not
+promoted and no BUY, ADD or SELL was approved. Review artifacts are
+`state/navigation-acceptance-20261125/independent-investment-review.{json,md}`.
+
+A separate offline supplement verifies six original source pairs and computes
+$313.75M fixed annual coupons, $5.025M floating spreads plus $1.25B times SOFR,
+existing lease-principal bounds, the dated proxy rights total and RSU rollforward.
+It distinguishes reserve units from outstanding claims and leaves undisclosed
+population-wide award terms explicit. It also quantifies, rather than hides, the
+remaining operating-profit-to-equity-cash residual. Reproduction requires no API
+calls: `python3 state/navigation-offline-supplement-20261125/rebuild.py`.
+This closes arithmetic/source-reading omissions separately from the immutable
+run; it does not establish a validated forward cash-flow forecast.
+
+Independent supplement review accepted the scoped public-source arithmetic and
+diligence repair after byte-identical reproduction and source-hash checks. The
+remaining engineering gap was identified explicitly: `value_scenarios` compounds
+a chosen cash-growth rate without reconciling it to the operating assumptions
+in prose. The structured horizon-bridge follow-up now calculates segment gross profit and
+operating profit, then reconciles explicit cash taxes, interest, depreciation,
+SBC/cash compensation, working capital, reinvestment, lease principal and net
+borrowing to the growth-implied cash endpoint. Original SEC provenance and
+report citations are required; no generic residual field is accepted. Invalid
+inputs return bounded correction feedback without saving a calculation, and
+durable replay preserves that outcome. Old calculations remain unchanged and
+are labeled unverified in model-facing context when this bridge is absent.
+It checks endpoint arithmetic only, not interim cash paths or economic merit.
+Independent code review passed 366 focused checks. The full offline suite
+passed 1,730 tests, with seven skipped and one deselected; lint, format and
+diff checks passed.
+It must not reinterpret the completed HOLD as approved full investment research.
+
+
+The bridge implementation is pushed as `12c2390` and deployed from Cloud Build
+`d8b4d1cd-2712-4b65-9764-1ef9d36251fb` to both production containers:
+`sha256:72dac49668ef16acefd5e5d67024cbcf3a21353a117dd67d1a22764474d6b1c4`.
+Source hashes and SDK 1.37.0 matched; natural client exit and worker shutdown
+passed, with worker exit zero. Guarded verification preserved ordinary config,
+original pause, ledger/history and the unchanged one-share portfolio. Only
+expected reconciliation, snapshot, loss-limit and stream-connect records changed.
+Release evidence is under `state/operating-bridge-release-20261125/`.
+
+No further paid research was run after the $11.2011800 attempt. The new endpoint
+contract is tested and deployed, but has not yet been exercised by an accepted
+real research result. Remaining acceptance requires a new, explicitly reconciled
+forecast and independent assessment of its economic assumptions, interim cash
+path and terminal treatment. Neither the offline supplement nor this deployment
+rewrites the original result or clears its material-gap flags.
