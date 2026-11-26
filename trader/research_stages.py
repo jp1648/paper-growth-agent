@@ -109,6 +109,11 @@ class ResearchStages:
         ):
             raise StageConfigurationError("Stage request differs from frozen research identity")
         stage = request["stage"]
+        synthesis = self.context.get("continuation", {}).get("mode") == "reviewed_synthesis"
+        if synthesis and stage not in {"acquisition", "synthesis_import", "lead", "commit"}:
+            raise StageConfigurationError("Synthesis permits no specialist or correction stages")
+        if stage == "synthesis_import" and not synthesis:
+            raise StageConfigurationError("Synthesis import requires explicit reviewed mode")
         stop = cancellation_event()
         store = self.store_factory(self.store_path)
         provider = None
@@ -132,7 +137,7 @@ class ResearchStages:
                         self.context,
                         consume=stage == "acquisition",
                     )
-                elif stage == "import":
+                elif stage in {"import", "synthesis_import"}:
                     raise StageConfigurationError("Import requires explicit continuation authority")
                 if store.db.execute(
                     "SELECT 1 FROM documents WHERE scope='global' AND kind='research_spend' "
@@ -159,11 +164,15 @@ class ResearchStages:
                     raise StageBudgetError(reason)
                 if stage == "acquisition":
                     receipt = (
-                        {"status": "next", "next_stage": "import", "receipt_ref": self._receipt_ref(stage)}
+                        {
+                            "status": "next",
+                            "next_stage": "synthesis_import" if synthesis else "import",
+                            "receipt_ref": self._receipt_ref(stage),
+                        }
                         if imported is not None
                         else self._acquisition(store, journal, reservation, provider, stop)
                     )
-                elif stage == "import":
+                elif stage in {"import", "synthesis_import"}:
                     receipt = self._import_parent(journal, reservation, provider, imported)
                 else:
                     saved = journal.load_state()
@@ -198,6 +207,7 @@ class ResearchStages:
     def _import_parent(self, journal, reservation, provider, bundle):
         from .research_continuation import import_into_desk
 
+        synthesis = self.context.get("continuation", {}).get("mode") == "reviewed_synthesis"
         saved = journal.load_state()
         if saved is None:
             evidence = copy.deepcopy(bundle["snapshot"]["desk"]["companies"][self.context["symbol"]])
@@ -215,12 +225,17 @@ class ResearchStages:
             saved.get("context") != self.context
             or saved.get("budget", {}).get("models") != 0
             or saved.get("budget", {}).get("tools") != 0
-            or set(saved.get("desk", {}).get("reports", {})) != {"business", "catalysts"}
+            or set(saved.get("desk", {}).get("reports", {}))
+            != (set(ROLES) if synthesis else {"business", "catalysts"})
             or saved.get("desk", {}).get("continuation", {}).get("parent_lineage", {}).get("bundle_sha256")
             != fingerprint(bundle)
         ):
             raise StageConfigurationError("Import checkpoint conflicts with fresh continuation")
-        return {"status": "next", "next_stage": "valuation", "receipt_ref": self._receipt_ref("import")}
+        return {
+            "status": "next",
+            "next_stage": "lead" if synthesis else "valuation",
+            "receipt_ref": self._receipt_ref("synthesis_import" if synthesis else "import"),
+        }
 
     def _require_predecessor(self, store, stage):
         records = [

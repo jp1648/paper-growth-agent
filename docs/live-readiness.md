@@ -6505,3 +6505,60 @@ skipped, one deselected), Ruff and formatting. Composed tests verify real export
 authority consumption, import, fresh specialist sequence, replay and unchanged
 parent artifacts, including funding refusal after claim consumption. No paid
 continuation has started, and trading remains paused.
+
+
+### November 26: reviewed continuation stops at lead cost reserve
+
+Deployed revision `acfd15e57a668a16b33df369fa90883fc39bb9b0` passes 1,893
+offline tests, both CI checks, source verification and controlled shutdown/restart.
+It supports exact audited provider-cost reconciliation when validating a canceled
+parent; original receipts, estimated costs and provider exchanges remain intact.
+Authenticated exports independently reconciled the prior annual run to $7.1987688
+and full-context parent to $7.3460811. Matching uses isolated run windows and all
+usage categories; provider/local minute buckets differ and are not claimed exact.
+
+One child, `held-aapl-continuation-20261126-1`, started at 06:35:51 UTC with a
+$12.6539189 cap, keeping parent billed cost plus child authorization within $20.
+It imports the exact parent evidence and locally replayed calculations, with
+business/catalyst reports explicitly inherited and unaccepted. New valuation and
+adversarial reports completed. The lead failed pre-dispatch at 333,286 bytes,
+10/16 model calls and $14.113175 conservative total against $12.6539189.
+Thus the stop is cost reserve, not context or call-count exhaustion. Saved known
+model usage is $5.479825; no provider operation remains pending and no lead
+request was sent. Cancellation was confirmed with no active activities; safe expired-run closure
+at 06:56:14 UTC settled $5.479825 known estimated usage, with no unknown charge,
+pending provider operation or retry authority. The original reservation/history
+remain in the audit.
+
+Independent replay verifies all 41 calculation records. Eight new records encode
+four cases economically identical to existing parent sensitivities; these do not
+represent new coverage. Fresh prose improves distinctions among conditional cash
+flows, award uncertainty and terminal assumptions. Independent review nevertheless
+requires coherent policy selection, interpretation of existing sensitivities and
+final synthesis, including resolution of a critic's overlooked revenue-recognition
+passage. It does not require private award maxima or certainty about future taxes.
+No final decision, economic acceptance, trade promotion or order submission exists.
+Ordinary config `fada4d29…` was restored and verified in both running containers.
+The pause hash, original experiment, one AAPL share and $99,655.93 cash remain
+unchanged. Trading remains paused.
+
+
+Independent review subsequently accepted the separate offline analyst addendum as
+complete **conditional economic synthesis**. It adopts explicit annual cash,
+financing, compensation and reinvestment policies, interprets the saved terminal
+and combined sensitivities, resolves the critic's missed revenue-recognition
+passage, and supports conditional SELL versus retaining the actual one share at
+the stipulated $355.58 historical reference. Reproducible arithmetic and source
+claims were checked. This neither establishes a unique intrinsic value nor
+predicts near-term performance. The original reports and unresolved flags remain
+unchanged; no executable quote or order approval is implied.
+
+A candidate adds exact repeated-field sharing to reduce synthesis context while
+retaining descriptive keys and exact values, plus a distinct reviewed-synthesis
+mode. This mode verifies the two ancestors and all costs/claims, binds the exact
+independently reviewed addendum, imports the dated reports without endorsing
+them, and permits one tool-free durable lead decision. Ordinary continuation
+chain refusal and BUY/ADD gap veto remain. Independent code review passed, including recovery and one-dispatch refusal;
+1,921 offline tests passed (seven skipped, one deselected), with Ruff and format
+checks clean. No new paid attempt has started and full durable-result acceptance
+is still pending.

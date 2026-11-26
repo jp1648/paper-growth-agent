@@ -453,3 +453,17 @@ The original accounting receipt, model estimates, run manifest and operation
 journal remain unchanged. Child combined-cost authority uses the verified
 current accounted cost, while lineage retains both the historical estimate and
 accounted cost. Reconciliation alone grants no retry, trade or acceptance authority.
+
+The distinct `reviewed_synthesis` continuation mode is restricted to a canceled,
+fully accounted ordinary-continuation child and its single nonchained ancestor.
+Both original bundles, current verified costs and the first consumed authorization
+claim are revalidated. Its new authorization counts both ancestors' costs.
+It imports four dated original reports, locally replays saved calculations and
+arithmetic, and supplies an independently hash-bound analyst addendum separately.
+The addendum review must bind its exact text, cited source/calculation digests and
+parent snapshot, and grant no execution authority. Original report flags remain
+unchanged. Only `acquisition → synthesis_import → lead → commit` is permitted;
+the fresh durable lead has no tools or correction/specialist delegation. The
+existing material-gap BUY/ADD veto and all funding/portfolio gates remain active.
+Ordinary continuations still reject chains. Neither mode grants order submission
+or converts an analyst review into a model decision or investment acceptance.

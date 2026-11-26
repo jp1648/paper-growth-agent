@@ -14,7 +14,8 @@ from .research_workflow import valid_reference
 def validate_descriptor(value):
     if (
         not isinstance(value, dict)
-        or set(value) != {"parent", "bundle_sha256"}
+        or set(value) not in ({"parent", "bundle_sha256"}, {"parent", "bundle_sha256", "mode"})
+        or ("mode" in value and value["mode"] != "reviewed_synthesis")
         or not valid_reference(value["parent"])
         or not isinstance(value["bundle_sha256"], str)
         or len(value["bundle_sha256"]) != 64
@@ -25,7 +26,7 @@ def validate_descriptor(value):
 
 def check_continuation(cfg, store, root, context, *, consume=False):
     """Verify immutable imports and current authority, including before paid dispatch."""
-    from .research_continuation import validate_bundle, validate_parent_state
+    from .research_continuation import accounted_ancestry_cost, validate_bundle, validate_parent_state
 
     descriptor = context.get("continuation")
     if descriptor is None:
@@ -82,7 +83,7 @@ def check_continuation(cfg, store, root, context, *, consume=False):
         or not approval["approved_by"].strip()
         or not dt(approval["approved_at"]) <= now() < dt(approval["expires_at"])
         or not 0 < cfg.research_max_cost_usd <= dec(approval["max_cost_usd"])
-        or dec(bundle["spend"]["body"]["usd"]) + dec(approval["max_cost_usd"])
+        or accounted_ancestry_cost(bundle) + dec(approval["max_cost_usd"])
         > dec(approval["max_combined_cost_usd"])
     ):
         raise ValueError("Continuation lacks matching unexpired bounded authority")

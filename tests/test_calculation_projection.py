@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from test_research_field_projection import expand_fields
 from test_valuation_variants import setup, variant
 
 from trader.config import Settings
@@ -12,6 +13,7 @@ from trader.research_team import ROLES, Budget, Guard, compact_calculation_conte
 
 
 def expand(context):
+    context = expand_fields(context)
     pool = context["calculation_context_pool"]
 
     def resolve(value, visited=()):

@@ -19,6 +19,8 @@ from .research_workflow import valid_reference
 
 SCHEMA = "research-continuation-v1"
 REUSED = ("business", "catalysts")
+SYNTHESIS_SCHEMA = "research-synthesis-v1"
+ALL_REPORTS = (*REUSED, "valuation", "adversarial")
 
 
 def _require(value, message):
@@ -133,6 +135,10 @@ def _reconciled_parent(store, reference, key, spend, receipt):
 
 
 def export_parent_bundle(root, reference, store):
+    return _export_parent_bundle(root, reference, store, allow_continuation=False)
+
+
+def _export_parent_bundle(root, reference, store, *, allow_continuation):
     """Read a terminal parent's original binding, journal and authoritative accounting.
 
     No comparison against the child's new runtime/config fingerprint is appropriate.
@@ -153,7 +159,7 @@ def export_parent_bundle(root, reference, store):
         and all(re.fullmatch("[0-9a-f]{64}", binding[k]) for k in ("code_sha256", "config_sha256")),
         "Parent manifest binding differs",
     )
-    _require(not context.get("continuation"), "Continuation chains are unsupported")
+    _require(allow_continuation or not context.get("continuation"), "Continuation chains are unsupported")
     _require(
         context.get("research_only") is True
         and context.get("runtime_control", {}).get("account_id") == store.experiment.get("account_id"),
@@ -268,6 +274,17 @@ def export_parent_bundle(root, reference, store):
                 "terminal",
                 "journal_tables_sha256",
                 *(("reconciliation",) if "reconciliation" in bundle else ()),
+                *(
+                    (
+                        "ancestor_bundle",
+                        "ancestor_claim",
+                        "ancestor_authorization",
+                        "analytical_addendum",
+                        "independent_review",
+                    )
+                    if bundle.get("schema") == SYNTHESIS_SCHEMA
+                    else ()
+                ),
             )
         }
         return bundle
@@ -278,7 +295,14 @@ def export_parent_bundle(root, reference, store):
 def validate_parent_state(store, root, bundle):
     """Revalidate authoritative originals, including every journal table, without mutation."""
     _require(
-        fingerprint(export_parent_bundle(root, bundle["parent"], store)) == fingerprint(bundle),
+        fingerprint(
+            export_synthesis_bundle(
+                root, bundle["parent"], store, bundle["analytical_addendum"], bundle["independent_review"]
+            )
+            if bundle.get("schema") == SYNTHESIS_SCHEMA
+            else export_parent_bundle(root, bundle["parent"], store)
+        )
+        == fingerprint(bundle),
         "Parent artifacts changed",
     )
 
@@ -287,8 +311,9 @@ def validate_bundle(
     bundle, child_context, expected_sha256, *, experiment_id, cfg, current=None, current_snapshot=None
 ):
     current = current or now()
+    synthesis = bundle.get("schema") == SYNTHESIS_SCHEMA
     _require(
-        bundle.get("schema") == SCHEMA and fingerprint(bundle) == expected_sha256,
+        bundle.get("schema") in {SCHEMA, SYNTHESIS_SCHEMA} and fingerprint(bundle) == expected_sha256,
         "Continuation bundle hash differs",
     )
     parent = bundle["manifest"]["context"]
@@ -305,6 +330,17 @@ def validate_bundle(
                 "terminal",
                 "journal_tables_sha256",
                 *(("reconciliation",) if "reconciliation" in bundle else ()),
+                *(
+                    (
+                        "ancestor_bundle",
+                        "ancestor_claim",
+                        "ancestor_authorization",
+                        "analytical_addendum",
+                        "independent_review",
+                    )
+                    if bundle.get("schema") == SYNTHESIS_SCHEMA
+                    else ()
+                ),
             )
         },
         "Continuation artifact hash differs",
@@ -315,13 +351,18 @@ def validate_bundle(
         "Continuation experiment differs",
     )
     _require(
-        child_context.get("continuation") == {"parent": bundle["parent"], "bundle_sha256": expected_sha256},
+        child_context.get("continuation")
+        == {
+            "parent": bundle["parent"],
+            "bundle_sha256": expected_sha256,
+            **({"mode": "reviewed_synthesis"} if synthesis else {}),
+        },
         "Continuation descriptor differs",
     )
     _require(
         child_context.get("run_key")
         and child_context["run_key"] != parent["run_key"]
-        and not parent.get("continuation"),
+        and (synthesis or not parent.get("continuation")),
         "New nonchained child identity required",
     )
     _require(
@@ -396,7 +437,9 @@ def validate_bundle(
         for field in ("published_at", "retrieved_at"):
             if source.get(field):
                 _require(dt(source[field]) <= dt(bundle["receipt"]["closed_at"]), "Future inherited source")
-    for role in REUSED:
+    if synthesis:
+        _validate_synthesis_artifacts(bundle, current)
+    for role in ALL_REPORTS if synthesis else REUSED:
         _require(role in data["reports"] and role in data["report_times"], "Reusable prerequisite missing")
         _require(
             timedelta(0)
@@ -425,15 +468,24 @@ def import_into_desk(desk, bundle):
     )
     original = desk.checkpoint()
     data = bundle["snapshot"]["desk"]
+    reused = ALL_REPORTS if bundle.get("schema") == SYNTHESIS_SCHEMA else REUSED
     try:
         for field in ("sources", "companies", "documents", "texts", "unavailable_documents"):
             setattr(desk, field, copy.deepcopy(data[field]))
         desk.verify_calculations(data["calculations"])
-        reports = {role: desk.validate(ROLES[role][0], data["reports"][role]) for role in REUSED}
+        if bundle.get("schema") == SYNTHESIS_SCHEMA:
+            desk.restore_arithmetic(
+                [
+                    {"event": kind, "result": copy.deepcopy(value)}
+                    for kind, value in bundle["snapshot"]["budget"]["events"]
+                    if kind in {"cash_flow_sum", "decimal_product"}
+                ]
+            )
+        reports = {role: desk.validate(ROLES[role][0], data["reports"][role]) for role in reused}
         desk.reports = reports
-        desk.report_times = {role: data["report_times"][role] for role in REUSED}
+        desk.report_times = {role: data["report_times"][role] for role in reused}
         desk.report_dependencies = {
-            role: copy.deepcopy(data["report_dependencies"].get(role, {})) for role in REUSED
+            role: copy.deepcopy(data["report_dependencies"].get(role, {})) for role in reused
         }
         for dependencies in desk.report_dependencies.values():
             _require(
@@ -443,7 +495,7 @@ def import_into_desk(desk, bundle):
                 ),
                 "Imported dependency differs",
             )
-        desk.reused = list(REUSED)
+        desk.reused = list(reused)
         budget = bundle["snapshot"]["budget"]
         desk.continuation = {
             "parent_lineage": {
@@ -455,12 +507,26 @@ def import_into_desk(desk, bundle):
                 "reconciliation_id": bundle["spend"]["body"].get("reconciliation_id"),
                 "model_calls": budget["models"],
                 "tool_calls": budget["tools"],
-                "reused_roles": list(REUSED),
+                "reused_roles": list(reused),
                 "status": "unaccepted_prerequisite_research",
                 "correction_reason": copy.deepcopy((data.get("correction") or {}).get("reason")),
                 "instruction": "Complete valuation from inherited original evidence/calculations; fresh critique and final decision remain mandatory. Prior valuations and critiques are not current reports or investment approval.",
             }
         }
+        if bundle.get("schema") == SYNTHESIS_SCHEMA:
+            desk.continuation["reviewed_synthesis"] = {
+                "addendum": copy.deepcopy(bundle["analytical_addendum"]),
+                "review": copy.deepcopy(bundle["independent_review"]),
+                "status": "original_reports_unaccepted_reviewed_addendum_separate",
+            }
+            desk.continuation["parent_lineage"]["ancestor"] = {
+                "reference": copy.deepcopy(bundle["ancestor_bundle"]["parent"]),
+                "bundle_sha256": fingerprint(bundle["ancestor_bundle"]),
+                "accounted_usd": bundle["ancestor_bundle"]["spend"]["body"]["usd"],
+            }
+            desk.continuation["parent_lineage"]["instruction"] = (
+                "Synthesize the dated original reports and separately reviewed analyst addendum. No inherited investment approval, fresh research, tools or order authority. Preserve original gap flags."
+            )
         _require(desk.context == original["context"], "Child context changed during import")
         _require(
             desk.budget.models == desk.budget.tools == 0 and desk.budget.reserved == 0,
@@ -470,3 +536,149 @@ def import_into_desk(desk, bundle):
     except BaseException:
         desk.restore(original)
         raise
+
+
+def accounted_ancestry_cost(bundle):
+    """Call only after complete bundle and authoritative parent validation."""
+    cost = dec(bundle["spend"]["body"]["usd"])
+    if bundle.get("schema") == SYNTHESIS_SCHEMA:
+        cost += dec(bundle["ancestor_bundle"]["spend"]["body"]["usd"])
+    return cost
+
+
+def _validate_synthesis_artifacts(bundle, current):
+    ancestor = bundle["ancestor_bundle"]
+    descriptor = bundle["manifest"]["context"].get("continuation")
+    _require(
+        ancestor.get("schema") == SCHEMA
+        and not ancestor["manifest"]["context"].get("continuation")
+        and descriptor == {"parent": ancestor["parent"], "bundle_sha256": fingerprint(ancestor)}
+        and ancestor["parent"]["run_key"] != bundle["parent"]["run_key"],
+        "Synthesis requires exactly one ordinary continuation ancestor",
+    )
+    data = bundle["snapshot"]["desk"]
+    old = ancestor["snapshot"]["desk"]
+    for role in REUSED:
+        _require(
+            data["reports"][role] == old["reports"][role]
+            and data["report_times"][role] == old["report_times"][role],
+            "Ancestor prerequisite report changed",
+        )
+    _require(set(data["reports"]) == set(ALL_REPORTS), "Synthesis needs four completed reports")
+    _require(
+        data["report_dependencies"].get("adversarial")
+        == {name: _hash_bytes(dumps(data["reports"][name]).encode()) for name in (*REUSED, "valuation")},
+        "Synthesis critique is not bound to current reports",
+    )
+    addendum, review = bundle["analytical_addendum"], bundle["independent_review"]
+    _require(
+        set(addendum) == {"text", "created_at", "source_ids", "calculation_ids"}
+        and isinstance(addendum["text"], str)
+        and addendum["text"].strip()
+        and len(dumps(addendum).encode()) <= 40000
+        and max(dt(stamp) for stamp in data["report_times"].values())
+        <= dt(addendum["created_at"])
+        <= current,
+        "Invalid dated synthesis addendum",
+    )
+    for field, records in (("source_ids", data["sources"]), ("calculation_ids", data["calculations"])):
+        ids = addendum[field]
+        _require(
+            isinstance(ids, list)
+            and ids
+            and all(isinstance(i, str) for i in ids)
+            and len(ids) == len(set(ids))
+            and set(ids) <= records.keys(),
+            "Unknown addendum references",
+        )
+    expected_sources = {i: fingerprint(data["sources"][i]) for i in addendum["source_ids"]}
+    expected_calculations = {i: fingerprint(data["calculations"][i]) for i in addendum["calculation_ids"]}
+    _require(
+        set(review)
+        == {
+            "verdict",
+            "reviewed_by",
+            "reviewed_at",
+            "parent",
+            "addendum_sha256",
+            "snapshot_sha256",
+            "source_sha256",
+            "calculation_sha256",
+            "execution_authorized",
+        }
+        and review["verdict"] == "approved_conditional_synthesis"
+        and isinstance(review["reviewed_by"], str)
+        and review["reviewed_by"].strip()
+        and dt(addendum["created_at"]) <= dt(review["reviewed_at"]) <= current
+        and review["parent"] == bundle["parent"]
+        and review["addendum_sha256"] == fingerprint(addendum)
+        and review["snapshot_sha256"] == fingerprint(bundle["snapshot"])
+        and review["source_sha256"] == expected_sources
+        and review["calculation_sha256"] == expected_calculations
+        and review["execution_authorized"] is False,
+        "Independent synthesis review does not bind exact evidence",
+    )
+
+
+def export_synthesis_bundle(root, reference, store, addendum, review):
+    """Export this fixed two-generation synthesis case; ordinary exports still reject chains."""
+    bundle = _export_parent_bundle(root, reference, store, allow_continuation=True)
+    descriptor = bundle["manifest"]["context"].get("continuation")
+    _require(
+        isinstance(descriptor, dict) and set(descriptor) == {"parent", "bundle_sha256"},
+        "Synthesis parent must be an ordinary continuation",
+    )
+    ancestor = export_parent_bundle(root, descriptor["parent"], store)
+    _require(fingerprint(ancestor) == descriptor["bundle_sha256"], "Original ancestor changed")
+    frozen = json.loads(_read(run_directory(root, reference["run_key"]) / "continuation.json"))
+    _require(frozen == ancestor, "Original imported ancestor differs")
+    authorization = store.get(reference["run_key"], "research_continuation_authorization")
+    claim = store.get(ancestor["parent"]["run_key"], "research_continuation_consumed")
+    expected_claim = {
+        "parent": ancestor["parent"],
+        "child_run_key": reference["run_key"],
+        "authorization_sha256": fingerprint(authorization),
+        "bundle_sha256": fingerprint(ancestor),
+    }
+    _require(
+        isinstance(authorization, dict)
+        and isinstance(claim, dict)
+        and claim.get("claim") == expected_claim
+        and authorization.get("parent") == ancestor["parent"]
+        and authorization.get("bundle_sha256") == fingerprint(ancestor)
+        and authorization.get("child_run_key") == reference["run_key"]
+        and authorization.get("experiment_id") == store.scope
+        and authorization.get("context_sha256") == bundle["manifest"]["binding"]["context_sha256"]
+        and authorization.get("config_sha256") == bundle["manifest"]["binding"]["config_sha256"]
+        and authorization.get("code_sha256") == bundle["manifest"]["binding"]["code_sha256"]
+        and isinstance(authorization.get("approved_by"), str)
+        and authorization["approved_by"].strip()
+        and 0 < dec(authorization["max_cost_usd"])
+        and dec(bundle["receipt"]["known_usd"]) <= dec(authorization["max_cost_usd"])
+        and accounted_ancestry_cost(ancestor) + dec(authorization["max_cost_usd"])
+        <= dec(authorization["max_combined_cost_usd"])
+        and dt(authorization["approved_at"]) <= dt(claim["consumed_at"]) < dt(authorization["expires_at"]),
+        "Ancestor child claim or authorization differs",
+    )
+    entries = store.db.execute(
+        "SELECT body FROM journal WHERE scope=? AND kind='research_continuation_consumed'", (store.scope,)
+    ).fetchall()
+    matches = [
+        json.loads(row[0])
+        for row in entries
+        if json.loads(row[0]).get("claim", {}).get("parent") == ancestor["parent"]
+    ]
+    _require(matches == [claim], "Ancestor consumed claim journal differs")
+    bundle.update(
+        schema=SYNTHESIS_SCHEMA,
+        ancestor_bundle=ancestor,
+        ancestor_claim=claim,
+        ancestor_authorization=authorization,
+        analytical_addendum=copy.deepcopy(addendum),
+        independent_review=copy.deepcopy(review),
+    )
+    _validate_synthesis_artifacts(bundle, now())
+    bundle["artifact_sha256"] = {
+        k: fingerprint(v) for k, v in bundle.items() if k not in {"schema", "parent", "artifact_sha256"}
+    }
+    return bundle

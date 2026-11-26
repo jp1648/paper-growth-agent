@@ -17,6 +17,28 @@ observability data for a password-protected, read-only Next.js dashboard.
 
 ## Last recorded status
 
+Latest November 26 check: **paused; investment acceptance incomplete**. Deployed
+`acfd15e` adds a provenance-bound continuation with strict provider-cost
+reconciliation; 1,893 offline tests and CI passed. Reviewed provider exports
+reconciled the two prior runs to $7.1987688 and $7.3460811, preserving their
+original estimates and histories. The single continuation
+`held-aapl-continuation-20261126-1` produced fresh valuation and critique, then
+stopped before any lead request: $5.479825 estimated usage plus an $8.633350
+next-call reserve exceeded its $12.6539189 cap. Cancellation was confirmed and the run settled at that known local estimate
+at 06:56 UTC, preserving its original reservation and history. There is
+no final decision or full economic acceptance. Independent review identifies
+interpretation and policy synthesis work using retained evidence; further blind
+acquisition or repeated calculations is not justified. No orders were submitted. Ordinary limits were restored and verified in both
+containers; the original one-share AAPL position and $99,655.93 cash are unchanged.
+
+Independent review now accepts the separate source-cited addendum as complete
+conditional economic analysis. It supports a conditional SELL at the stipulated
+historical reference, not an executable order. A new audited, tool-free durable
+final synthesis and independent review of that result remain pending. The
+original reports and gap flags are preserved.
+
+Older entries below record the progression, not current authority.
+
 As checked November 25, 2026: **paused; NO-GO for real
 money**. A one-share AAPL paper fill was confirmed, but that does not establish
 investment quality or unattended-trading readiness.
