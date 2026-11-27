@@ -6622,3 +6622,57 @@ Fresh provider exports support a read-only cost reconciliation proposal, but no
 ancestor charge or reservation was changed. A fresh funding-receipt carry-forward
 can preserve only the existing $13.95885260 unspent allocation and $15 buffer;
 installation still requires exact fresh evidence and independent review.
+
+
+### November 27: durable historical AAPL reasoning independently accepted
+
+User approved the pending single $7.50 revision and $22.5000061 combined lineage
+ceiling. Fresh provider evidence showed $111.84 available. An independently
+reviewed, compare-and-swap funding update carried forward only $13.95885260 of
+existing unused allocation, preserving the $15 buffer, all 81 prior spend records,
+original receipt/audit history and pause. No credits were purchased or charges
+repriced. Ordinary daily authority remained $20 because this was a new New York day.
+
+The retained reports had exceeded the ordinary 12-hour reuse limit. A reviewed
+48-hour supervised allowance permitted this explicitly historical, non-executable
+revision without changing any source timestamp or reference price. The final
+request measured 245,947 bytes and reserved $6.449875 offline, within the $7.50
+cap. Sixty-one admission/control tests and the complete supervisor preflight
+passed. No ordinary freshness gate was removed.
+
+`held-aapl-synthesis-revision-20261126-1`, manifest
+`2e69151fb4f19da24bbae5022cc9ec761bdaec47e9dcbdacd3a8ad0a3ca842f0`,
+completed at 17:57:48 UTC: one model call, zero tools, $2.033825 settled local
+estimated cost, no unknown charge or pending provider operation. This is not a
+provider invoice. Cached attachment used the completed result without another
+model call; 13 completion/attachment tests passed. The original start packet and
+all ancestor results remain immutable.
+
+Independent review accepts **complete conditional historical investment-decision
+reasoning**. The decision selects explicit financing, compensation/dilution,
+reinvestment and tax policies; compares the existing share's modeled retention
+value with marginal sale proceeds; and explains terminal and combined sensitivities.
+The reviewer independently reproduced all 41 scenario triplets and verified all
+14 cited calculation IDs and nine cited source IDs. Approval concerns the reasoning,
+not a predetermined SELL outcome. Review SHA-256:
+`cfcba5b56f10ead1a43f101f9ba64ac9e2d0cd3351d6109a6e0bd98572a7d2b3`.
+Private bound result/review artifacts are retained in
+`state/synthesis-revision-acceptance-20261127/`.
+
+The conditional SELL of one share uses the historical $355.58 reference. It was
+not submitted, promoted to a current thesis, or approved for execution. Original
+material-gap flags and BUY/ADD restrictions remain. Confidence is explicitly
+subjective and uncalibrated; forecast accuracy, future profitability and current
+trading readiness are not established. Full research lineage cost is $17.0338311
+on its disclosed mixture of provider-billed and local-estimated costs; remaining
+approved allocation is $11.92502760. Separate current-market, trial and live-release
+requirements remain outside this completed historical acceptance exercise.
+
+Post-restore verification at 18:01:30 UTC confirmed both containers retain the
+reviewed image and ordinary $20/day, $20/run, 12-hour cache and 240,000-byte input
+limits. All 81 prior spending records are unchanged; the new 82nd record is known
+settled. The original pause remains, no research workflow or provider operation
+is pending, and cached acceptance is complete. The current reconciled ledger
+snapshot remains $99,655.93 cash, one AAPL share and no open orders; this verification
+did not make a new broker call. Post-restore proof SHA-256:
+`285d1f06f265f1a37918fb2d9dc2dfacac642ebc61cd0c15f6adc5733518056c`.

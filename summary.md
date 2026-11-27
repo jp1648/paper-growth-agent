@@ -17,6 +17,20 @@ observability data for a password-protected, read-only Next.js dashboard.
 
 ## Last recorded status
 
+Latest November 27 result: **the durable AAPL historical investment decision is
+independently accepted; trading remains paused**. Run
+`held-aapl-synthesis-revision-20261126-1` completed one model call and zero tools
+for $2.033825 settled local estimated cost, with no unknown charge. The reviewer
+reproduced all 41 scenario calculations and accepted its explicit conditional
+policy and sell-versus-retain reasoning. Its proposed SELL uses the retained
+$355.58 historical, non-executable reference; no order or thesis promotion occurred.
+Original report gaps remain. This closes the retained-evidence research acceptance
+exercise, not current-market or unattended/live-trading readiness. The complete
+lineage totals $17.0338311 on mixed provider-billed and estimated accounting bases.
+See the November 27 entry in `docs/live-readiness.md` for exact evidence bindings.
+
+Previous dated status follows for historical context.
+
 Latest November 26 check: **paused; complete investment-decision acceptance
 still pending**. Deployed `3635c71` adds bounded revisions of rejected final decisions and
 explicit conditional policy comparison. 1,947 offline tests, both CI runs and
