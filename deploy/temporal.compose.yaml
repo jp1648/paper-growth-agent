@@ -1,0 +1,54 @@
+# Local deployment verification only. Cloud SQL replaces postgres on the executor.
+name: trader-temporal-verification
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${TEMPORAL_POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:?required}
+    volumes:
+      - temporal-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}"']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [temporal]
+  schema:
+    image: temporalio/admin-tools:1.32.2
+    profiles: [tools]
+    entrypoint: [temporal-sql-tool]
+    environment:
+      SQL_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:?required}
+    networks: [temporal]
+  server:
+    image: temporalio/server@sha256:7bf69188a6232fea14869b9cef3d94aa82a1601d99517f7e86c71f22da4e0670
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: [temporal-server]
+    command: [--config, /etc/temporal, --env, server, --allow-no-auth, start]
+    environment:
+      TEMPORAL_POSTGRES_ADDRESS: postgres:5432
+      TEMPORAL_POSTGRES_USER: ${TEMPORAL_POSTGRES_USER:?required}
+      TEMPORAL_POSTGRES_PASSWORD: ${TEMPORAL_POSTGRES_PASSWORD:?required}
+      BIND_ON_IP: 0.0.0.0
+      TEMPORAL_BROADCAST_ADDRESS: 172.31.248.3
+    volumes:
+      - ./temporal-server.yaml:/etc/temporal/server.yaml:ro
+    ports:
+      - '127.0.0.1:${TEMPORAL_VERIFY_PORT:-17233}:7233'
+    networks:
+      temporal:
+        ipv4_address: 172.31.248.3
+    mem_limit: 1g
+    logging:
+      options: {max-size: 10m, max-file: '3'}
+networks:
+  temporal:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.248.0/29
+volumes:
+  temporal-postgres:

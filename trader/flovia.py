@@ -67,7 +67,7 @@ class FloviaX:
 
     @traced("flovia.snapshot")
     def snapshot(self, symbol):
-        if symbol not in self.cfg.universe or not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
+        if symbol not in self.cfg.research_universe or not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
             raise ValueError("Invalid research symbol")
         if not self.cfg.flovia_x_enabled:
             return []

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import date, datetime, time, timedelta
 from typing import TypedDict
+from zoneinfo import ZoneInfo
 
 from langgraph.graph import END, START, StateGraph
 
-from .models import Decision, dec, dt, now
+from .models import Decision, dec, dt, dumps, now
 from .observability import traced
 
 
@@ -14,9 +16,13 @@ class GraphState(TypedDict, total=False):
     fresh: bool
     trigger: str
     research_only: bool
+    finalize_from: str
+    study_id: str
+    study_stratum: str
     portfolio: dict
     evidence: dict
-    quote: dict
+    quote: dict | None
+    research_reference: dict | None
     research: dict
     valuation: dict
     catalysts: dict
@@ -24,6 +30,7 @@ class GraphState(TypedDict, total=False):
     team_reports: dict
     team_report_times: dict
     calculations: dict
+    arithmetic_records: list[dict]
     reused_reports: list
     decision: dict
     risk: list[str]
@@ -31,12 +38,184 @@ class GraphState(TypedDict, total=False):
     report: dict
 
 
-def build_graph(service, team):
+def research_input(service, symbol, *, deferred):
+    if deferred:
+        clock = service.broker.clock()
+        if clock["is_open"] is False:
+            stamp, observed = dt(clock["timestamp"]), now()
+            if abs((observed - stamp).total_seconds()) > 30:
+                raise ValueError("Broker clock stale; historical research reference unavailable")
+            zone = ZoneInfo("America/New_York")
+            day = stamp.astimezone(zone).date()
+            start = day - timedelta(days=14)
+            sessions = service.broker.calendar(start.isoformat(), day.isoformat())
+            if not isinstance(sessions, list) or len(sessions) > 15:
+                raise ValueError("Invalid historical research calendar")
+            dates, completed = [], []
+            for session in sessions:
+                session_day = date.fromisoformat(session["date"])
+                opening, closing = time.fromisoformat(session["open"]), time.fromisoformat(session["close"])
+                if (
+                    session_day.isoformat() != session["date"]
+                    or not start <= session_day <= day
+                    or session_day.weekday() >= 5
+                    or opening.tzinfo is not None
+                    or closing.tzinfo is not None
+                    or not time(9, 30) == opening < closing <= time(16)
+                ):
+                    raise ValueError("Invalid regular-session research calendar boundaries")
+                dates.append(session_day)
+                closing_at = datetime.combine(session_day, closing, zone)
+                if closing_at <= min(stamp, observed):
+                    completed.append((closing_at, session))
+            if dates != sorted(set(dates)):
+                raise ValueError("Research calendar requires unique increasing session dates")
+            if not completed:
+                raise ValueError("No completed regular session available for research reference")
+            closing_at, session = completed[-1]
+            price = dec(service.data.session_close(symbol, session))
+            if price <= 0:
+                raise ValueError("Nonpositive historical research reference")
+            return {
+                "quote": None,
+                "research_reference": {
+                    "symbol": symbol,
+                    "price": str(price),
+                    "basis": "last_validated_regular_session_minute_bar_close",
+                    "method": "Last available split-adjusted 1Min bar close within 300 seconds before the scheduled session close; not an official consolidated closing-auction price",
+                    "session_bounds_source": "https://paper-api.alpaca.markets/v2/calendar",
+                    "session": session,
+                    "session_closed_at": closing_at.isoformat(),
+                    "retrieved_at": now().isoformat(),
+                    "feed": service.cfg.feed,
+                    "source": f"https://data.alpaca.markets/v2/stocks/{symbol}/bars",
+                    "timeframe": "1Min",
+                    "adjustment": "split",
+                    "coverage": "IEX exchange only" if service.cfg.feed == "iex" else "US consolidated SIP",
+                    "historical": True,
+                    "executable": False,
+                },
+            }
+    return {"quote": service.data.quote(symbol).model_dump(mode="json"), "research_reference": None}
+
+
+def commit_research(store, state, result, *, review=None):
+    """Publish a thesis, immutable decision and audit atomically; never execute orders."""
+    from .observability import emit
+    from .paper_dispatch import fingerprint
+
+    key, symbol = state["run_key"], state["symbol"]
+    result_hash = fingerprint(result)
+    stamp = now().isoformat()
+    marker = {"at": stamp, "result_sha256": result_hash, "review": review}
+    with store.db:
+        store.db.execute("BEGIN IMMEDIATE")
+        committed = store.get(key, "research_committed")
+        if committed:
+            if committed.get("result_sha256") != result_hash or committed.get("review") != review:
+                raise ValueError("Research commit identity conflicts with existing receipt")
+            return False
+        legacy = store.get(key, "graph_decision")
+        if legacy is not None and legacy != result["decision"]:
+            raise ValueError("Run key already has a different immutable decision")
+        existing = store.get(symbol, "thesis")
+        if review is not None:
+            if fingerprint(existing) != review["prior_thesis_sha256"]:
+                raise ValueError("Prior thesis changed since accepted research admission")
+            if existing and dt(existing["reviewed_at"]) >= dt(result["research_completed_at"]):
+                raise ValueError("Reviewed research would overwrite a newer thesis")
+        documents = [("graph_decision", key, result["decision"])]
+        if not existing or dt(existing["reviewed_at"]) <= dt(result["research_completed_at"]):
+            thesis = {
+                "run_key": key,
+                "decision": result["decision"],
+                "reviewed_at": result["research_completed_at"],
+                "reference_price": (
+                    result["research_reference"]["price"]
+                    if result.get("research_reference")
+                    else result["quote"]["ask"]
+                ),
+                "reference_basis": result.get("research_reference")
+                or {
+                    "basis": "broker_quote_ask",
+                    "timestamp": result["quote"]["timestamp"],
+                    "feed": result["quote"]["feed"],
+                },
+                "evidence_ids": sorted(x["id"] for x in result["evidence"]["sources"]),
+                "valuation": result["valuation"],
+                "team_reports": result["team_reports"],
+                "team_report_times": result.get("team_report_times", {}),
+                "research_sources": result["evidence"]["sources"],
+                "research_calculations": result.get("calculations", {}),
+                "research_arithmetic_records": result.get("arithmetic_records", []),
+            }
+            if review is not None:
+                thesis.update(research_only=True, independent_review=review)
+            documents.append(("thesis", symbol, thesis))
+        if review is not None:
+            documents.append(("acceptance_review", key, review))
+        documents.append(("research_committed", key, marker))
+        for kind, document_key, value in documents:
+            store.db.execute(
+                "INSERT INTO documents VALUES (?,?,?,?) ON CONFLICT(scope,kind,key) DO UPDATE SET body=excluded.body",
+                (store.scope, kind, document_key, dumps(value)),
+            )
+        body = {**state, **result}
+        if review is not None:
+            body["independent_review"] = review
+        store.db.execute(
+            "INSERT INTO journal(scope,at,kind,body) VALUES (?,?,?,?)",
+            (store.scope, stamp, "research_decision", dumps(body)),
+        )
+    for kind, document_key, value in documents:
+        emit("document." + kind, {"key": document_key, "value": value}, experiment_id=store.scope)
+    emit("research_decision", body, experiment_id=store.scope, run_key=key)
+    return True
+
+
+def build_graph(service, team, *, research_client=None):
     store = service.store
 
     def portfolio(s):
         if service.kill_path.exists():
             raise RuntimeError("Kill switch is active; research paused")
+        study = store.get("active", "paper_study")
+        if study is not None and (
+            s.get("study_id") != study["schedule"]["study_id"]
+            or s.get("study_stratum") not in {"scheduled", "safety"}
+        ):
+            raise RuntimeError("Active study research must pass through the study dispatcher")
+        if study is not None:
+            if s["study_stratum"] == "scheduled":
+                claim = store.get(dumps([s["study_id"], s["run_key"]]), "paper_slot")
+                if (
+                    not claim
+                    or claim.get("symbol") != s["symbol"]
+                    or claim.get("outcome") == "missed"
+                    or claim.get("schedule_sha256") != study["schedule_sha256"]
+                ):
+                    raise RuntimeError("Scheduled graph has no matching durable slot claim")
+            else:
+                job = store.get(s["run_key"], "job")
+                if (
+                    not s["run_key"].startswith(s["study_id"] + ":safety:")
+                    or not job
+                    or job.get("status") not in ({"running", "pending"} if research_client else {"running"})
+                ):
+                    raise RuntimeError("Safety graph has no matching running study job")
+            if not store.claim_paper_slot(
+                s["study_id"],
+                s["run_key"],
+                {
+                    "symbol": s["symbol"],
+                    "at": now(),
+                    "schedule_sha256": study["schedule_sha256"],
+                },
+                kind="paper_invocation",
+            ):
+                claim = store.get(dumps([s["study_id"], s["run_key"]]), "paper_invocation")
+                if not research_client or not research_client.same_invocation(s, claim):
+                    raise RuntimeError("Study graph invocation already consumed; no automatic retry")
         snap = service.reconcile()
         previous = store.get(s["symbol"], "thesis")
         return {
@@ -52,15 +231,43 @@ def build_graph(service, team):
         }
 
     def research(s):
+        if research_client is None and (
+            any(
+                store.get(s["run_key"], kind) is not None
+                for kind in ("research_request", "research_workflow", "research_workflow_submission")
+            )
+            or store.db.execute(
+                "SELECT 1 FROM documents WHERE scope='global' AND kind='research_spend' "
+                "AND json_extract(body,'$.run_key')=? AND json_extract(body,'$.experiment_id')=? "
+                "AND json_extract(body,'$.durable')=1 LIMIT 1",
+                (s["run_key"], store.scope),
+            ).fetchone()
+        ):
+            raise ValueError("Durable research requires its verified Temporal workflow")
+        if research_client is not None:
+            reference = research_client.reference_for(s)
+            if reference is not None:
+                result = research_client.poll(reference)
+                commit_research(store, s, result)
+                return result
         cached = store.get(s["run_key"], "research_result")
         if cached:
+            if research_client is not None:
+                raise ValueError("Cached research lacks a verified durable workflow reference")
             if cached["decision"]["symbol"] != s["symbol"]:
                 raise ValueError("Research run key belongs to another symbol")
-            commit_research(s, cached)
+            commit_research(store, s, cached)
             return cached
-        quote = service.data.quote(s["symbol"]).model_dump(mode="json")
-        result = team.run({**s, "quote": quote, "current_timestamp": now().isoformat()})
-        result["quote"] = quote
+        pricing = research_input(service, s["symbol"], deferred=bool(s.get("research_only")))
+        context = {**s, **pricing, "current_timestamp": now().isoformat()}
+        if research_client is not None:
+            return research_client.start(context)
+        result = (
+            team.run(context, finalize_from=s["finalize_from"])
+            if s.get("finalize_from")
+            else team.run(context)
+        )
+        result.update(pricing)
         proposal = Decision.model_validate(result["decision"])
         if proposal.symbol != s["symbol"]:
             raise ValueError("Decision changed the requested symbol")
@@ -82,36 +289,11 @@ def build_graph(service, team):
             raise ValueError("Run key already has a different immutable decision")
         result["research_completed_at"] = now().isoformat()
         store.put(s["run_key"], result, "research_result")
-        commit_research(s, result)
+        commit_research(store, s, result)
         return result
 
-    def commit_research(s, result):
-        if store.get(s["run_key"], "research_committed"):
-            return
-        store.put(s["run_key"], result["decision"], "graph_decision")
-        existing = store.get(s["symbol"], "thesis")
-        if not existing or dt(existing["reviewed_at"]) <= dt(result["research_completed_at"]):
-            store.put(
-                s["symbol"],
-                {
-                    "run_key": s["run_key"],
-                    "decision": result["decision"],
-                    "reviewed_at": result["research_completed_at"],
-                    "reference_price": result["quote"]["ask"],
-                    "evidence_ids": sorted(x["id"] for x in result["evidence"]["sources"]),
-                    "valuation": result["valuation"],
-                    "team_reports": result["team_reports"],
-                    "team_report_times": result.get("team_report_times", {}),
-                    "research_sources": result["evidence"]["sources"],
-                    "research_calculations": result.get("calculations", {}),
-                },
-                "thesis",
-            )
-        store.log("research_decision", {**s, **result})
-        store.put(s["run_key"], {"at": now()}, "research_committed")
-
     def risk(s):
-        if s.get("research_only"):
+        if s.get("research_only") or s["symbol"] in service.cfg.research_only_universe:
             return {"risk": []}
         d = Decision.model_validate(s["decision"])
         prior = store.get(service.client_order_id(s["run_key"]), "intent")
@@ -121,21 +303,24 @@ def build_graph(service, team):
         return {"risk": reasons}
 
     def execution(s):
-        result = (
-            {"status": "deferred", "reason": "Research outside regular trading hours"}
-            if s.get("research_only")
-            else service.execute(
-                s["decision"],
-                s["run_key"],
-                {
-                    "sources": s["evidence"],
-                    "research": s["research"],
-                    "valuation": s["valuation"],
-                    "critique": s["critique"],
-                    "catalysts": s["catalysts"],
-                },
+        if s["symbol"] in service.cfg.research_only_universe:
+            result = {"status": "research_only", "reason": "Symbol is excluded from execution universe"}
+        else:
+            result = (
+                {"status": "deferred", "reason": "Research outside regular trading hours"}
+                if s.get("research_only")
+                else service.execute(
+                    s["decision"],
+                    s["run_key"],
+                    {
+                        "sources": s["evidence"],
+                        "research": s["research"],
+                        "valuation": s["valuation"],
+                        "critique": s.get("critique"),
+                        "catalysts": s["catalysts"],
+                    },
+                )
             )
-        )
         thesis = store.get(s["symbol"], "thesis")
         if thesis and thesis.get("run_key") == s["run_key"]:
             thesis["execution"] = result
@@ -162,4 +347,6 @@ def build_graph(service, team):
         graph.add_edge(previous, name)
         previous = name
     graph.add_edge(previous, END)
-    return graph.compile()
+    compiled = graph.compile()
+    compiled.research_client = research_client
+    return compiled

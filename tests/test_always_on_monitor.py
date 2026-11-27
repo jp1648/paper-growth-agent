@@ -92,3 +92,23 @@ def test_unreadable_ledger_preserves_other_health_metrics(tmp_path, monkeypatch,
     assert values["daily_model_spend_ratio"] == 1e12
     if state == "missing":
         assert not database.exists()
+
+
+def test_slow_outbox_scan_reports_unknown_instead_of_losing_heartbeat(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location(
+        "always_on_monitor", Path(__file__).parents[1] / "deploy/always-on-monitor.py"
+    )
+    monitor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(monitor)
+    database = tmp_path / "outbox.sqlite"
+    with sqlite3.connect(database) as db:
+        db.execute("CREATE TABLE outbox(id,body)")
+        db.executemany(
+            "INSERT INTO outbox VALUES (?,?)",
+            [(str(i), '{"at":"2026-11-14T00:00:00Z"}') for i in range(100)],
+        )
+    ticks = iter([0, 6])
+    monkeypatch.setattr(monitor.time, "monotonic", lambda: next(ticks))
+    assert monitor.outbox_oldest_age(database) == 1e12
+    with sqlite3.connect(database) as db:
+        assert db.execute("SELECT count(*) FROM outbox").fetchone()[0] == 100

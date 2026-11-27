@@ -5,36 +5,7 @@ import json
 from .models import dec, now
 from .observability import emit
 from .reports import portfolio_report
-
-
-def spend_breakdown(store, model_usage):
-    rows = {}
-
-    def record(source, amount):
-        row = rows.setdefault(
-            source, {"source": source, "known_usd": dec(0), "requests": 0, "unknown_requests": 0}
-        )
-        row["requests"] += 1
-        if amount is None:
-            row["unknown_requests"] += 1
-        else:
-            row["known_usd"] += dec(amount)
-
-    for event in model_usage:
-        record("OpenAI · " + event.get("model", "unspecified model"), event.get("estimated_usd"))
-    x_results = {e["body"]["operation_id"]: e["body"] for e in store.events("x_result")}
-    for event in store.events("x_attempt"):
-        result = x_results.get(event["body"]["operation_id"], {})
-        record("X API", result.get("cost_usd"))
-    for _ in store.events("flovia_x_attempt"):
-        record("Flovia (legacy)", None)
-    for event in store.events("data_cost"):
-        body = event["body"]
-        record(body.get("source") or body.get("provider") or "Other data", body.get("usd"))
-    for row in rows.values():
-        if row["unknown_requests"] == row["requests"]:
-            row["known_usd"] = None
-    return sorted(rows.values(), key=lambda row: (-(row["known_usd"] or dec(0)), row["source"]))
+from .spending import spend_breakdown
 
 
 def publish_snapshot(service):
@@ -72,6 +43,11 @@ def publish_snapshot(service):
         "generated_at": now(),
         "experiment_id": store.scope,
         "started_at": store.experiment.get("started_at"),
+        "lifecycle": {
+            "original_ends_at": store.experiment["ends_at"],
+            "amended": report["lifecycle"]["approval"] is not None,
+            **{k: report["lifecycle"].get(k) for k in ("valid", "execution_ends_at", "effective_ends_at")},
+        },
         "portfolio": {
             k: report[k]
             for k in (
@@ -80,6 +56,8 @@ def publish_snapshot(service):
                 "equity",
                 "cash",
                 "total_pnl",
+                "economic_result",
+                "execution_quality",
                 "unrealized_pnl",
                 "reserved_for_buys",
                 "model_cost_usd_estimate",
@@ -108,6 +86,7 @@ def publish_snapshot(service):
                     "benchmarks",
                     "matching_period_return",
                     "max_drawdown",
+                    "drawdown_note",
                     "missing_sessions",
                     "benchmark_method",
                 )

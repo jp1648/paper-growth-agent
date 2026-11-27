@@ -1,8 +1,62 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
+from decimal import InvalidOperation
 from zoneinfo import ZoneInfo
 
 from .accounting import recent_turnover, remaining, reserved
 from .models import ZERO, dec, dt
+
+
+def daily_loss(account, activities, calendar, at, fraction):
+    """Use broker prior-close equity, never the first balance observed after downtime."""
+    local = at.astimezone(ZoneInfo("America/New_York"))
+    result = {"date": local.date().isoformat(), "valid": False, "breached": False}
+    try:
+        sessions = {}
+        for session in calendar:
+            day = session["date"]
+            if date.fromisoformat(day).isoformat() != day or day in sessions:
+                raise ValueError("Ambiguous broker calendar")
+            sessions[day] = session
+        prior = max(day for day in sessions if day < result["date"])
+        session = sessions[prior]
+        if account.get("balance_asof") != prior or session["close"] != "16:00":
+            raise ValueError("Prior-close date or regular-close baseline is unverified")
+        baseline = dec(account["last_equity"])
+        if baseline <= 0 or dec(account["intraday_adjustments"]) != 0:
+            raise ValueError("Prior-close equity or intraday adjustments are unsupported")
+        cutoff = datetime.fromisoformat(prior + "T16:00:00").replace(tzinfo=local.tzinfo)
+        flows = ZERO
+        for activity in activities:
+            if activity["activity_type"] not in {"CSD", "CSW"}:
+                continue
+            if activity.get("transaction_time"):
+                stamp = dt(activity["transaction_time"])
+                if stamp > at:
+                    raise ValueError("Future capital movement")
+                if stamp == cutoff:
+                    raise ValueError("Capital movement coincides with baseline cutoff")
+                after = stamp > cutoff
+            else:
+                day = date.fromisoformat(activity["date"])
+                if day > local.date() or day == cutoff.date():
+                    raise ValueError("Capital movement cannot be placed relative to prior close")
+                after = day > cutoff.date()
+            if after:
+                flows += dec(activity["net_amount"])
+        pnl = dec(account["equity"]) - baseline - flows
+        threshold = baseline * fraction
+        result.update(
+            valid=True,
+            baseline_equity=baseline,
+            baseline_date=prior,
+            capital_flows=flows,
+            pnl=pnl,
+            threshold_usd=threshold,
+            breached=pnl <= -threshold,
+        )
+    except (KeyError, ValueError, TypeError, InvalidOperation, StopIteration) as error:
+        result["error"] = f"Daily loss baseline unavailable: {type(error).__name__}"
+    return result
 
 
 def check(
@@ -63,6 +117,14 @@ def check(
     ):
         reasons.append("Security halted or halt status unavailable/stale")
     reference = quote.ask if decision.side == "buy" else quote.bid
+    spread = (quote.ask - quote.bid) / ((quote.ask + quote.bid) / 2)
+    if spread > settings.max_spread_fraction:
+        reasons.append("Quoted spread exceeds execution limit")
+    displayed = quote.ask_size if decision.side == "buy" else quote.bid_size
+    if displayed is None or displayed <= 0:
+        reasons.append("Displayed executable quote size unavailable")
+    elif decision.quantity > displayed * settings.max_quote_participation:
+        reasons.append("Order exceeds displayed quote participation limit")
     if abs(decision.limit_price / reference - 1) > settings.price_tolerance:
         reasons.append("Limit price outside configured quote tolerance")
     if decision.next_review <= at:
@@ -75,20 +137,41 @@ def check(
         reasons.append("ADD requires a position")
     if any(o["symbol"] == decision.symbol for o in orders):
         reasons.append("Outstanding order already exists for this symbol")
+    protective_exit = decision.side == "sell" and decision.exit_reason in {
+        "risk",
+        "thesis_invalid",
+        "catalyst_failed",
+    }
     if (
-        settings.cooldown_hours > 0
+        not protective_exit
+        and settings.cooldown_hours > 0
         and last_trade
         and at - dt(last_trade) < timedelta(hours=settings.cooldown_hours)
     ):
         reasons.append("Symbol cooldown is active")
     notional = decision.quantity * decision.limit_price
-    if equity > 0 and recent_turnover(activities, orders, at) + notional > equity * settings.turnover_30d:
+    if notional > equity * settings.max_order_equity:
+        reasons.append("Order exceeds per-order equity limit")
+    if (
+        not protective_exit
+        and equity > 0
+        and recent_turnover(activities, orders, at) + notional > equity * settings.turnover_30d
+    ):
         reasons.append("Rolling 30-day gross turnover ceiling exceeded")
     if decision.side == "buy":
         # Alpaca cash is the cash ledger, not margin buying power and not net of open-order holds.
         available = cash - reserved(orders, settings.fee_buffer)
         if notional + settings.fee_buffer > available:
             reasons.append("Insufficient unreserved cash")
+        try:
+            non_marginable = dec(account["non_marginable_buying_power"])
+            if non_marginable < 0:
+                raise ValueError("Negative non-marginable buying power")
+            # Broker balance already reflects holds; do not subtract local reservations twice.
+            if notional + settings.fee_buffer > non_marginable:
+                reasons.append("Insufficient broker non-marginable buying power")
+        except (KeyError, ValueError, InvalidOperation):
+            reasons.append("Broker non-marginable buying power unavailable or invalid")
         exposure = {s: max(ZERO, dec(p["market_value"])) for s, p in positions.items()}
         for o in orders:
             if o["side"] == "buy":

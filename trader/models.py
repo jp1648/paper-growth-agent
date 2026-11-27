@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Protocol
@@ -13,6 +14,12 @@ PAPER_URL = "https://paper-api.alpaca.markets"
 TERMINAL = {"filled", "canceled", "expired", "rejected", "replaced"}
 
 
+class SubmissionPreflightError(RuntimeError):
+    def __init__(self, reasons):
+        self.reasons = reasons
+        super().__init__("Submission preflight rejected")
+
+
 def now() -> datetime:
     return datetime.now(UTC)
 
@@ -22,6 +29,14 @@ def dt(value: str | datetime) -> datetime:
     if value.tzinfo is None:
         raise ValueError("Timezone required")
     return value
+
+
+def news_time(article):
+    created = dt(article["created_at"])
+    updated = dt(article.get("updated_at", article["created_at"]))
+    if updated < created:
+        raise ValueError("News update predates publication")
+    return updated
 
 
 def dec(value) -> Decimal:
@@ -64,7 +79,11 @@ class Decision(Model):
     why_now: str = Field(min_length=1)
     catalysts: list[str] = Field(min_length=1)
     thesis_development: str = Field(min_length=1)
-    holding_period_days: int = Field(ge=1, le=730)
+    holding_period_days: int = Field(
+        ge=0,
+        le=730,
+        description="Use 0 for WATCH when no holding is proposed; use 1–730 days for other actions.",
+    )
     next_review: datetime
     add_if: str = Field(min_length=1)
     reduce_if: str = Field(min_length=1)
@@ -72,7 +91,10 @@ class Decision(Model):
     exit_reason: Literal[
         "none", "thesis_invalid", "valuation", "catalyst_failed", "better_opportunity", "risk"
     ]
-    evidence_ids: list[str] = Field(min_length=1)
+    evidence_ids: list[str] = Field(
+        min_length=1,
+        description="Exact original source IDs only. Never include calculation IDs; cite calculations in narrative fields or calculation_id.",
+    )
     assumptions: list[str]
     expected_outcome: str = Field(min_length=1)
     confidence: Annotated[Decimal, WithJsonSchema({"type": "number", "minimum": 0, "maximum": 1})] = Field(
@@ -86,6 +108,8 @@ class Decision(Model):
 
     @model_validator(mode="after")
     def valid_trade(self):
+        if self.action != "WATCH" and self.holding_period_days == 0:
+            raise ValueError("A non-WATCH decision requires a positive holding period")
         if self.quantity != self.quantity.to_integral_value():
             raise ValueError("Whole shares required")
         if self.action in {"BUY", "ADD", "REDUCE", "SELL"}:
@@ -106,6 +130,8 @@ class Quote(Model):
     symbol: str
     bid: Decimal = Field(gt=0)
     ask: Decimal = Field(gt=0)
+    bid_size: Decimal | None = Field(default=None, ge=0)
+    ask_size: Decimal | None = Field(default=None, ge=0)
     timestamp: datetime
     source: str
     feed: str
@@ -133,7 +159,7 @@ class PaperBroker(Protocol):
     def open_orders(self) -> list[dict]: ...
     def snapshot(self, after: str, tracked_ids: list[str]) -> Snapshot: ...
     def lookup(self, client_id: str) -> dict | None: ...
-    def submit(self, payload: dict) -> dict: ...
+    def submit(self, payload: dict, *, before_send: Callable[[], None] | None = None) -> dict: ...
     def cancel(self, order_id: str) -> None: ...
     def clock(self) -> dict: ...
     def calendar(self, start: str, end: str) -> list[dict]: ...

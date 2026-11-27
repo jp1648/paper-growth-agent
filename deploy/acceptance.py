@@ -2,11 +2,12 @@
 
 import argparse
 import fcntl
+import json
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import ROUND_DOWN
-from zoneinfo import ZoneInfo
+from pathlib import Path
 
 import httpx
 
@@ -15,10 +16,204 @@ from trader.alpaca import AlpacaBroker, AlpacaData, safe_error
 from trader.config import Settings
 from trader.evidence import EvidenceProvider
 from trader.models import TERMINAL, D, Decision, dt, dumps, now
+from trader.research import commit_research, research_input
 from trader.research_team import DeepResearchTeam
 from trader.service import Service
 from trader.spending import spending_status
 from trader.store import Store
+
+
+def durable_research(service, symbol, run_key):
+    from trader.research_client import ResearchPending, TemporalResearchClient
+
+    store, cfg = service.store, service.cfg
+    client = TemporalResearchClient(
+        cfg,
+        store,
+        root=Path(cfg.database).resolve().parent / "research-runs",
+        address=cfg.temporal_address,
+        namespace=cfg.temporal_namespace,
+        task_queue=cfg.temporal_task_queue,
+        tls=cfg.temporal_tls,
+    )
+    # Only bounded start/query work holds these locks; the worker owns research.
+    with exclusive(service), service.lock():
+        if symbol not in cfg.research_universe:
+            raise ValueError("Symbol outside configured research universe")
+        record = store.get(run_key, "acceptance")
+        if record is None:
+            if any(
+                store.get(run_key, kind) for kind in ("research_request", "research_audit", "research_result")
+            ):
+                raise RuntimeError("Acceptance run ID already attempted; inspect its saved evidence")
+            snapshot = service.reconcile()
+            context = {
+                "symbol": symbol,
+                "run_key": run_key,
+                "fresh": True,
+                "research_only": True,
+                **research_input(service, symbol, deferred=True),
+                "current_timestamp": now().isoformat(),
+                "portfolio": {
+                    "snapshot": snapshot.model_dump(mode="json"),
+                    "prior_thesis": store.get(symbol, "thesis"),
+                },
+            }
+            record = {
+                "mode": "research",
+                "symbol": symbol,
+                "status": "started",
+                "at": now(),
+                "context": context,
+                "durable": True,
+            }
+            store.put(run_key, record, "acceptance")
+            store.log("acceptance_started", {"run_key": run_key, **record})
+        elif (
+            record.get("mode") != "research"
+            or record.get("symbol") != symbol
+            or record.get("durable") is not True
+            or record.get("status") not in {"started", "pending"}
+        ):
+            raise RuntimeError("Acceptance run ID already attempted; inspect its saved evidence")
+        try:
+            result = client.start(record["context"])
+        except ResearchPending as pending:
+            record.update(status="pending", workflow=pending.reference, workflow_state=pending.state)
+        else:
+            if set(result["team_reports"]) != {"business", "catalysts", "valuation", "adversarial"}:
+                raise ValueError("Incomplete specialist team")
+            if Decision.model_validate(result["decision"]).symbol != symbol:
+                raise ValueError("Research decision changed the requested symbol")
+            store.put(run_key, result, "acceptance_research")
+            record.update(status="complete", estimated_cap_usd=cfg.research_max_cost_usd)
+        store.put(run_key, record, "acceptance")
+        return record
+
+
+def commit_reviewed_research(service, symbol, run_key, review):
+    """Promote an independently accepted durable result while trading stays paused."""
+    from trader.paper_dispatch import fingerprint
+    from trader.research_client import TemporalResearchClient
+    from trader.research_team import Catalysts, Critique, Research, Valuation
+
+    store, cfg = service.store, service.cfg
+    service.require_experiment()
+    if not service.kill_path.exists() or not cfg.temporal_address:
+        raise RuntimeError("Reviewed commit requires persistent pause and durable research")
+    with exclusive(service), service.lock():
+        pause = service.kill_path.read_bytes()
+        record = store.get(run_key, "acceptance")
+        result = store.get(run_key, "acceptance_research")
+        reference = store.get(run_key, "research_workflow")
+        if (
+            not record
+            or record.get("status") != "complete"
+            or record.get("mode") != "research"
+            or record.get("durable") is not True
+            or record.get("symbol") != symbol
+            or not result
+            or not reference
+            or reference.get("run_key") != run_key
+            or store.get(f"research_stage_receipt:{run_key}:commit", "research_stage_receipt") is None
+        ):
+            raise ValueError("Require completed matching durable acceptance and commit receipt")
+        context = record["context"]
+        if (
+            context.get("run_key") != run_key
+            or context.get("symbol") != symbol
+            or context.get("research_only") is not True
+        ):
+            raise ValueError("Acceptance context identity mismatch")
+        frozen = store.get(run_key, "research_request")
+        frozen_context = dict(frozen.get("context", {})) if frozen else {}
+        frozen_context.pop("runtime_control", None)
+        if fingerprint(frozen_context) != fingerprint(context):
+            raise ValueError("Acceptance context differs from frozen durable request")
+        prior = context["portfolio"]["prior_thesis"]
+        expected = {
+            "experiment_id": store.scope,
+            "run_key": run_key,
+            "symbol": symbol,
+            "result_sha256": fingerprint(result),
+            "reference_sha256": fingerprint(reference),
+            "prior_thesis_sha256": fingerprint(prior),
+        }
+        if (
+            not isinstance(review, dict)
+            or any(review.get(k) != v for k, v in expected.items())
+            or review.get("verdict") != "accepted_complete_research"
+            or review.get("research_complete") is not True
+            or review.get("independent") is not True
+            or not isinstance(review.get("reviewed_by"), str)
+            or not review["reviewed_by"].strip()
+            or not isinstance(review.get("rationale"), str)
+            or not review["rationale"].strip()
+        ):
+            raise ValueError("Require independently hash-bound complete research approval")
+        completed, reviewed = dt(result["research_completed_at"]), dt(review["reviewed_at"])
+        current = now()
+        if not completed <= reviewed <= current or not timedelta(0) <= current - completed < timedelta(
+            hours=cfg.research_cache_hours
+        ):
+            raise ValueError("Research or independent review timestamp is stale or invalid")
+        decision = Decision.model_validate(result["decision"])
+        if decision.symbol != symbol or dt(decision.next_review) <= current:
+            raise ValueError("Decision symbol or review deadline is invalid")
+        schemas = {
+            "business": Research,
+            "catalysts": Catalysts,
+            "valuation": Valuation,
+            "adversarial": Critique,
+        }
+        if set(result["team_reports"]) != set(schemas):
+            raise ValueError("Incomplete specialist team")
+        ids = {source["id"] for source in result["evidence"]["sources"]}
+        for role, schema in schemas.items():
+            report = schema.model_validate(result["team_reports"][role])
+            if not set(report.evidence_ids).issubset(ids):
+                raise ValueError("Research cited unknown evidence")
+        if not decision.evidence_ids or not set(decision.evidence_ids).issubset(ids):
+            raise ValueError("Decision cited unknown evidence")
+        valuation = result["team_reports"]["valuation"]
+        normalization = valuation.get("normalization_review")
+        if (
+            not valuation.get("calculation_id")
+            or valuation["calculation_id"] not in result.get("calculations", {})
+            or any(valuation.get(k) is None for k in ("bear_value", "base_value", "bull_value"))
+            or not normalization
+            or normalization["unresolved_material_gaps"]
+        ):
+            raise ValueError("Complete research requires sourced valuation and resolved normalization")
+        if not set(normalization["evidence_ids"]).issubset(ids):
+            raise ValueError("Normalization cited unknown evidence")
+        if result["team_reports"]["adversarial"]["unresolved_material_gaps"]:
+            raise ValueError("Unresolved material gaps cannot be accepted as complete research")
+        for field, role in (
+            ("research", "business"),
+            ("valuation", "valuation"),
+            ("catalysts", "catalysts"),
+            ("critique", "adversarial"),
+        ):
+            if result[field] != result["team_reports"][role]:
+                raise ValueError("Research projection differs from specialist report")
+        client = TemporalResearchClient(
+            cfg,
+            store,
+            root=Path(cfg.database).resolve().parent / "research-runs",
+            address=cfg.temporal_address,
+            namespace=cfg.temporal_namespace,
+            task_queue=cfg.temporal_task_queue,
+            tls=cfg.temporal_tls,
+        )
+        # Existing commit receipt forces verification only: never start or resume provider work.
+        verified = client.poll(reference)
+        if fingerprint(verified) != fingerprint(result):
+            raise ValueError("Acceptance result differs from verified durable result")
+        if service.kill_path.read_bytes() != pause:
+            raise RuntimeError("Pause changed during reviewed commit")
+        changed = commit_research(store, context, result, review=review)
+        return {"status": "committed" if changed else "already_committed", "run_key": run_key, **expected}
 
 
 @contextmanager
@@ -31,38 +226,6 @@ def exclusive(service):
             yield
         finally:
             fcntl.flock(handle, fcntl.LOCK_UN)
-
-
-def research_price(service, symbol):
-    clock = service.broker.clock()
-    if clock["is_open"]:
-        return service.data.quote(symbol).model_dump(mode="json")
-    zone = ZoneInfo("America/New_York")
-    stamp = dt(clock["timestamp"])
-    day = stamp.astimezone(zone).date()
-    sessions = service.broker.calendar((day - timedelta(days=14)).isoformat(), day.isoformat())
-    completed = [
-        session
-        for session in sessions
-        if datetime.fromisoformat(session["date"] + "T" + session["close"]).replace(tzinfo=zone) <= stamp
-    ]
-    if not completed:
-        raise RuntimeError("No completed regular session available for research reference")
-    session = max(completed, key=lambda item: item["date"])
-    close = service.data.session_close(symbol, session)
-    return {
-        "symbol": symbol,
-        "reference_price": str(close),
-        "ask": str(close),
-        "timestamp": datetime.fromisoformat(session["date"] + "T" + session["close"])
-        .replace(tzinfo=zone)
-        .isoformat(),
-        "source": "historical regular-session close; ask field is a reference only",
-        "feed": service.cfg.feed,
-        "historical": True,
-        "executable": False,
-        "coverage": "IEX exchange only" if service.cfg.feed == "iex" else "consolidated SIP",
-    }
 
 
 def confirmed_fill(store, cid):
@@ -96,6 +259,10 @@ def run(
     service.require_experiment()
     if not service.kill_path.exists():
         raise RuntimeError("Acceptance requires the persistent trading pause")
+    if mode == "research" and cfg.temporal_address:
+        if unrestricted_research or finalize_from or team is not None:
+            raise ValueError("Temporal acceptance requires configured limits and the original full team")
+        return durable_research(service, symbol, run_key)
     original_pause = service.kill_path.read_bytes()
     cid = service.client_order_id("explicit-paper-smoke:" + symbol)
     attempted_order = False
@@ -151,15 +318,18 @@ def run(
                     EvidenceProvider(bounded, store, service.data),
                     unrestricted_research=unrestricted_research,
                 )
-                quote = research_price(service, symbol)
+                pricing = research_input(service, symbol, deferred=True)
                 context = {
                     "symbol": symbol,
                     "run_key": run_key,
                     "fresh": True,
                     "research_only": True,
-                    "quote": quote,
+                    **pricing,
                     "current_timestamp": now().isoformat(),
-                    "portfolio": {"snapshot": snapshot.model_dump(mode="json"), "prior_thesis": None},
+                    "portfolio": {
+                        "snapshot": snapshot.model_dump(mode="json"),
+                        "prior_thesis": store.get(symbol, "thesis"),
+                    },
                 }
                 result = (
                     worker.run(context, finalize_from=finalize_from) if finalize_from else worker.run(context)
@@ -169,7 +339,7 @@ def run(
                 proposal = Decision.model_validate(result["decision"])
                 if proposal.symbol != symbol:
                     raise ValueError("Research decision changed the requested symbol")
-                result["quote"] = quote
+                result.update(pricing)
                 store.put(run_key, result, "acceptance_research")
                 record.update(status="complete", estimated_cap_usd=cap)
             else:
@@ -245,13 +415,14 @@ def run(
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=["research", "paper-smoke"])
+    parser.add_argument("mode", choices=["research", "paper-smoke", "commit-reviewed"])
     parser.add_argument("symbol")
     parser.add_argument("--run-key", required=True)
     parser.add_argument("--config", default="config.toml")
     parser.add_argument("--listener-stopped", action="store_true", required=True)
     parser.add_argument("--research-key")
     parser.add_argument("--reviewed", action="store_true")
+    parser.add_argument("--review-file", help="Independent hash-bound complete research approval JSON")
     parser.add_argument(
         "--finalize-from",
         help="Research only: synthesize a new final decision from a failed run's four completed reports, without repeating investigation",
@@ -264,12 +435,21 @@ def main():
     args = parser.parse_args()
     if args.finalize_from and args.mode != "research":
         parser.error("--finalize-from is only available for research")
+    if args.mode == "commit-reviewed" and not args.review_file:
+        parser.error("commit-reviewed requires --review-file")
     cfg = Settings.load(args.config)
     store = Store(cfg.database)
     try:
         print(
             dumps(
-                run(
+                commit_reviewed_research(
+                    Service(cfg, store, AlpacaBroker(cfg), AlpacaData(cfg)),
+                    args.symbol,
+                    args.run_key,
+                    json.loads(Path(args.review_file).read_text()),
+                )
+                if args.mode == "commit-reviewed"
+                else run(
                     Service(cfg, store, AlpacaBroker(cfg), AlpacaData(cfg)),
                     args.mode,
                     args.symbol,

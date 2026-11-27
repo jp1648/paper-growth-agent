@@ -50,9 +50,9 @@ For a fresh news-triggered reassessment, the catalyst specialist can conclude th
 
 ## Bounded runs and limitations
 
-Engineering defaults per investigation: 24 model calls, 48 tool calls, 600 seconds, 180,000 bytes of model-request context, 3,000 maximum output tokens per call, and $5 estimated model spend. The lead and all specialists share these limits, including parallel calls. Tool/model checks enforce the deadline between steps; an in-flight HTTP operation can finish after the deadline, but no decision is accepted afterward. OpenAI request timeout is 60 seconds and automatic retries are off.
+Engineering defaults per investigation: 24 model calls, 48 tool calls, 600 seconds, 180,000 bytes of model-request context, 3,000 maximum output tokens per call, and $5 estimated model spend. The lead and all specialists share these limits, including parallel calls. Tool/model checks enforce the deadline between steps; an in-flight HTTP operation can finish after the deadline, but no decision is accepted afterward. OpenAI request timeout is 180 seconds for valuation and lead synthesis, and 60 seconds for other specialists; automatic retries are off. Valuation allows longer annual-path reasoning and structured arguments (up to 12,000 output tokens). A read timeout after dispatch remains ambiguous and requires reconciliation; a longer timeout does not authorize replay or clear unknown spend.
 
-Before a model request, the budget uses the selected role’s token rates and reserves a conservative input allowance based on UTF-8 payload bytes plus framing overhead and the maximum output tokens. Confirmed usage replaces that reservation. Configured rates must be accurate; this is an estimated guard, not a provider billing cap. Failed calls may be billed with unknown usage. Repeated runs also share `research_daily_cost_usd` (selected $5/day pilot, configurable, zero disables new research). Durable SQLite reservations prevent restarts or concurrent runs from silently resetting the daily allowance. Unknown usage/crashes retain conservative reservations. Dates are New York run-start dates; ongoing investigations stop before making another call after midnight. Reconciliation and reporting continue when the research cap is exhausted; the cap is an application estimate, not an OpenAI billing limit. Hidden summarizer model calls are disabled; excessive context fails closed instead of silently adding cost.
+Before a model request, the budget uses the selected role’s token rates and reserves a conservative input allowance based on UTF-8 payload bytes plus framing overhead and the maximum output tokens. Returned token counts replace that reservation at configured price ceilings. Input ceilings must cover cache writes as well as uncached input; the shipped settings cover Standard short-context 12h writes and deliberately ignore cache-read/incentive savings. These remain estimates until provider reconciliation. Reverify ceilings for different models, context lengths, processing tiers or regional endpoints; this is an estimated guard, not a provider billing cap. Failed calls may be billed with unknown usage. Repeated runs also share `research_daily_cost_usd` (selected $5/day pilot, configurable, zero disables new research). Durable SQLite reservations prevent restarts or concurrent runs from silently resetting the daily allowance. Unknown usage/crashes retain conservative reservations. Dates are New York run-start dates; ongoing investigations stop before making another call after midnight. Reconciliation and reporting continue when the research cap is exhausted; the cap is an application estimate, not an OpenAI billing limit. Hidden summarizer model calls are disabled; excessive context fails closed instead of silently adding cost.
 
 The initial valuation tool discounts per-share annual cash flows and a terminal cash-flow multiple across three scenarios, using Decimal arithmetic. Assumptions remain model judgments. It is not a universal valuation method; unsupported businesses or insufficient evidence should be reported as gaps and cannot justify purchases. No general web browsing, paid transcript feed, automatic universe expansion, or external investor-relations crawler is included. SEC earnings exhibits are available only when filed; news is a bounded vendor feed. Coverage gaps must remain explicit.
 
@@ -120,3 +120,132 @@ also previews, retrievable with read_source. Each specialist has ten tool calls,
 then tools are removed and it must return a structured report with evidence gaps.
 The shared 48-tool, model-call, time and dollar guards still apply. A bounded report
 is not proof that the evidence is sufficient to trade.
+
+Structured claim coverage uses the runtime-only `runtime-claims-coverage-v1`
+completion contract inside the existing valuation normalization review. The four
+fixed categories are common shares, preferred/convertible claims, legacy awards,
+and noncontrolling interests. Supported treatment requires retained original SEC
+citations, a treatment explanation, and a point date for common shares; these
+checks establish neither semantic support nor correct economic treatment.
+Unread, undisclosed or unsupported claims remain valid incomplete research and
+block BUY/ADD even when a model clears its global gap flag. Legacy reports lacking
+coverage remain unreviewed; cached execution uses the same boundary. The existing
+single model-requested correction may repair valuation and rebuild its critic
+without resetting budgets. Compact claim gaps are propagated into that existing
+context; the diagnostic does not automatically schedule a correction or guarantee
+that remaining capacity is spent on repair. Missing evidence may still produce honest WATCH/abstention. Frozen
+replay candidates, original-case economics and the v8 scoring rubric are unchanged;
+this is a runtime diagnostic and execution gate, not a new economic score.
+
+An explicit `capital_expenditure_source` may select the original
+`PaymentsToAcquireProductiveAssets` fact when its cited SEC filing passage and
+rationale identify the cash-purchase line. The default remains
+`PaymentsToAcquirePropertyPlantAndEquipment`; no automatic alias or fallback is
+used. Original taxonomy, USD annual period, accession, filing basis and supporting
+passage are retained. The same selection must reach the historical proxy and any
+normalization bridge; conflicting tool/bridge selections fail. Explicit selection
+uses bridge version 5, while omitted selections preserve existing canonical
+payloads and calculation IDs. SEC cache schema 7 refreshes older caches that did
+not retain the additional original tag. Gross purchases are not silently netted
+against proceeds, acquisitions, financing principal, noncash lease additions or
+unpaid asset balances. Selection and exact arithmetic do not certify semantic
+support, normalized earnings or investment acceptance. Independent replay applies
+the unchanged v8 financial-provenance criteria to the retained selected tag.
+
+Specialist and final-lead contexts use the same reversible calculation projection:
+identical embedded normalization assumptions and provenance are replaced with
+explicit paths to the retained copy within that calculation. Original calculations,
+citations, correction provenance and paginated `read_source` remain unchanged.
+This removes duplication without summarizing evidence or spending another model call.
+
+For tool caps above 64, half the additional slots are reserved for the single
+correction and its dependent reports. A 96-call cap reserves 30 correction slots
+and initially assigns 15 to each specialist plus two lead auxiliary calls and
+four delegations. Unused completed business/catalyst allowances can still transfer
+to initial valuation. Correction allocations add to cumulative role limits;
+restart restores spent counters, and global tool/model/context/cost guards remain
+binding. A larger tool cap does not authorize additional dollar spending.
+
+The November 25 AAPL correction exceeded 240,000 input bytes at 262,710 bytes,
+with 58/64 tools used. Offline projection of its last admitted saved request reduces
+serialized input from 239,904 to 222,125 bytes. Applying that same seed reduction
+to the uncaptured blocked request estimates 244,931 bytes, still over the old cap.
+A supervised fresh attempt may therefore use explicitly authorized 320,000-byte
+and 96-tool testing bounds, retaining the $20 cost cap and all evidence/risk gates.
+These are recommended testing overrides, not changed defaults or proof of research
+acceptance. No failed run should be resumed under silently changed authority.
+
+Valuation methodology also requires a compact numeric operating-driver bridge
+from business mix and margins through expenses, tax/cash conversion and
+reinvestment to horizon cash flow. An aggregate cash-conversion residual must
+not be combined with a second deduction for cash-tax timing already inside it.
+Available debt coupons and maturities should inform incremental financing
+sensitivity; an undisclosed floating rate is not zero. Material normalization
+alternatives must be carried through to the proposed action.
+
+The lead applies symmetric evidence standards to valuation-driven purchases and
+exits: compare selling with retaining the position, including horizon, friction
+and upside/downside. An unsupported buy does not establish a sell; the chosen
+optimistic case is not a ceiling. A separately supported protective exit can
+still be proposed for a broken thesis or portfolio constraint. This is research
+guidance, not a blanket SELL veto or a change to deterministic execution gates.
+Prompt-contract tests cannot certify economic reasoning; independent review of
+the actual output remains necessary.
+
+### Optional Robinhood MCP research
+
+`robinhood_enabled` exposes `research_data_catalog` and `research_data` to the
+research team. The fixed allowlist covers filing discovery/content/facts,
+financials, earnings dates/results, fundamentals and analyst ratings. Authenticate
+with the local OAuth command in [Robinhood setup](robinhood-mcp-assessment.md#implemented-research-adapter).
+The research tool tries Robinhood first, then returns applicable existing SEC and
+Alpaca news evidence with explicit partial-coverage warnings. Existing original
+filing tools remain available. No broker/account/order tools or executable quotes
+are routed through MCP. This opt-in does not unpause trading or clear acceptance
+gaps, and is excluded from historical evaluations.
+
+
+Annual sensitivities can use `evaluate_valuation_variants` with a saved annual `calculation_id` and one to six explicitly named variants. Each contains at most 32 patches: an existing numeric `path` (string segments, canonical zero-based indices), replacement scalar or complete annual vector, rationale, and registered original `evidence_ids`. For example, `["annual_operating_forecast", "cases", "0", "cash_rows", "5", "amounts_usd"]` selects the existing row at that index; inspect its category first rather than assuming index meanings. The replacement includes the forward terminal year. There is no inferred scaling or terminal cash recomputation when a growth or discount assumption changes; explicit compatible multiples and cash policies remain the analyst's responsibility.
+
+The tool runs the unchanged `value_scenarios` validation and arithmetic, checks original source identity/cutoff, and returns compact child IDs and values. Historical anchors, source identity, vector lengths and policy categories cannot be patched. Patches sharing a row require consistent rationale and citations; numeric duplicates and no-op patches are rejected. A failed batch publishes no new calculations. Child records preserve the parent input hash, exact ordered before/after changes and canonical arithmetic ID; saved finalization replays every lineage edge. Original calculations and sources remain unchanged. One explicitly requested batch counts as one tool operation (no provider calls inside); the normal model, context, time and dollar guards still apply. Conditional arithmetic never certifies the policies or clears material gaps.
+
+
+Model synthesis messages losslessly pool exact repeated objects/lists/strings of at least 128 bytes across the human context, including calculation records, reports and correction context. `calculation_context_ref` aliases resolve recursively through `calculation_context_pool` in the same message; all original numerical vectors, policies, citations, results, instructions and lineage remain available without an extra source read. Reserved-key collisions anywhere in the context leave the projection unchanged. This changes only the human model-context projection; saved reports/calculations, assistant tool arguments, provider history, replay and conservative cost checks are unchanged. Smaller context is not proof that a full remaining research sequence fits its dollar or byte limits.
+
+An offline projection of Run6's exact saved peak lead request reduced 425,041 to 184,094 bytes. Under the unchanged bytes-plus-2,048 reserve formula, the minimum valuation/critique/final-lead tail fell from $14.007290 to $7.983615. Added to the recorded $11.2525125, that hypothetical minimum is $19.2361275 within the existing $20 ceiling. This is minimum-tail admission evidence, not a guarantee that every additional source check or correction fits. Original Run6's recorded context maxima and source binding remain immutable; the projection does not authorize migration or retry.
+
+
+Research agents disable the framework's implicit human-message eviction while retaining its default file tools and 20,000-token tool-result offload. Large single-line JSON context can otherwise become a file whose first read truncates mid-line without a usable continuation, hiding a correction reason or price reference. The full original human context now reaches the research Guard, which applies lossless pooling and the existing exact request-size, cost, model and time admission checks before a provider call. Oversized requests fail before dispatch; this is not an unbounded-context or replay exemption. Correction delivery does not establish completion or economic acceptance.
+
+### Continuing settled, incomplete research
+
+An explicitly authorized child run can reuse a canceled parent's verified evidence
+without changing its immutable identity or replaying paid calls. The parent must
+have known settled accounting, no pending operations or unanswered provider
+dispatches, and unchanged original manifest, snapshot and journal tables. The
+first implementation refuses continuation chains and reconciled parent projections;
+those require a separately reviewed extension, not an accounting exception.
+
+The child's frozen context names the parent reference and canonical bundle hash
+in `continuation`. Its private run directory contains `continuation.json`, exported
+with `research_continuation.export_parent_bundle`. A separate
+`research_continuation_authorization` ledger record binds that child, experiment,
+code/config/context hashes, bundle hash, reviewer, expiry, child dollar cap and
+combined parent-plus-child dollar ceiling. A transactional parent claim prevents
+two children consuming the same authority; retrying the same child is idempotent.
+Existing funding, daily allowance, pause, reconciliation and reservation gates
+still apply, including before each paid dispatch. This does not create funding.
+
+The explicit path is acquisition admission → import → valuation → adversarial
+review → lead → ordinary research commit. Import makes no provider calls. It
+replays saved arithmetic locally and preserves original evidence, publication
+times and report dates. Only business/catalyst prerequisites are reused, labeled
+unaccepted; old valuation, critique, decisions, budget state and provider responses
+are not imported as completed child work. Fresh valuation, fresh critique and a
+new final decision are mandatory. Parent lineage remains visible to those agents
+and in the resulting audit. The child has its own journal and spending record;
+the parent cost is retained once, not reset or charged again.
+
+This route produces research only. Independent investment acceptance and all
+paper execution gates remain separate; importing calculations or completing a
+workflow never unpauses trading or authorizes an order.

@@ -36,3 +36,33 @@ The automated suite validates operational behavior against fixtures and mocked H
 Container checks: `tests/test_operations.py` covers durable daily reservations, atomic concurrent admission, retained unknown usage, date rollover, continued reconciliation with zero research budget, health staleness, maintenance during blocked research, and timed-out child cleanup. Docker build and a live paper-account maintenance command must also pass before deployment; neither places an order.
 
 The 2026-10-28 iterative readiness review added `tests/test_readiness.py` for cancellation under reconciliation failure, account/order identity, cached execution recovery, premarket budget reuse, news invalidation, paused reporting/research, timezone replay, feed consistency, zero-equity returns, backup restoration/privacy, cooldowns, SQL filtering, date-bound budgets, safe API diagnostics and immutable execution-time risk evidence. See [production review](production-review.md) for fixes, measured validation and outstanding external gates.
+
+### Promote independently reviewed durable research while paused
+
+`deploy/acceptance.py commit-reviewed SYMBOL --run-key RUN --review-file REVIEW.json
+--listener-stopped --config CONFIG` saves an accepted thesis without running the
+trading graph, changing the pause, or submitting/canceling orders. Stop the
+listener through the supervised operating procedure first; the command also
+acquires the listener and executor account locks. This is separate from research
+generation and paper-smoke execution.
+
+The private review JSON must contain `experiment_id`, `run_key`, `symbol`,
+`result_sha256`, `reference_sha256`, and `prior_thesis_sha256` (canonical
+`trader.paper_dispatch.fingerprint` of the saved acceptance result, workflow
+reference and admitted prior thesis respectively), plus `reviewed_by`,
+`reviewed_at`, `rationale`, `independent: true`, `research_complete: true`, and
+`verdict: "accepted_complete_research"`. The operator must obtain this artifact
+from a separate reviewer of the exact result; these identity fields record that
+approval, not a cryptographic reviewer authentication system. A qualified WATCH
+with unresolved research does not qualify.
+
+Promotion verifies the existing durable commit receipt, manifest/journal hashes
+and settled cost through the Temporal client, the frozen admission context,
+complete schemas/citations, valuation/normalization, future review deadline and
+research freshness. It cannot start missing provider work. The shared production
+publisher saves decision, thesis, approval, completion marker and audit in one
+SQLite transaction. Changed prior theses and conflicting replays reject; identical
+valid replays do not write another decision. The research completion time remains
+the thesis timestamp and the independent review retains its separate timestamp.
+Legacy completion markers without a result hash require explicit inspection and
+are not silently promoted into new verified receipts.

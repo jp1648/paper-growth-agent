@@ -6,6 +6,7 @@ import pathlib
 import shutil
 import sqlite3
 import subprocess
+import time
 import tomllib
 import urllib.request
 from zoneinfo import ZoneInfo
@@ -17,13 +18,16 @@ def metadata(path):
     request = urllib.request.Request(
         "http://metadata.google.internal/computeMetadata/v1/" + path, headers={"Metadata-Flavor": "Google"}
     )
-    with urllib.request.urlopen(request, timeout=10) as response:
+    with urllib.request.urlopen(request, timeout=5) as response:
         return response.read().decode()
 
 
 def outbox_oldest_age(database):
     try:
         with sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=5) as db:
+            # SQLite's connection timeout only bounds locks, not scanning a large backlog.
+            deadline = time.monotonic() + 5
+            db.set_progress_handler(lambda: time.monotonic() >= deadline, 100)
             oldest, total, valid = db.execute(
                 "SELECT min(julianday(json_extract(body,'$.at'))), count(*), "
                 "count(julianday(json_extract(body,'$.at'))) FROM outbox"
@@ -56,7 +60,7 @@ def measurements(root=ROOT):
                 "/run/config.toml",
             ],
             capture_output=True,
-            timeout=45,
+            timeout=30,
             check=False,
         )
         healthy = float(result.returncode == 0)
@@ -72,6 +76,8 @@ def measurements(root=ROOT):
     day = dt.datetime.now(ZoneInfo("America/New_York")).date().isoformat()
     try:
         with sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=5) as db:
+            deadline = time.monotonic() + 5
+            db.set_progress_handler(lambda: time.monotonic() >= deadline, 100)
             used = db.execute(
                 "SELECT coalesce(sum(CAST(json_extract(body,'$.usd') AS REAL)),0) "
                 "FROM documents WHERE scope='global' AND kind='research_spend' "

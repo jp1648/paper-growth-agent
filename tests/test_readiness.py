@@ -94,6 +94,7 @@ def test_ledger_sorts_absolute_times_not_timestamp_strings():
     buy = {
         "id": "buy",
         "activity_type": "FILL",
+        "type": "fill",
         "side": "buy",
         "symbol": "ACME",
         "qty": "1",
@@ -128,6 +129,43 @@ def test_report_is_immutable_and_rejects_mixed_benchmark_feed(env, monkeypatch):
         daily_report(service)
 
 
+@pytest.mark.parametrize("failure", ["baseline_fetch", "report_write", "journal_write"])
+def test_daily_sample_is_not_published_without_completed_report(env, monkeypatch, failure):
+    service, _, data = env
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(hours=6))
+    original_close = data.session_close
+    calls = 0
+
+    def fail_baseline(*args):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise RuntimeError("Baseline provider unavailable")
+        return original_close(*args)
+
+    if failure == "baseline_fetch":
+        monkeypatch.setattr(data, "session_close", fail_baseline)
+        expected = RuntimeError
+    else:
+        table = "journal" if failure == "journal_write" else "documents"
+        service.store.db.execute(
+            f"CREATE TEMP TRIGGER fail_report BEFORE INSERT ON {table} "
+            "WHEN NEW.kind='daily_report' BEGIN SELECT RAISE(ABORT, 'disk write fault'); END"
+        )
+        expected = sqlite3.IntegrityError
+    with pytest.raises(expected):
+        daily_report(service)
+    assert service.store.items("daily") == []
+    assert service.store.items("daily_report") == []
+    assert service.store.events("daily_report") == []
+    monkeypatch.setattr(data, "session_close", original_close)
+    service.store.db.execute("DROP TRIGGER IF EXISTS fail_report")
+    report = daily_report(service)
+    assert len(service.store.items("daily")) == len(service.store.items("daily_report")) == 1
+    assert len(service.store.events("daily_report")) == 1
+    assert dec(daily_report(service)["close_equity"]) == report["close_equity"]
+
+
 def test_zero_comparison_equity_does_not_break_reporting(env, monkeypatch):
     service, broker, _ = env
     # A fully withdrawn experiment has no denominator for subsequent percentage returns.
@@ -142,7 +180,33 @@ def test_zero_comparison_equity_does_not_break_reporting(env, monkeypatch):
     monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=1, hours=6))
     result = daily_report(service)
     assert result["experiment_price_return"] is None
+    assert result["experiment_total_return"] is None
     assert result["daily_equity"][-1]["return"] is None
+    assert result["daily_equity"][-1]["total_return"] is None
+    assert result["max_drawdown"] is None
+    assert result["total_return_max_drawdown"] is None
+
+
+def test_missing_session_cannot_certify_drawdown(env, monkeypatch):
+    service, _, _ = env
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(hours=6))
+    daily_report(service)
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=2, hours=6))
+    result = daily_report(service)
+    assert result["missing_sessions"] == ["2026-10-22"]
+    assert result["experiment_total_return"] == 0
+    assert result["max_drawdown"] is None
+    assert result["total_return_max_drawdown"] is None
+
+
+def test_first_report_does_not_hide_missed_opening_sessions(env, monkeypatch):
+    service, _, _ = env
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=2, hours=6))
+    result = daily_report(service)
+    assert result["missing_sessions"] == ["2026-10-21", "2026-10-22"]
+    assert result["matching_dates"]["start"] == "2026-10-23"
+    assert result["max_drawdown"] is None
+    assert result["total_return_max_drawdown"] is None
 
 
 @pytest.mark.parametrize(
@@ -173,8 +237,8 @@ def test_mismatched_submission_keeps_unknown_intent(env, decision):
     service, broker, _ = env
     original = broker.submit
 
-    def corrupt(payload):
-        order = original(payload)
+    def corrupt(payload, **kwargs):
+        order = original(payload, **kwargs)
         order["client_order_id"] = "unexpected"
         return order
 
@@ -339,3 +403,43 @@ def test_financial_previews_require_original_evidence_reads(env):
     reader = next(t for t in desk.tools() if t.name == "read_source")
     assert "100" in reader.invoke({"source_id": "facts"})["content"]
     assert desk.sources["facts"] == original
+
+
+def test_total_return_includes_net_distributions_but_excludes_external_cash_flow(env, monkeypatch):
+    service, broker, _ = env
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(hours=6))
+    first = daily_report(service)
+    assert first["experiment_total_return"] == 0
+    broker.activities = [
+        {"id": "div", "activity_type": "DIV", "date": "2026-10-22", "net_amount": "100"},
+        {"id": "tax", "activity_type": "DIVNRA", "date": "2026-10-22", "net_amount": "-30"},
+        {"id": "fee", "activity_type": "FEE", "date": "2026-10-22", "net_amount": "-10"},
+        {"id": "deposit", "activity_type": "CSD", "date": "2026-10-22", "net_amount": "500"},
+    ]
+    service.store.put(
+        "deposit", {"id": "deposit", "cash": "500", "reason": "verified capital flow"}, "adjustment"
+    )
+    broker.raw_account.update(cash="100560", equity="100560")
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=1, hours=6))
+    second = daily_report(service)
+    assert second["experiment_total_return"] == dec(".0006")
+    assert second["experiment_price_return"] == dec("-.0001")
+    assert second["daily_equity"][-1]["total_return"] == dec(".0006")
+    assert second["total_pnl"] == dec("60")
+    assert second["total_return_max_drawdown"] == 0
+    assert "price-only" in second["total_return_method"]
+    broker.activities += [
+        {"id": "fee-two", "activity_type": "FEE", "date": "2026-10-23", "net_amount": "-200"},
+        {"id": "withdraw", "activity_type": "CSW", "date": "2026-10-23", "net_amount": "-500"},
+    ]
+    service.store.put(
+        "withdraw", {"id": "withdraw", "cash": "-500", "reason": "verified withdrawal"}, "adjustment"
+    )
+    broker.raw_account.update(cash="99860", equity="99860")
+    monkeypatch.setattr("trader.reports.now", lambda: AT + timedelta(days=2, hours=6))
+    third = daily_report(service)
+    expected_daily = dec("100360") / dec("100560") - 1
+    assert third["daily_equity"][-1]["total_return"] == expected_daily
+    assert third["experiment_total_return"] == dec("1.0006") * (1 + expected_daily) - 1
+    assert abs(third["total_return_max_drawdown"] + expected_daily) < dec("1e-24")
+    assert third["total_pnl"] == dec("-140")

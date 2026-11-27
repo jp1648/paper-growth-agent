@@ -29,11 +29,14 @@ def test_research_once_and_pause(env, decision):
             self.calls += 1
             assert service.kill_path.exists()
             assert context["research_only"]
+            assert context["portfolio"]["prior_thesis"] == service.store.get("ACME", "thesis")
             return {
                 "team_reports": {key: {} for key in ("business", "catalysts", "valuation", "adversarial")},
                 "decision": decision.model_dump(mode="json"),
             }
 
+    prior = {"decision": decision.model_dump(mode="json"), "run_key": "prior-held"}
+    service.store.put("ACME", prior, "thesis")
     team = Team()
     result = acceptance.run(service, "research", "ACME", "one", team=team)
     assert result["status"] == "complete"
@@ -43,6 +46,51 @@ def test_research_once_and_pause(env, decision):
         acceptance.run(service, "research", "ACME", "one", team=team)
     assert team.calls == 1
     assert service.kill_path.read_text() == "operator pause"
+
+
+def test_durable_acceptance_reenters_original_context_and_preserves_pause(env, decision, monkeypatch):
+    from trader.research_client import ResearchPending, TemporalResearchClient
+
+    service, _, _ = env
+    prepare(service, decision)
+    service.cfg = service.cfg.model_copy(update={"temporal_address": "127.0.0.1:7233"})
+    prior = {"decision": decision.model_dump(mode="json"), "run_key": "prior-held"}
+    service.store.put("ACME", prior, "thesis")
+    pause_stat = service.kill_path.stat().st_mtime_ns
+    contexts = []
+
+    def start(self, context):
+        contexts.append(context)
+        if len(contexts) == 1:
+            raise ResearchPending({"run_key": "durable", "manifest_hash": "a" * 64})
+        return {
+            "team_reports": {key: {} for key in ("business", "catalysts", "valuation", "adversarial")},
+            "decision": decision.model_dump(mode="json"),
+        }
+
+    monkeypatch.setattr(TemporalResearchClient, "start", start)
+    assert acceptance.run(service, "research", "ACME", "durable")["status"] == "pending"
+    assert contexts[0]["portfolio"]["prior_thesis"] == prior
+    service.store.put("ACME", {"run_key": "changed-after-admission"}, "thesis")
+    # Re-entry must not fetch a new quote or retain the caller's account lock.
+    monkeypatch.setattr(acceptance, "research_input", lambda *a, **kw: pytest.fail("new context"))
+    with service.lock():
+        pass
+    assert acceptance.run(service, "research", "ACME", "durable")["status"] == "complete"
+    assert acceptance.dumps(contexts[0]) == acceptance.dumps(contexts[1])
+    assert service.kill_path.stat().st_mtime_ns == pause_stat
+    assert not service.store.items("intent")
+    with pytest.raises(RuntimeError, match="already attempted"):
+        acceptance.run(service, "research", "ACME", "durable")
+
+
+def test_durable_acceptance_rejects_limit_overrides(env, decision):
+    service, _, _ = env
+    prepare(service, decision)
+    service.cfg = service.cfg.model_copy(update={"temporal_address": "127.0.0.1:7233"})
+    with pytest.raises(ValueError, match="configured limits"):
+        acceptance.run(service, "research", "ACME", "durable", unrestricted_research=True)
+    assert service.store.get("durable", "acceptance") is None
 
 
 @pytest.mark.parametrize("stage", ["before", "after"])
@@ -138,10 +186,10 @@ def test_real_deepagents_under_acceptance_lock(env, decision):
 def test_closed_market_uses_completed_regular_session(env):
     service, broker, _ = env
     broker.open = False
-    result = acceptance.research_price(service, "ACME")
+    result = acceptance.research_input(service, "ACME", deferred=True)["research_reference"]
     assert result["historical"] and result["executable"] is False
-    assert result["timestamp"].startswith("2026-10-20T16:00")
-    assert result["reference_price"] == "100"
+    assert result["session_closed_at"].startswith("2026-10-20T16:00")
+    assert result["price"] == "100"
 
 
 def test_fill_requires_matching_activity_quantity(env, decision):

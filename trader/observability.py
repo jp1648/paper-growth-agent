@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
 CREATE INDEX IF NOT EXISTS telemetry_trace ON telemetry_events(trace_id, at);
 CREATE INDEX IF NOT EXISTS telemetry_run ON telemetry_events(run_key, at);
 CREATE INDEX IF NOT EXISTS telemetry_name ON telemetry_events(name, at);
-CREATE INDEX IF NOT EXISTS telemetry_payload ON telemetry_events USING gin(payload);
 """
 
 
@@ -94,9 +93,12 @@ class Sink:
         self.export_lock = self.path.with_suffix(".export.lock")
         self.export_lock.touch(mode=0o600, exist_ok=True)
         with self.db() as db:
+            # Monitoring reads must not block event commits while a backlog is scanned.
+            db.execute("PRAGMA journal_mode=WAL")
             db.execute("CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, body TEXT NOT NULL)")
         self.stop = threading.Event()
         self.lock = threading.Lock()
+        self.write_lock = threading.Lock()
         self.thread = None
         if start:
             self.thread = threading.Thread(target=self.work, daemon=True, name="telemetry-export")
@@ -126,7 +128,8 @@ class Sink:
             "phase": phase,
             "payload": clean(payload),
         }
-        with self.db() as db:
+        # Queue this sink's producers instead of competing for SQLite's busy timeout.
+        with self.write_lock, self.db() as db:
             db.execute("INSERT INTO outbox VALUES (?, ?)", (row["event_id"], json.dumps(row)))
 
     def flush(self):
@@ -138,6 +141,13 @@ class Sink:
             rows = db.execute("SELECT id, body FROM outbox ORDER BY rowid LIMIT 200").fetchall()
             if not rows:
                 return 0
+            # A count-only batch can contain hundreds of megabytes of model/report payloads.
+            size = 0
+            for index, (_, body) in enumerate(rows):
+                size += len(body.encode("utf-8"))
+                if index and size > 4 * 1024 * 1024:
+                    rows = rows[:index]
+                    break
             with psycopg.connect(self.dsn, connect_timeout=2, options="-c statement_timeout=30000") as pg:
                 # Hosted writers only need INSERT/SELECT; schema provisioning belongs to migration.
                 if pg.execute("SELECT to_regclass('public.telemetry_events')").fetchone()[0] is None:
@@ -165,13 +175,17 @@ class Sink:
                 if failed:
                     LOG.warning("Telemetry Postgres export recovered")
                 failed = False
-            except Exception:  # noqa: BLE001 - telemetry must not change trading behavior
+            except Exception as error:  # noqa: BLE001 - only research opts into fail-closed persistence
                 if not failed:
-                    LOG.warning("Telemetry export unavailable; events retained in local outbox")
+                    LOG.warning(
+                        "Telemetry export unavailable (%s, SQLSTATE %s); events retained in local outbox",
+                        type(error).__name__,
+                        getattr(error, "sqlstate", None),
+                    )
                 failed, count = True, 0
             if self.stop.is_set():
                 return
-            if count < 200:
+            if count == 0:
                 self.stop.wait(2 if not failed else 15)
 
     def close(self):
@@ -199,11 +213,15 @@ def configure(ledger):
             _sink = Sink(
                 Path(ledger).parent / "telemetry-outbox.sqlite", os.environ["OBSERVABILITY_DATABASE_URL"]
             )
-        except Exception:  # noqa: BLE001 - telemetry must not change trading behavior
+        except Exception:  # noqa: BLE001 - only research opts into fail-closed persistence
             LOG.error("Telemetry local outbox unavailable; trading ledger remains authoritative")
 
 
-def emit(name, payload, phase="event", **context):
+class TracePersistenceError(RuntimeError):
+    pass
+
+
+def emit(name, payload, phase="event", *, required=False, **context):
     if _sink is not None:
         try:
             _sink.emit(
@@ -212,8 +230,12 @@ def emit(name, payload, phase="event", **context):
                 payload,
                 {**(CONTEXT.get() or {}), **{k: v for k, v in context.items() if v is not None}},
             )
-        except Exception:  # noqa: BLE001 - telemetry must not change trading behavior
+        except Exception:  # noqa: BLE001 - only research opts into fail-closed persistence
             LOG.error("Telemetry event could not be persisted: %s", name)
+            if required:
+                raise TracePersistenceError("Required research trace could not be persisted") from None
+    elif required and os.environ.get("OBSERVABILITY_DATABASE_URL"):
+        raise TracePersistenceError("Configured research trace outbox is unavailable")
 
 
 @contextmanager
