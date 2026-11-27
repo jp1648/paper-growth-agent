@@ -6676,3 +6676,21 @@ is pending, and cached acceptance is complete. The current reconciled ledger
 snapshot remains $99,655.93 cash, one AAPL share and no open orders; this verification
 did not make a new broker call. Post-restore proof SHA-256:
 `285d1f06f265f1a37918fb2d9dc2dfacac642ebc61cd0c15f6adc5733518056c`.
+
+
+### November 27 — supervised operating date advanced, formal cohort unchanged
+
+Under the user’s instruction to proceed with Monday paper trading, the operator
+scheduled current AAPL research for Sunday, November 29 at 23:15 New York, and
+one supervised cycle for Monday, November 30 at 10:00, replacing the earlier
+late-Monday/Tuesday operating sequence. The approved ceiling stays $40 total,
+$20 per attempt/day and a $15 buffer, with no automatic retries. Exact fresh funding,
+current research acceptance/publication and independent controller/watchdog review
+remain prerequisites. The proposed funding expiry is narrowed to Monday at 16:00 New York;
+the inherited funding arithmetic is planning evidence, not a fresh balance check.
+
+The formal December 1 cohort is still unactivated. These two attempts are separate
+preopening work and do not count toward formal scheduled outcomes. Preserve the
+November 30 close baseline, original experiment, positions, audit history and pause;
+any actual Monday fills/claims must be reconciled into that baseline. No paid call,
+funding installation, order or unpause occurred while preparing this proposal.

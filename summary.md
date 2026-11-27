@@ -28,8 +28,13 @@ Current-evidence refresh is deployed as `a446f328`; 1,973 offline tests, CI,
 independent deployment review and clean worker shutdown passed. The first-cycle
 supervisor remains subject to exact opening-state approval. The user approved a $40 total bounded opening budget; dated allocation
 installation and fresh funding checks are still required. The revised plan keeps
-$20/day by separating late-November-30 research and the December-1 cycle. No new
-model spend or orders occurred in this audit.
+$20/day. The user subsequently advanced the supervised operating cycle: one
+research-only attempt Sunday November 29 at 23:15 New York, then one Monday
+November 30 cycle at 10:00 if current acceptance and safety gates pass. The same
+$40 total and $15 buffer apply, with no retries. This Monday cycle is outside the
+unactivated December 1 formal cohort and does not count as a study result.
+Fresh funding and a separately reviewed Monday watchdog/controller are required.
+No new model spend or orders occurred in this audit.
 See [paper-opening readiness](docs/paper-opening-readiness.md) for the gates.
 
 Latest November 27 result: **the durable AAPL historical investment decision is

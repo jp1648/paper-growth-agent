@@ -33,7 +33,7 @@ and remain uncommitted.
 | Recovery | Last retained off-host checkpoint predates new funding and accepted research | Fresh consistent checkpoint and verified off-host generation after final installed state |
 | Notifications | Telegram configured; earlier fill notification has a sent receipt | Preserve broker-confirmed-fill-only deduplication; do not send test spam |
 
-A fresh research result prepared now may expire before Tuesday's opening. Final
+A fresh research result prepared now may expire before the next authorized cycle. Final
 current review must be timed inside the ordinary reuse window; changing dates or
 clearing old flags is not a substitute. This audit file alone does not authorize paid work; the separate bounded
 user approval below governs future attempts.
@@ -146,3 +146,29 @@ watchdog and fresh installed study/funding/thesis bindings. It waits on only the
 admitted workflow, then permits one exact cached completion through normal risk
 and execution gates. It restores pause on completion, failure or deadline; any
 unfinished charge or order requires reconciliation, not an automatic retry.
+
+
+## Updated operating dates — Monday supervised cycle
+
+Under the user’s instruction to proceed with Monday paper trading, the operator
+scheduled one bounded cycle for **Monday, November 30 at 10:00 New York**, preceded
+by research on **Sunday, November 29 at 23:15 New York**. This supersedes only the Tuesday operational sequence
+above. The formal December1 study remains unactivated and separate; neither
+attempt counts toward its prospective outcomes. Retain old proposals and history.
+
+The same $40 total ($20 each on separate New York dates), ordinary $20/day and
+$15 buffer apply, with no automatic retries. Research may use the independently reviewed temporary1200second/
+320k/128tool envelope and must settle/restore ordinary settings before midnight.
+A missed start, blocked/unknown charge or incomplete independent acceptance keeps
+Monday paused. The10h45 interval fits within12hours only if actual evidence/report
+freshness and all current checks also pass; never date-forward stale inputs.
+
+The revised proposal narrows allocation expiry to Monday16:00NY/21UTC and requires
+fresh credit/ledger checks before installation. A separately reviewed Monday
+single-admission operational controller and10:20NY watchdog are required; the
+December1 formal-slot controller/guard is not silently reused or backdated.
+There is no formal study activation or guaranteed trade. Any resulting paper
+inventory/claims remain in the original account and must enter the actual
+November30 closing baseline; no automatic liquidation/reset is allowed.
+
+Private preserved proposal: `state/supervised-monday-opening-20261130/`.
