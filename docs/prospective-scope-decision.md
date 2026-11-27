@@ -58,10 +58,11 @@ safety reviews remain recorded. Never reclassify an unsuccessful sufficient case
 after seeing its result merely to improve the completion rate. Independently
 reviewed economic acceptance remains distinct from mechanical completion.
 
-The current ordinary model caps are $6 per New York day and $6 per run.
-Thirty-six runs each consuming the maximum would cost $216 in model usage. This is
+As verified against the paused runtime on November 27, the ordinary model caps
+are $20 per New York day and $20 per run. Thirty-six runs each consuming the
+maximum would cost $720 in model usage. This is
 scenario arithmetic, not a forecast, new budget approval or guaranteed successful
-research. Two $6 runs cannot fit the same $6 day. Schedule at most one full-cap
+research. Two $20 runs cannot fit the same $20 day. Schedule at most one full-cap
 attempt per day; any additional calls must fit the actual remaining allowance,
 confirmed provider credit and conservative buffer. Unknown charges/reservations
 remain liabilities. Failed attempts and required independent review costs count.
@@ -70,14 +71,17 @@ its settled costs remain in gross spending and provider-credit deductions. Unkno
 charges block both modes. No testing override is permitted within this study, and
 ordinary safety reviews share its daily allowance. Historical charges are never
 removed or relabeled.
-At 60 sessions the daily ceilings sum to $360, but that is neither a funding
+At 60 sessions the daily ceilings sum to $1,200, but that is neither a funding
 balance nor authorization to spend that total. Existing per-call/run safeguards
 continue to control every attempt; do not stretch capped runs to meet a quota.
 
-The retained confirmed $100 grant expires November 29, 2026. It is partly used,
-not $100 presently available. Even an unspent grant would not fund the above
-$180 maximum-use scenario and does not establish funding throughout a twelve-week
-study beginning in November. Do not assume renewal or purchase credits. Before
+The historical November 1 $100 grant receipt expires November 29, 2026; it is
+not a current balance. The authenticated November 27 observation instead showed
+$111.84 split between $100 expiring December 10 and $11.84 expiring November 29.
+Neither that observation nor an unspent $100 grant funds the $720 maximum-use
+scenario or establishes funding throughout a twelve-week study. Current allocation,
+known spending, unreflected-usage holdbacks and the retained $15 buffer remain
+separate admission checks. Do not assume renewal or purchase credits. Before
 activation, document a realistic funded schedule and what happens when funding
 expires; prove available credit before each paid run. This document does not
 certify the current provider balance or costs outside this project.
@@ -183,10 +187,11 @@ inside the original experiment expiry; there is no implicit extension or reset.
 
 Funding requires a separate retained provider-confirmed available-credit record,
 verified within 30 minutes, unexpired beyond the bounded run deadline, with a
-minimum $10 buffer and a digest of the current settled global model-spend ledger.
+minimum $10 buffer under the original November 9 rule (the current reviewed
+receipt retains $15) and a digest of the current settled global model-spend ledger.
 Every active-study investigation, including safety research, rechecks this inside
 the atomic model-budget reservation. Spending changes invalidate the receipt;
-unknown charges block. A full capped run must fit both the remaining $6 daily
+unknown charges block. A full capped run must fit both the remaining ordinary $20 daily
 allowance and available credit; unbounded research is forbidden. No runtime code
 purchases credits or infers renewal. Ordinary manual graph calls cannot bypass the
 study route. Calendar/clock/config/source changes fail closed; existing execution,

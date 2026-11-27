@@ -10,6 +10,30 @@ The existing `evaluations/forward-paper-v1.json` remains authoritative: at least
 60 regular sessions **and** 12 calendar weeks, with all failed attempts retained.
 An exact future opening manifest still requires explicit operator activation.
 
+## November 27 readiness clarification
+
+The 60-session/12-week observation window and minimum 30 independently accepted
+investigations are **prospective trial outcomes**, not counts that must already
+be completed before opening. Before opening, the required research acceptance,
+five-company sufficiency templates, current held-position review, measurement
+conventions, funded schedule, safety controls and exact operator approval must
+still pass. A historical accepted analysis does not automatically refresh or
+promote the current held-position thesis.
+
+The November 27 close has elapsed. The next candidate preserves the boundary
+rule below: approve and capture the November 30 closing baseline prospectively,
+then begin session one December 1. The broker-backed draft contains 60 sessions
+through February 26, 2027 and 36 research opportunities. It is unapproved. Freeze
+the measurement protocol, cohort and exact activation conditions before the
+baseline close; capture that baseline while paused. Current research, funding,
+portfolio and safety acceptance must pass before dispatch the next morning.
+If opening fails, retain the baseline and failed/missed opening as a protocol
+outcome; never silently replace it after inspecting returns. A later cohort
+requires a new prospective amendment retaining that failure. November 30 baseline
+collection need not submit any order. Existing
+research allocation expiry must be checked separately; a draft calendar grants
+no funding or trading authority.
+
 ## Opening boundary and comparators
 
 Approve the manifest before a future broker-calendar regular-session close. That

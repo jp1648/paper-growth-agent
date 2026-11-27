@@ -17,6 +17,21 @@ observability data for a password-protected, read-only Next.js dashboard.
 
 ## Last recorded status
 
+November 27 paper-opening audit: **paused; activation checks remain incomplete**.
+Fresh broker checks confirm the original one AAPL share, $99,655.93 cash and no
+open orders. Runtime/reconciliation are healthy, but the active held-position
+thesis is overdue. Historical acceptance below does not refresh that thesis.
+The next prospective measurement candidate uses November 30 close as baseline
+and December 1 as session one; it is not activated. A reviewed December 1 close
+re-pause guard is installed, preserving the original pause and guard history.
+Current-evidence refresh is deployed as `a446f328`; 1,973 offline tests, CI,
+independent deployment review and clean worker shutdown passed. The first-cycle
+supervisor remains subject to exact opening-state approval. The user approved a $40 total bounded opening budget; dated allocation
+installation and fresh funding checks are still required. The revised plan keeps
+$20/day by separating late-November-30 research and the December-1 cycle. No new
+model spend or orders occurred in this audit.
+See [paper-opening readiness](docs/paper-opening-readiness.md) for the gates.
+
 Latest November 27 result: **the durable AAPL historical investment decision is
 independently accepted; trading remains paused**. Run
 `held-aapl-synthesis-revision-20261126-1` completed one model call and zero tools
