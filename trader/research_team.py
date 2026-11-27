@@ -610,6 +610,9 @@ class Guard(AgentMiddleware):
                     context = None
                 if isinstance(context, dict):
                     original = context
+                    from .research_refresh import project_refresh_context
+
+                    context = project_refresh_context(context)
                     if "analytical_hypothesis" in context:
                         hypothesis = compact_hypothesis(context["analytical_hypothesis"])
                         if hypothesis is not context["analytical_hypothesis"]:
@@ -3059,6 +3062,15 @@ class ResearchDesk:
                     "same_as": "normalization_bridge.historical_provenance",
                     "note": f"Context projection only; read_source({identifier}) returns the full saved calculation.",
                 }
+        if self.context.get("continuation", {}).get("mode") == "current_refresh":
+            from .research_refresh import calculation_index
+
+            return calculation_index(
+                self.calculations,
+                calculations,
+                self.reports,
+                set(self.continuation.get("parent_lineage", {}).get("historical_calculation_ids", [])),
+            )
         return calculations
 
     def run_reviewed_synthesis(self):

@@ -310,6 +310,12 @@ def _export_parent_bundle(root, reference, store, *, allow_continuation, allow_c
 
 def validate_parent_state(store, root, bundle):
     """Revalidate authoritative originals, including every journal table, without mutation."""
+    if bundle.get("schema") == "research-current-refresh-v1":
+        from .research_refresh import export_refresh_bundle
+
+        actual = export_refresh_bundle(root, bundle["parent"], store, bundle["evidence_delta"])
+        _require(fingerprint(actual) == fingerprint(bundle), "Refresh parent artifacts changed")
+        return
     if "revision" in bundle:
         from .research_synthesis_revision import export_revision_bundle
 
@@ -333,6 +339,18 @@ def validate_bundle(
     bundle, child_context, expected_sha256, *, experiment_id, cfg, current=None, current_snapshot=None
 ):
     current = current or now()
+    if bundle.get("schema") == "research-current-refresh-v1":
+        from .research_refresh import validate_refresh_bundle
+
+        return validate_refresh_bundle(
+            bundle,
+            child_context,
+            expected_sha256,
+            experiment_id=experiment_id,
+            cfg=cfg,
+            current=current,
+            current_snapshot=current_snapshot,
+        )
     synthesis = bundle.get("schema") == SYNTHESIS_SCHEMA
     _require(
         bundle.get("schema") in {SCHEMA, SYNTHESIS_SCHEMA} and fingerprint(bundle) == expected_sha256,
@@ -490,6 +508,10 @@ def import_into_desk(desk, bundle):
     """
     from .research_team import ROLES
 
+    if bundle.get("schema") == "research-current-refresh-v1":
+        from .research_refresh import import_refresh
+
+        return import_refresh(desk, bundle)
     _require(
         not desk.reports and not desk.calculations and not desk.correction and not desk.continuation,
         "Child desk is not fresh",
@@ -579,7 +601,7 @@ def import_into_desk(desk, bundle):
 def accounted_ancestry_cost(bundle):
     """Call only after complete bundle and authoritative parent validation."""
     cost = dec(bundle["spend"]["body"]["usd"])
-    if bundle.get("schema") == SYNTHESIS_SCHEMA:
+    if bundle.get("schema") in {SYNTHESIS_SCHEMA, "research-current-refresh-v1"}:
         cost += accounted_ancestry_cost(bundle["ancestor_bundle"])
     return cost
 

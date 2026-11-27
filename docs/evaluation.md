@@ -497,3 +497,47 @@ are separate unaccepted evidence; original reports, calculations, timestamps and
 gap flags do not change. New revisions start a fresh bounded budget and make one
 tool-free lead call. This mechanism grants neither additional budget nor a retry;
 exact new authorization and independent output review are still required.
+
+### Current evidence refresh after a historical synthesis
+
+A `current_refresh` continuation uses a new immutable run and explicit bounded
+continuation authority. Its `research-current-refresh-v1` bundle binds a completed
+synthesis, the original source/calculation history, a current portfolio, and an
+independently captured evidence delta. The delta must cover the interval starting
+no later than the original evidence cutoff, with saved filings, news and issuer
+coverage records (including explicit partial/unavailable results), and a current
+quote or clearly nonexecutable historical reference. A new completion date does
+not turn historical evidence into current evidence.
+
+Import locally replays the historical calculations but imports **no reports as
+fresh**. Business, catalysts, valuation, adversarial review and the lead all run
+again under the ordinary durable checkpoints, cost limits and correction rules.
+The original reports and their flags remain labeled historical context; original
+source and company dates remain unchanged. Every material delta must be assessed
+and affected assumptions recalculated. Successful import or fresh report dates
+alone do not establish investment acceptance. Publication still requires the
+existing independent acceptance procedure, and execution retains its existing
+conservative news/filing, cash, risk and reconciliation gates. This path never
+publishes a thesis, clears a pause, or submits an order by itself.
+
+Capture and any separately authorized paid run should occur close enough to the
+intended paper session to satisfy the ordinary 12-hour research window. An
+opening-day packet also needs fresh funding evidence and an unexpired allocation;
+a historical approval or expired grant cannot be carried forward by changing a
+date. The offline refresh tests exercise the real durable stage graph with a fake
+model; they do not establish provider cost, economic acceptance or live freshness.
+
+For this refresh mode only, the model initially receives an explicit index of
+historical calculations that no fresh report references. It retains exact scalar
+outcomes, original variant-family identifiers, and a canonical hash; full inputs
+and patch provenance are explicitly omitted from that index. The existing
+`read_source` tool returns every page of the unchanged canonical calculation.
+Calculations referenced by fresh reports stay fully represented in model context.
+Targeted reads should establish the material assumptions, rather than rereading
+all historical variants. Superseded hypothesis and navigation text are omitted
+with hashes; the operationally active prior thesis's complete decision, triggers,
+review date and identity remain in a summary. Historical reports, their gaps,
+prior decision and analytical addendum stay available. These are disclosed model
+view selections, not lossless compression or economic validation. Large retrieval
+transcripts may still hit the unchanged context limit; offline tail measurement
+is required before authorizing a run.

@@ -20,7 +20,7 @@ def validate_descriptor(value):
             {"parent", "bundle_sha256", "mode"},
             {"parent", "bundle_sha256", "mode", "revision_of"},
         )
-        or ("mode" in value and value["mode"] != "reviewed_synthesis")
+        or ("mode" in value and value["mode"] not in {"reviewed_synthesis", "current_refresh"})
         or (
             "revision_of" in value
             and (value.get("mode") != "reviewed_synthesis" or value["revision_of"] != value["parent"])

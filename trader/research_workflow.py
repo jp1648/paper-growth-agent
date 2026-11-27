@@ -49,7 +49,7 @@ class StageBudgetError(Exception):
 
 def valid_stage(stage: object) -> bool:
     return isinstance(stage, str) and (
-        stage in (*STAGES, "import", "synthesis_import")
+        stage in (*STAGES, "import", "synthesis_import", "refresh_import")
         or stage.startswith("correction:")
         and stage.removeprefix("correction:") in CORRECTION_ROLES
     )
@@ -84,6 +84,8 @@ def valid_transition(stage: str, receipt: dict[str, str]) -> bool:
     if receipt["status"] != "next":
         return receipt["status"] == "blocked" or stage in STAGES
     next_stage = receipt["next_stage"]
+    if stage == "refresh_import":
+        return next_stage == "business"
     if stage == "synthesis_import":
         return next_stage == "lead"
     if stage == "import":
@@ -91,7 +93,7 @@ def valid_transition(stage: str, receipt: dict[str, str]) -> bool:
     if stage in STAGES[:-1]:
         allowed = {STAGES[STAGES.index(stage) + 1]}
         if stage == "acquisition":
-            allowed.update({"import", "synthesis_import"})
+            allowed.update({"import", "synthesis_import", "refresh_import"})
         if stage == "lead":
             allowed.update({"correction:business", "correction:catalysts", "correction:valuation"})
     else:
